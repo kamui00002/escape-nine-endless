@@ -53,7 +53,7 @@ struct BeatIndicatorView: View {
                     .foregroundColor(.white)
             }
             
-            Text("Beat: \(currentBeat)")
+            Text("ビート: \(currentBeat)")
                 .font(.fantasyCaption())
                 .foregroundColor(Color(hex: GameColors.textSecondary))
         }

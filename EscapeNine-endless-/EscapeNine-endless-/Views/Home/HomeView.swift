@@ -65,7 +65,7 @@ struct HomeView: View {
                             )
                             .shadow(color: Color(hex: GameColors.available).opacity(0.5), radius: 10)
                         
-                        Text("Endless Dungeon")
+                        Text("エンドレス・ダンジョン")
                             .font(.fantasySubheading())
                             .foregroundColor(Color(hex: GameColors.text).opacity(0.8))
                     }

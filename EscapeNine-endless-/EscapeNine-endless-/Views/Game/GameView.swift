@@ -196,11 +196,11 @@ struct GameView: View {
                                 .font(.system(size: 80))
                         }
                         
-                        Text("FLOOR \(viewModel.currentFloor)")
+                        Text("\(viewModel.currentFloor)階層")
                             .font(.fantasyHeading())
                             .foregroundColor(Color(hex: GameColors.available))
                         
-                        Text("CLEAR!")
+                        Text("クリア！")
                             .font(.fantasySubheading())
                             .foregroundColor(Color(hex: GameColors.textSecondary))
                         
@@ -220,7 +220,7 @@ struct GameView: View {
                             .frame(height: 2)
                             .padding(.horizontal, 60)
                         
-                        Text("Next: Floor \(viewModel.currentFloor + 1)")
+                        Text("次: \(viewModel.currentFloor + 1)階層")
                             .font(.fantasyBody())
                             .foregroundColor(Color(hex: GameColors.text).opacity(0.8))
                     }

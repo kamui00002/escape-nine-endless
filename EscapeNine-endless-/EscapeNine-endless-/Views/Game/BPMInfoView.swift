@@ -15,7 +15,7 @@ struct BPMInfoView: View {
         HStack(spacing: 12) {
             // 階層表示
             VStack(spacing: 4) {
-                Text("FLOOR")
+                Text("階層")
                     .font(.fantasyCaption())
                     .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
                 

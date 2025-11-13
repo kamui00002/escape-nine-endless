@@ -122,7 +122,7 @@ struct SettingsView: View {
                             .font(.fantasyBody())
                             .foregroundColor(Color(hex: GameColors.textSecondary))
                         
-                        Text("Version 1.0.0")
+                        Text("バージョン 1.0.0")
                             .font(.fantasyCaption())
                             .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
                         
