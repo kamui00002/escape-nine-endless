@@ -14,14 +14,16 @@ class PlayerViewModel: ObservableObject {
     @Published var unlockedCharacters: [CharacterType] = [.hero]
     @Published var selectedCharacter: CharacterType = .hero
     @Published var adRemoved: Bool = false
-    @Published var volume: Double = 0.7 // デフォルト音量（0.0-1.0）
+    @Published var bgmVolume: Double = 0.7 // BGM音量（0.0-1.0）
+    @Published var seVolume: Double = 0.7 // 効果音量（0.0-1.0）
     
     // MARK: - UserDefaults Keys
     private let highestFloorKey = "highestFloor"
     private let unlockedCharactersKey = "unlockedCharacters"
     private let selectedCharacterKey = "selectedCharacter"
     private let adRemovedKey = "adRemoved"
-    private let volumeKey = "volume"
+    private let bgmVolumeKey = "bgmVolume"
+    private let seVolumeKey = "seVolume"
     
     // MARK: - Initialization
     init() {
@@ -42,9 +44,13 @@ class PlayerViewModel: ObservableObject {
         }
         
         adRemoved = UserDefaults.standard.bool(forKey: adRemovedKey)
-        volume = UserDefaults.standard.double(forKey: volumeKey)
-        if volume == 0.0 {
-            volume = 0.7 // デフォルト値
+        bgmVolume = UserDefaults.standard.double(forKey: bgmVolumeKey)
+        if bgmVolume == 0.0 {
+            bgmVolume = 0.7 // デフォルト値
+        }
+        seVolume = UserDefaults.standard.double(forKey: seVolumeKey)
+        if seVolume == 0.0 {
+            seVolume = 0.7 // デフォルト値
         }
     }
     
@@ -53,7 +59,8 @@ class PlayerViewModel: ObservableObject {
         UserDefaults.standard.set(unlockedCharacters.map { $0.rawValue }, forKey: unlockedCharactersKey)
         UserDefaults.standard.set(selectedCharacter.rawValue, forKey: selectedCharacterKey)
         UserDefaults.standard.set(adRemoved, forKey: adRemovedKey)
-        UserDefaults.standard.set(volume, forKey: volumeKey)
+        UserDefaults.standard.set(bgmVolume, forKey: bgmVolumeKey)
+        UserDefaults.standard.set(seVolume, forKey: seVolumeKey)
     }
     
     // MARK: - Character Management

@@ -21,6 +21,9 @@ class GameViewModel: ObservableObject {
     @Published var specialRule: SpecialRule = .none // 現在の特殊ルール
     @Published var disappearedCells: Set<Int> = [] // 消失したマス
     @Published var showFloorClear: Bool = false // 階層クリア表示
+    @Published var isInvisible: Bool = false // 透明化状態
+    @Published var enemyStopped: Bool = false // 敵が停止しているか
+    @Published var isSkillActive: Bool = false // スキルがアクティブか（ダッシュ、斜め移動用）
     
     // MARK: - Dependencies
     private let beatEngine = BeatEngine()
@@ -31,6 +34,26 @@ class GameViewModel: ObservableObject {
     // MARK: - Constants
     private let maxTurns = Constants.maxTurns
     private let maxSkillUsage = Constants.maxSkillUsage
+    
+    // MARK: - Character & Skill
+    private weak var playerViewModelInstance: PlayerViewModel?
+    
+    var currentCharacter: Character {
+        let vm = playerViewModelInstance ?? PlayerViewModel()
+        return Character.getCharacter(for: vm.selectedCharacter)
+    }
+    
+    var currentSkill: Skill {
+        currentCharacter.skill
+    }
+    
+    var remainingSkillUses: Int {
+        currentSkill.maxUsage - skillUsageCount
+    }
+    
+    func setPlayerViewModel(_ viewModel: PlayerViewModel) {
+        playerViewModelInstance = viewModel
+    }
     
     // MARK: - Combine
     private var cancellables = Set<AnyCancellable>()
@@ -71,11 +94,40 @@ class GameViewModel: ObservableObject {
             return
         }
         
-        // 移動可能かチェック
-        guard gameEngine.isValidMove(from: playerPosition, to: nextPosition) else {
+        // 移動可能かチェック（スキルを考慮）
+        var isValid = false
+        var shouldConsumeSkill = false
+        
+        if isSkillActive {
+            // スキルがアクティブな場合
+            switch currentSkill.type {
+            case .dash:
+                isValid = gameEngine.isValidDashMove(from: playerPosition, to: nextPosition)
+                shouldConsumeSkill = isValid
+            case .diagonal:
+                isValid = gameEngine.isValidDiagonalMove(from: playerPosition, to: nextPosition) || gameEngine.isValidMove(from: playerPosition, to: nextPosition)
+                shouldConsumeSkill = gameEngine.isValidDiagonalMove(from: playerPosition, to: nextPosition)
+            default:
+                isValid = gameEngine.isValidMove(from: playerPosition, to: nextPosition)
+            }
+        } else if currentSkill.type == .diagonal {
+            // 盗賊の斜め移動は常時有効
+            isValid = gameEngine.isValidDiagonalMove(from: playerPosition, to: nextPosition) || gameEngine.isValidMove(from: playerPosition, to: nextPosition)
+            shouldConsumeSkill = gameEngine.isValidDiagonalMove(from: playerPosition, to: nextPosition)
+        } else {
+            isValid = gameEngine.isValidMove(from: playerPosition, to: nextPosition)
+        }
+        
+        guard isValid else {
             endGame(result: .lose)
             return
         }
+        
+        // スキル使用回数を消費（ダッシュ、斜め移動の場合）
+        if shouldConsumeSkill && remainingSkillUses > 0 {
+            skillUsageCount += 1
+        }
+        isSkillActive = false
         
         // 消失したマスに入っていないかチェック
         if disappearedCells.contains(nextPosition) {
@@ -88,13 +140,27 @@ class GameViewModel: ObservableObject {
         pendingPlayerMove = nil
         hasMovedThisBeat = true
         
-        // 敵の移動
-        moveEnemy()
+        // 敵の移動（拘束スキルを考慮）
+        if !enemyStopped {
+            moveEnemy()
+        } else {
+            // 拘束中は敵を移動させない
+            enemyStopped = false
+        }
         
-        // 衝突チェック
+        // 衝突チェック（透明化スキルを考慮）
         if playerPosition == enemyPosition {
-            endGame(result: .lose)
-            return
+            if currentSkill.type == .invisible && isInvisible && skillUsageCount < currentSkill.maxUsage {
+                // 透明化スキルで無敵
+                skillUsageCount += 1
+                // 次のビートで透明化を解除
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.isInvisible = false
+                }
+            } else {
+                endGame(result: .lose)
+                return
+            }
         }
         
         // ターン進行
@@ -122,6 +188,9 @@ class GameViewModel: ObservableObject {
         pendingPlayerMove = nil
         hasMovedThisBeat = false
         lastProcessedBeat = 0
+        isInvisible = false
+        enemyStopped = false
+        isSkillActive = false
         
         // ランダム配置（同じ位置にならないように）
         let playerPos = Int.random(in: 1...9)
@@ -134,7 +203,8 @@ class GameViewModel: ObservableObject {
         
         // BPM設定
         let bpm = stageManager.getBPM(for: currentFloor)
-        beatEngine.loadMusic(bpm: bpm)
+        let bgmVolume = playerViewModelInstance?.bgmVolume ?? 0.7
+        beatEngine.loadMusic(bpm: bpm, volume: bgmVolume)
         beatEngine.play()
         
         // 特殊ルール設定
@@ -158,9 +228,113 @@ class GameViewModel: ObservableObject {
     
     // 移動可能な位置を取得
     func getAvailableMoves() -> [Int] {
-        let moves = gameEngine.getAvailableMoves(from: playerPosition)
+        var moves: [Int] = []
+        
+        // 基本移動
+        moves.append(contentsOf: gameEngine.getAvailableMoves(from: playerPosition))
+        
+        // スキルによる追加移動
+        if isSkillActive {
+            switch currentSkill.type {
+            case .dash:
+                // ダッシュ: 2マス移動
+                let dashMoves = getDashMoves(from: playerPosition)
+                moves.append(contentsOf: dashMoves)
+            case .diagonal:
+                // 斜め移動
+                let diagonalMoves = getDiagonalMoves(from: playerPosition)
+                moves.append(contentsOf: diagonalMoves)
+            default:
+                break
+            }
+        } else if currentSkill.type == .diagonal && remainingSkillUses > 0 {
+            // 盗賊の斜め移動は常時有効
+            let diagonalMoves = getDiagonalMoves(from: playerPosition)
+            moves.append(contentsOf: diagonalMoves)
+        }
+        
         // 消失したマスを除外
-        return moves.filter { !disappearedCells.contains($0) }
+        return Array(Set(moves)).filter { !disappearedCells.contains($0) }
+    }
+    
+    private func getDashMoves(from position: Int) -> [Int] {
+        var moves: [Int] = []
+        let row = (position - 1) / 3
+        let col = (position - 1) % 3
+        
+        // 上2マス
+        if row >= 2 {
+            moves.append((row - 2) * 3 + col + 1)
+        }
+        // 下2マス
+        if row <= 0 {
+            moves.append((row + 2) * 3 + col + 1)
+        }
+        // 左2マス
+        if col >= 2 {
+            moves.append(row * 3 + (col - 2) + 1)
+        }
+        // 右2マス
+        if col <= 0 {
+            moves.append(row * 3 + (col + 2) + 1)
+        }
+        
+        return moves
+    }
+    
+    private func getDiagonalMoves(from position: Int) -> [Int] {
+        var moves: [Int] = []
+        let row = (position - 1) / 3
+        let col = (position - 1) % 3
+        
+        // 左上
+        if row > 0 && col > 0 {
+            moves.append((row - 1) * 3 + (col - 1) + 1)
+        }
+        // 右上
+        if row > 0 && col < 2 {
+            moves.append((row - 1) * 3 + (col + 1) + 1)
+        }
+        // 左下
+        if row < 2 && col > 0 {
+            moves.append((row + 1) * 3 + (col - 1) + 1)
+        }
+        // 右下
+        if row < 2 && col < 2 {
+            moves.append((row + 1) * 3 + (col + 1) + 1)
+        }
+        
+        return moves
+    }
+    
+    // MARK: - Skill Actions
+    func activateSkill() {
+        guard gameStatus == .playing else { return }
+        guard remainingSkillUses > 0 else { return }
+        
+        switch currentSkill.type {
+        case .dash:
+            // ダッシュ: 次の移動で2マス移動可能
+            isSkillActive = true
+        case .diagonal:
+            // 斜め移動: 常時有効なので何もしない
+            break
+        case .invisible:
+            // 透明化: アクティブにする
+            isInvisible = true
+        case .bind:
+            // 拘束: 敵を停止させる（敵をタップした時に発動）
+            break
+        }
+    }
+    
+    func bindEnemy() {
+        guard gameStatus == .playing else { return }
+        guard currentSkill.type == .bind else { return }
+        guard remainingSkillUses > 0 else { return }
+        
+        enemyStopped = true
+        skillUsageCount += 1
     }
     
     private func moveEnemy() {
@@ -187,6 +361,9 @@ class GameViewModel: ObservableObject {
         skillUsageCount = 0
         pendingPlayerMove = nil
         hasMovedThisBeat = false
+        isInvisible = false
+        enemyStopped = false
+        isSkillActive = false
         
         // 100階層でクリア
         if currentFloor > Constants.maxFloors {
@@ -196,7 +373,8 @@ class GameViewModel: ObservableObject {
         
         // BPM変更
         let newBPM = stageManager.getBPM(for: currentFloor)
-        beatEngine.changeBPM(newBPM)
+        let bgmVolume = playerViewModelInstance?.bgmVolume ?? 0.7
+        beatEngine.changeBPM(newBPM, volume: bgmVolume)
         
         // 特殊ルール設定
         specialRule = stageManager.getSpecialRule(for: currentFloor)
@@ -296,6 +474,9 @@ class GameViewModel: ObservableObject {
         specialRule = .none
         disappearedCells = []
         showFloorClear = false
+        isInvisible = false
+        enemyStopped = false
+        isSkillActive = false
     }
 }
 

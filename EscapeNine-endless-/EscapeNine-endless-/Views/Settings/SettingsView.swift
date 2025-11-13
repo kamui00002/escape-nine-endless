@@ -117,21 +117,45 @@ struct SettingsView: View {
                         .font(.fantasySubheading())
                         .foregroundColor(Color(hex: GameColors.text))
                     
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("音量")
-                                .font(.fantasyCaption())
-                                .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
-                            Spacer()
-                            Text("\(Int(playerViewModel.volume * 100))%")
-                                .font(.fantasyNumber())
-                                .foregroundColor(Color(hex: GameColors.available))
+                    VStack(alignment: .leading, spacing: 16) {
+                        // BGM音量
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("BGM")
+                                    .font(.fantasyCaption())
+                                    .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                                Spacer()
+                                Text("\(Int(playerViewModel.bgmVolume * 100))%")
+                                    .font(.fantasyNumber())
+                                    .foregroundColor(Color(hex: GameColors.available))
+                            }
+                            
+                            Slider(value: $playerViewModel.bgmVolume, in: 0...1) { _ in
+                                playerViewModel.saveData()
+                            }
+                            .tint(Color(hex: GameColors.available))
                         }
                         
-                        Slider(value: $playerViewModel.volume, in: 0...1) { _ in
-                            playerViewModel.saveData()
+                        Divider()
+                            .background(Color(hex: GameColors.gridBorder).opacity(0.3))
+                        
+                        // 効果音量
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("効果音")
+                                    .font(.fantasyCaption())
+                                    .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                                Spacer()
+                                Text("\(Int(playerViewModel.seVolume * 100))%")
+                                    .font(.fantasyNumber())
+                                    .foregroundColor(Color(hex: GameColors.available))
+                            }
+                            
+                            Slider(value: $playerViewModel.seVolume, in: 0...1) { _ in
+                                playerViewModel.saveData()
+                            }
+                            .tint(Color(hex: GameColors.available))
                         }
-                        .tint(Color(hex: GameColors.available))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

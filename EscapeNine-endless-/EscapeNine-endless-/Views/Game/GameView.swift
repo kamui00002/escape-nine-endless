@@ -14,6 +14,10 @@ struct GameView: View {
     @State private var showResult = false
     @State private var isGameStarted = false
     
+    init() {
+        // ViewModelにPlayerViewModelを設定
+    }
+    
     var body: some View {
         ZStack {
             // 背景グラデーション
@@ -90,15 +94,30 @@ struct GameView: View {
                     // Beat Indicator
                     BeatIndicatorView(currentBeat: viewModel.currentBeat)
                     
-                    // Turn Count（小さく）
-                    HStack(spacing: 8) {
-                        Text("ターン")
-                            .font(.fantasyCaption())
-                            .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                    // Turn Count & Skill Info
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            Text("ターン")
+                                .font(.fantasyCaption())
+                                .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                            
+                            Text("\(viewModel.turnCount) / \(Constants.maxTurns)")
+                                .font(.fantasyNumber())
+                                .foregroundColor(Color(hex: GameColors.available))
+                        }
                         
-                        Text("\(viewModel.turnCount) / \(Constants.maxTurns)")
-                            .font(.fantasyNumber())
-                            .foregroundColor(Color(hex: GameColors.available))
+                        // スキル残回数表示
+                        if viewModel.currentSkill.type != .diagonal {
+                            HStack(spacing: 8) {
+                                Text("\(viewModel.currentSkill.name)")
+                                    .font(.fantasyCaption())
+                                    .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                                
+                                Text("\(viewModel.remainingSkillUses) / \(viewModel.currentSkill.maxUsage)")
+                                    .font(.fantasyNumber())
+                                    .foregroundColor(viewModel.remainingSkillUses > 0 ? Color(hex: GameColors.available) : Color(hex: GameColors.warning))
+                            }
+                        }
                     }
                     
                     // Grid Board（大きく中央に）
@@ -116,8 +135,52 @@ struct GameView: View {
                         onCellTap: { position in
                             viewModel.selectMove(to: position)
                         },
+                        onEnemyTap: {
+                            // エルフの拘束スキル: 敵をタップで発動
+                            if viewModel.currentSkill.type == .bind {
+                                viewModel.bindEnemy()
+                            }
+                        },
                         disabled: viewModel.gameStatus != .playing
                     )
+                    
+                    // スキルボタン（ダッシュ、透明化の場合）
+                    if viewModel.currentSkill.type == .dash || viewModel.currentSkill.type == .invisible {
+                        Button(action: {
+                            viewModel.activateSkill()
+                        }) {
+                            HStack(spacing: 8) {
+                                Text(viewModel.currentSkill.name)
+                                    .font(.fantasyBody())
+                                Text("(残り\(viewModel.remainingSkillUses)回)")
+                                    .font(.fantasyCaption())
+                            }
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: 200)
+                            .background(
+                                viewModel.remainingSkillUses > 0 ?
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.available),
+                                        Color(hex: GameColors.main)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ) :
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.gridBorder).opacity(0.5),
+                                        Color(hex: GameColors.main).opacity(0.3)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(12)
+                        }
+                        .disabled(viewModel.remainingSkillUses <= 0 || viewModel.gameStatus != .playing)
+                    }
                     
                     // 特殊ルール表示
                     if viewModel.specialRule != .none {
@@ -347,6 +410,9 @@ struct GameView: View {
                     }
                 }
             }
+        }
+        .onAppear {
+            viewModel.setPlayerViewModel(playerViewModel)
         }
         .onChange(of: viewModel.gameStatus) {
             if viewModel.gameStatus == .win || viewModel.gameStatus == .lose {

@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var showGame = false
     @State private var showRanking = false
     @State private var showSettings = false
+    @State private var showCharacterSelection = false
     
     var body: some View {
         NavigationStack {
@@ -109,6 +110,34 @@ struct HomeView: View {
                         }
                         
                         Button(action: {
+                            showCharacterSelection = true
+                        }) {
+                            Text("キャラクター")
+                                .font(.fantasyBody())
+                                .foregroundColor(Color(hex: GameColors.text))
+                                .frame(maxWidth: 280)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(hex: GameColors.backgroundSecondary))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(
+                                                    LinearGradient(
+                                                        colors: [
+                                                            Color(hex: GameColors.gridBorder).opacity(0.5),
+                                                            Color(hex: GameColors.main).opacity(0.3)
+                                                        ],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ),
+                                                    lineWidth: 2
+                                                )
+                                        )
+                                )
+                        }
+                        
+                        Button(action: {
                             showSettings = true
                         }) {
                             Text("設定")
@@ -161,6 +190,9 @@ struct HomeView: View {
             }
             .navigationDestination(isPresented: $showSettings) {
                 SettingsView()
+            }
+            .navigationDestination(isPresented: $showCharacterSelection) {
+                CharacterSelectionView()
             }
         }
     }

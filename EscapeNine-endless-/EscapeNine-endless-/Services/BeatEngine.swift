@@ -42,7 +42,7 @@ class BeatEngine: ObservableObject {
     }
     
     // MARK: - Load Music
-    func loadMusic(bpm: Double) {
+    func loadMusic(bpm: Double, volume: Double = 0.7) {
         self.bpm = bpm
         self.beatInterval = 60.0 / bpm
         
@@ -59,11 +59,16 @@ class BeatEngine: ObservableObject {
         
         do {
             audioPlayer = try AVAudioPlayer(contentsOf: url)
+            audioPlayer?.volume = Float(volume)
             audioPlayer?.prepareToPlay()
             audioPlayer?.numberOfLoops = -1 // 無限ループ
         } catch {
             print("Failed to load BGM: \(error)")
         }
+    }
+    
+    func setVolume(_ volume: Double) {
+        audioPlayer?.volume = Float(volume)
     }
     
     // MARK: - Playback Control
@@ -135,9 +140,9 @@ class BeatEngine: ObservableObject {
     }
     
     // MARK: - BPM Change
-    func changeBPM(_ newBPM: Double) {
+    func changeBPM(_ newBPM: Double, volume: Double = 0.7) {
         stop()
-        loadMusic(bpm: newBPM)
+        loadMusic(bpm: newBPM, volume: volume)
         play()
     }
     

@@ -45,5 +45,33 @@ struct Character {
     let isFree: Bool
     let price: Int?
     let spriteName: String
+    
+    static func getCharacter(for type: CharacterType) -> Character {
+        let skill: Skill
+        switch type {
+        case .hero:
+            skill = Skill(type: .dash, name: "ダッシュ", description: "2マス移動できる", maxUsage: 5)
+        case .thief:
+            skill = Skill(type: .diagonal, name: "斜め移動", description: "斜め方向に移動可能", maxUsage: 5)
+        case .wizard:
+            skill = Skill(type: .invisible, name: "透明化", description: "鬼に当たっても無敵", maxUsage: 3)
+        case .elf:
+            skill = Skill(type: .bind, name: "拘束", description: "鬼を1ターン停止させる", maxUsage: 3)
+        }
+        
+        return Character(
+            id: type.rawValue,
+            type: type,
+            name: type.name,
+            skill: skill,
+            isFree: type.isFree,
+            price: type.price,
+            spriteName: type.rawValue
+        )
+    }
+    
+    static var defaultCharacter: Character {
+        return getCharacter(for: .hero)
+    }
 }
 
