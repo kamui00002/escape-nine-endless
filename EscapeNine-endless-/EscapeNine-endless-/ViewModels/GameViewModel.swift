@@ -150,7 +150,7 @@ class GameViewModel: ObservableObject {
         
         // 衝突チェック（透明化スキルを考慮）
         if playerPosition == enemyPosition {
-            if currentSkill.type == .invisible && isInvisible && skillUsageCount < currentSkill.maxUsage {
+            if currentSkill.type == .invisible && isInvisible && remainingSkillUses > 0 {
                 // 透明化スキルで無敵
                 skillUsageCount += 1
                 // 次のビートで透明化を解除
@@ -217,8 +217,16 @@ class GameViewModel: ObservableObject {
         guard gameStatus == .playing else { return }
         guard !hasMovedThisBeat else { return } // 既にこのビートで移動済み
         
+        // 移動可能な位置を取得（スキルを考慮）
+        let availableMoves = getAvailableMoves()
+        
         // 移動可能かチェック
-        guard gameEngine.isValidMove(from: playerPosition, to: position) else {
+        guard availableMoves.contains(position) else {
+            return
+        }
+        
+        // 消失したマスに入っていないかチェック
+        guard !disappearedCells.contains(position) else {
             return
         }
         

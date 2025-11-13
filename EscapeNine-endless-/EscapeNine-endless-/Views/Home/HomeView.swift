@@ -82,9 +82,9 @@ struct HomeView: View {
                         }
                         
                         Button(action: {
-                            showRanking = true
+                            showCharacterSelection = true
                         }) {
-                            Text("ランキング")
+                            Text("キャラクター")
                                 .font(.fantasyBody())
                                 .foregroundColor(Color(hex: GameColors.text))
                                 .frame(maxWidth: 280)
@@ -110,9 +110,9 @@ struct HomeView: View {
                         }
                         
                         Button(action: {
-                            showCharacterSelection = true
+                            showRanking = true
                         }) {
-                            Text("キャラクター")
+                            Text("ランキング")
                                 .font(.fantasyBody())
                                 .foregroundColor(Color(hex: GameColors.text))
                                 .frame(maxWidth: 280)

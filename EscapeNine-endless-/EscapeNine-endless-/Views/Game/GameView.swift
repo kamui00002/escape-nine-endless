@@ -149,35 +149,61 @@ struct GameView: View {
                         Button(action: {
                             viewModel.activateSkill()
                         }) {
-                            HStack(spacing: 8) {
-                                Text(viewModel.currentSkill.name)
-                                    .font(.fantasyBody())
-                                Text("(残り\(viewModel.remainingSkillUses)回)")
-                                    .font(.fantasyCaption())
-                            }
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: 200)
-                            .background(
-                                viewModel.remainingSkillUses > 0 ?
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: GameColors.available),
-                                        Color(hex: GameColors.main)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ) :
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: GameColors.gridBorder).opacity(0.5),
-                                        Color(hex: GameColors.main).opacity(0.3)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                            let isActive = (viewModel.currentSkill.type == .dash && viewModel.isSkillActive) || (viewModel.currentSkill.type == .invisible && viewModel.isInvisible)
+                            
+                            return AnyView(
+                                HStack(spacing: 8) {
+                                    Text(viewModel.currentSkill.name)
+                                        .font(.fantasyBody())
+                                    Text("(残り\(viewModel.remainingSkillUses)回)")
+                                        .font(.fantasyCaption())
+                                    if isActive {
+                                        Text("ON")
+                                            .font(.fantasyCaption())
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color(hex: GameColors.success))
+                                            .cornerRadius(4)
+                                    }
+                                }
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(maxWidth: 200)
+                                .background(
+                                    isActive ?
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: GameColors.success),
+                                            Color(hex: GameColors.available)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ) :
+                                    (viewModel.remainingSkillUses > 0 ?
+                                     LinearGradient(
+                                         colors: [
+                                             Color(hex: GameColors.available),
+                                             Color(hex: GameColors.main)
+                                         ],
+                                         startPoint: .leading,
+                                         endPoint: .trailing
+                                     ) :
+                                     LinearGradient(
+                                         colors: [
+                                             Color(hex: GameColors.gridBorder).opacity(0.5),
+                                             Color(hex: GameColors.main).opacity(0.3)
+                                         ],
+                                         startPoint: .leading,
+                                         endPoint: .trailing
+                                     ))
+                                )
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(isActive ? Color(hex: GameColors.success) : Color.clear, lineWidth: 2)
                                 )
                             )
-                            .cornerRadius(12)
                         }
                         .disabled(viewModel.remainingSkillUses <= 0 || viewModel.gameStatus != .playing)
                     }

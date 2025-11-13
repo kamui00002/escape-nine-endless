@@ -13,51 +13,59 @@ struct CharacterSelectionView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(hex: GameColors.background),
-                    Color(hex: GameColors.backgroundSecondary)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            // 全体の背景
+            Color(hex: GameColors.background)
+                .ignoresSafeArea()
             
-            VStack(spacing: 24) {
-                // Header
-                HStack {
-                    Button(action: { dismiss() }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("戻る")
-                        }
-                        .font(.fantasyCaption())
-                        .foregroundColor(Color(hex: GameColors.text))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(hex: GameColors.backgroundSecondary))
-                                .overlay(
+            VStack(spacing: 0) {
+                // Header with background
+                VStack(spacing: 0) {
+                    LinearGradient(
+                        colors: [
+                            Color(hex: GameColors.background),
+                            Color(hex: GameColors.backgroundSecondary)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 120)
+                    .overlay(
+                        HStack {
+                            Button(action: { dismiss() }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.left")
+                                    Text("戻る")
+                                }
+                                .font(.fantasyCaption())
+                                .foregroundColor(Color(hex: GameColors.text))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color(hex: GameColors.gridBorder).opacity(0.5), lineWidth: 1)
+                                        .fill(Color(hex: GameColors.backgroundSecondary))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color(hex: GameColors.gridBorder).opacity(0.5), lineWidth: 1)
+                                        )
                                 )
-                        )
-                    }
-                    
-                    Spacer()
-                    
-                    Text("キャラクター選択")
-                        .font(.fantasyHeading())
-                        .foregroundColor(Color(hex: GameColors.text))
-                    
-                    Spacer()
-                    
-                    Color.clear
-                        .frame(width: 80)
+                            }
+                            
+                            Spacer()
+                            
+                            Text("キャラクター選択")
+                                .font(.fantasyHeading())
+                                .foregroundColor(Color(hex: GameColors.text))
+                            
+                            Spacer()
+                            
+                            Color.clear
+                                .frame(width: 80)
+                        }
+                        .padding()
+                    )
                 }
-                .padding()
                 
+                // Content area
                 ScrollView {
                     VStack(spacing: 20) {
                         ForEach(CharacterType.allCases, id: \.self) { characterType in
@@ -65,6 +73,7 @@ struct CharacterSelectionView: View {
                                 characterType: characterType,
                                 isUnlocked: playerViewModel.unlockedCharacters.contains(characterType),
                                 isSelected: playerViewModel.selectedCharacter == characterType,
+                                highestFloor: playerViewModel.highestFloor,
                                 onSelect: {
                                     if playerViewModel.unlockedCharacters.contains(characterType) {
                                         playerViewModel.selectCharacter(characterType)
@@ -77,6 +86,7 @@ struct CharacterSelectionView: View {
                         }
                     }
                     .padding(.horizontal)
+                    .padding(.top, 16)
                 }
             }
         }
@@ -87,6 +97,7 @@ struct CharacterCardView: View {
     let characterType: CharacterType
     let isUnlocked: Bool
     let isSelected: Bool
+    let highestFloor: Int
     let onSelect: () -> Void
     let onPurchase: () -> Void
     
@@ -195,8 +206,14 @@ struct CharacterCardView: View {
                         .cornerRadius(12)
                 }
             } else {
-                Button(action: onPurchase) {
-                    Text("購入する")
+                Button(action: {
+                    if characterType == .thief {
+                        // 盗賊の場合は何もしない（10階層クリアで自動解放）
+                    } else {
+                        onPurchase()
+                    }
+                }) {
+                    Text(characterType == .thief ? "10階層クリアで解放" : "購入する")
                         .font(.fantasyBody())
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -212,6 +229,15 @@ struct CharacterCardView: View {
                             )
                         )
                         .cornerRadius(12)
+                }
+                .disabled(characterType == .thief) // 盗賊の場合はボタンを無効化
+                
+                // 盗賊の場合は現在の階層を表示
+                if characterType == .thief {
+                    Text("現在: \(highestFloor)階層 / 必要: 10階層")
+                        .font(.fantasyCaption())
+                        .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                        .padding(.top, 4)
                 }
             }
         }
