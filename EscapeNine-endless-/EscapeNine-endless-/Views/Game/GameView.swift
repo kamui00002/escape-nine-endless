@@ -138,18 +138,15 @@ struct GameView: View {
                     
                     // 次の移動先が指定されていない場合の警告
                     if viewModel.gameStatus == .playing && viewModel.pendingPlayerMove == nil {
-                        HStack(spacing: 6) {
-                            Text("⚠️")
-                            Text("次の移動先を選択してください")
-                        }
-                        .font(.fantasyCaption())
-                        .foregroundColor(Color(hex: GameColors.warning))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(hex: GameColors.warning).opacity(0.1))
-                        )
+                        Text("次の移動先を選択してください")
+                            .font(.fantasyCaption())
+                            .foregroundColor(Color(hex: GameColors.warning))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(hex: GameColors.warning).opacity(0.1))
+                            )
                     }
                 }
                 
@@ -177,26 +174,6 @@ struct GameView: View {
                     .ignoresSafeArea()
                     
                     VStack(spacing: 30) {
-                        // 装飾的なアイコン
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(hex: GameColors.available).opacity(0.3),
-                                            Color(hex: GameColors.main).opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 120, height: 120)
-                                .blur(radius: 20)
-                            
-                            Text("⚔️")
-                                .font(.system(size: 80))
-                        }
-                        
                         Text("\(viewModel.currentFloor)階層")
                             .font(.fantasyHeading())
                             .foregroundColor(Color(hex: GameColors.available))
@@ -247,26 +224,6 @@ struct GameView: View {
                     .ignoresSafeArea()
                     
                     VStack(spacing: 40) {
-                        // 装飾的なアイコン
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(hex: GameColors.available).opacity(0.3),
-                                            Color(hex: GameColors.main).opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 120, height: 120)
-                                .blur(radius: 20)
-                            
-                            Text("⚔️")
-                                .font(.system(size: 80))
-                        }
-                        
                         VStack(spacing: 16) {
                             Text("準備はできましたか？")
                                 .font(.fantasySubheading())
@@ -281,48 +238,41 @@ struct GameView: View {
                             isGameStarted = true
                             viewModel.startGame(aiLevel: .normal)
                         }) {
-                            HStack(spacing: 12) {
-                                Text("▶")
-                                    .font(.system(size: 24))
-                                Text("冒険を始める")
-                            }
-                            .font(.fantasyBody())
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(width: 220)
-                            .background(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: GameColors.available),
-                                        Color(hex: GameColors.main)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                            Text("冒険を始める")
+                                .font(.fantasyBody())
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(width: 220)
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: GameColors.available),
+                                            Color(hex: GameColors.main)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
                                 )
-                            )
-                            .cornerRadius(16)
-                            .shadow(color: Color(hex: GameColors.available).opacity(0.6), radius: 15)
+                                .cornerRadius(16)
+                                .shadow(color: Color(hex: GameColors.available).opacity(0.6), radius: 15)
                         }
                         
                         Button(action: {
                             dismiss()
                         }) {
-                            HStack(spacing: 8) {
-                                Text("🚪")
-                                Text("戻る")
-                            }
-                            .font(.fantasyBody())
-                            .foregroundColor(Color(hex: GameColors.text))
-                            .padding()
-                            .frame(width: 220)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(hex: GameColors.backgroundSecondary))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(Color(hex: GameColors.gridBorder).opacity(0.5), lineWidth: 2)
-                                    )
-                            )
+                            Text("戻る")
+                                .font(.fantasyBody())
+                                .foregroundColor(Color(hex: GameColors.text))
+                                .padding()
+                                .frame(width: 220)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(hex: GameColors.backgroundSecondary))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(Color(hex: GameColors.gridBorder).opacity(0.5), lineWidth: 2)
+                                        )
+                                )
                         }
                     }
                 }
@@ -335,9 +285,6 @@ struct GameView: View {
                         .ignoresSafeArea()
                     
                     VStack(spacing: 30) {
-                        Text("⏸")
-                            .font(.system(size: 60))
-                        
                         Text("一時停止")
                             .font(.fantasyHeading())
                             .foregroundColor(Color(hex: GameColors.text))
@@ -346,47 +293,41 @@ struct GameView: View {
                             Button(action: {
                                 viewModel.resumeGame()
                             }) {
-                                HStack {
-                                    Text("▶")
-                                    Text("再開")
-                                }
-                                .font(.fantasyBody())
-                                .foregroundColor(.white)
-                                .padding()
-                                .frame(width: 180)
-                                .background(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(hex: GameColors.available),
-                                            Color(hex: GameColors.main)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
+                                Text("再開")
+                                    .font(.fantasyBody())
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .frame(width: 180)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(hex: GameColors.available),
+                                                Color(hex: GameColors.main)
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
                                     )
-                                )
-                                .cornerRadius(12)
-                                .shadow(color: Color(hex: GameColors.available).opacity(0.5), radius: 10)
+                                    .cornerRadius(12)
+                                    .shadow(color: Color(hex: GameColors.available).opacity(0.5), radius: 10)
                             }
                             
                             Button(action: {
                                 dismiss()
                             }) {
-                                HStack {
-                                    Text("🚪")
-                                    Text("終了")
-                                }
-                                .font(.fantasyBody())
-                                .foregroundColor(Color(hex: GameColors.text))
-                                .padding()
-                                .frame(width: 180)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color(hex: GameColors.backgroundSecondary))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(Color(hex: GameColors.warning).opacity(0.5), lineWidth: 2)
-                                        )
-                                )
+                                Text("終了")
+                                    .font(.fantasyBody())
+                                    .foregroundColor(Color(hex: GameColors.text))
+                                    .padding()
+                                    .frame(width: 180)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color(hex: GameColors.backgroundSecondary))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(Color(hex: GameColors.warning).opacity(0.5), lineWidth: 2)
+                                            )
+                                    )
                             }
                         }
                     }
@@ -420,11 +361,11 @@ struct GameView: View {
         case .none:
             return ""
         case .fog:
-            return "🌫️ 霧の呪い: 視界が制限されています"
+            return "霧の呪い: 視界が制限されています"
         case .disappear:
-            return "💀 崩壊の罠: 消失したマスに注意"
+            return "崩壊の罠: 消失したマスに注意"
         case .fogDisappear:
-            return "🌫️💀 霧の呪い + 崩壊の罠"
+            return "霧の呪い + 崩壊の罠"
         }
     }
 }

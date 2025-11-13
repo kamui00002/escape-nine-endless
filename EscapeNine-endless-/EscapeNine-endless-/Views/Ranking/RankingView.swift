@@ -109,13 +109,9 @@ struct RankingView: View {
                     Spacer()
                 } else if viewModel.rankings.isEmpty {
                     Spacer()
-                    VStack(spacing: 12) {
-                        Text("📜")
-                            .font(.system(size: 50))
-                        Text("まだランキングがありません")
-                            .font(.fantasyBody())
-                            .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
-                    }
+                    Text("まだランキングがありません")
+                        .font(.fantasyBody())
+                        .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
                     Spacer()
                 } else {
                     List(viewModel.rankings.indices, id: \.self) { index in

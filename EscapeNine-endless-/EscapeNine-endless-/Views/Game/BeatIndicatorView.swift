@@ -48,9 +48,9 @@ struct BeatIndicatorView: View {
                     .scaleEffect(scale)
                     .shadow(color: Color(hex: GameColors.available).opacity(0.8), radius: 15)
                 
-                Text("♪")
-                    .font(.system(size: 24))
-                    .foregroundColor(.white)
+                Circle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 20, height: 20)
             }
             
             Text("ビート: \(currentBeat)")

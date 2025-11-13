@@ -67,46 +67,44 @@ struct GridCellView: View {
                 
                 // プレイヤー（見える場合のみ）
                 if isPlayer && isVisible {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: GameColors.player),
-                                        Color(hex: GameColors.success)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: GameColors.player),
+                                    Color(hex: GameColors.success)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .frame(width: 50, height: 50)
-                            .shadow(color: Color(hex: GameColors.player).opacity(0.8), radius: 10)
-                        
-                        Text("⚔️")
-                            .font(.system(size: 24))
-                    }
+                        )
+                        .frame(width: 50, height: 50)
+                        .shadow(color: Color(hex: GameColors.player).opacity(0.8), radius: 10)
+                        .overlay(
+                            Circle()
+                                .stroke(Color(hex: GameColors.available), lineWidth: 3)
+                        )
                 }
                 
                 // 敵（見える場合のみ）
                 if isEnemy && isVisible {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: GameColors.enemy),
-                                        Color(hex: GameColors.warning)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: GameColors.enemy),
+                                    Color(hex: GameColors.warning)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .frame(width: 50, height: 50)
-                            .shadow(color: Color(hex: GameColors.enemy).opacity(0.8), radius: 10)
-                        
-                        Text("👹")
-                            .font(.system(size: 24))
-                    }
+                        )
+                        .frame(width: 50, height: 50)
+                        .shadow(color: Color(hex: GameColors.enemy).opacity(0.8), radius: 10)
+                        .overlay(
+                            Circle()
+                                .stroke(Color(hex: GameColors.warning), lineWidth: 3)
+                        )
                 }
             }
         }

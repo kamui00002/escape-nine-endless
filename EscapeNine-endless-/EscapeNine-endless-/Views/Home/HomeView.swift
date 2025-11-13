@@ -27,28 +27,12 @@ struct HomeView: View {
                 )
                 .ignoresSafeArea()
                 
-                // 装飾的な背景パターン
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Text("⚔️")
-                            .font(.system(size: 200))
-                            .foregroundColor(Color(hex: GameColors.gridBorder).opacity(0.1))
-                            .rotationEffect(.degrees(-15))
-                        Spacer()
-                    }
-                    Spacer()
-                }
                 
                 VStack(spacing: 50) {
                     Spacer()
                     
                     // Title
                     VStack(spacing: 16) {
-                        Text("⚔️")
-                            .font(.system(size: 80))
-                        
                         Text("ESCAPE NINE")
                             .font(.fantasyTitle())
                             .foregroundColor(Color(hex: GameColors.available))
@@ -65,7 +49,7 @@ struct HomeView: View {
                             )
                             .shadow(color: Color(hex: GameColors.available).opacity(0.5), radius: 10)
                         
-                        Text("エンドレス・ダンジョン")
+                        Text("Endless Dungeon")
                             .font(.fantasySubheading())
                             .foregroundColor(Color(hex: GameColors.text).opacity(0.8))
                     }
@@ -77,88 +61,79 @@ struct HomeView: View {
                         Button(action: {
                             showGame = true
                         }) {
-                            HStack {
-                                Text("🗡")
-                                Text("冒険を始める")
-                            }
-                            .font(.fantasyBody())
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 280)
-                            .padding()
-                            .background(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: GameColors.available),
-                                        Color(hex: GameColors.main)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                            Text("冒険を始める")
+                                .font(.fantasyBody())
+                                .foregroundColor(.white)
+                                .frame(maxWidth: 280)
+                                .padding()
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: GameColors.available),
+                                            Color(hex: GameColors.main)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
                                 )
-                            )
-                            .cornerRadius(16)
-                            .shadow(color: Color(hex: GameColors.available).opacity(0.6), radius: 15)
+                                .cornerRadius(16)
+                                .shadow(color: Color(hex: GameColors.available).opacity(0.6), radius: 15)
                         }
                         
                         Button(action: {
                             showRanking = true
                         }) {
-                            HStack {
-                                Text("🏆")
-                                Text("ランキング")
-                            }
-                            .font(.fantasyBody())
-                            .foregroundColor(Color(hex: GameColors.text))
-                            .frame(maxWidth: 280)
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(hex: GameColors.backgroundSecondary))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(
-                                                LinearGradient(
-                                                    colors: [
-                                                        Color(hex: GameColors.gridBorder).opacity(0.5),
-                                                        Color(hex: GameColors.main).opacity(0.3)
-                                                    ],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                ),
-                                                lineWidth: 2
-                                            )
-                                    )
-                            )
+                            Text("ランキング")
+                                .font(.fantasyBody())
+                                .foregroundColor(Color(hex: GameColors.text))
+                                .frame(maxWidth: 280)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(hex: GameColors.backgroundSecondary))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(
+                                                    LinearGradient(
+                                                        colors: [
+                                                            Color(hex: GameColors.gridBorder).opacity(0.5),
+                                                            Color(hex: GameColors.main).opacity(0.3)
+                                                        ],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ),
+                                                    lineWidth: 2
+                                                )
+                                        )
+                                )
                         }
                         
                         Button(action: {
                             showSettings = true
                         }) {
-                            HStack {
-                                Text("⚙️")
-                                Text("設定")
-                            }
-                            .font(.fantasyBody())
-                            .foregroundColor(Color(hex: GameColors.text))
-                            .frame(maxWidth: 280)
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(hex: GameColors.backgroundSecondary))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(
-                                                LinearGradient(
-                                                    colors: [
-                                                        Color(hex: GameColors.gridBorder).opacity(0.5),
-                                                        Color(hex: GameColors.main).opacity(0.3)
-                                                    ],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                ),
-                                                lineWidth: 2
-                                            )
-                                    )
-                            )
+                            Text("設定")
+                                .font(.fantasyBody())
+                                .foregroundColor(Color(hex: GameColors.text))
+                                .frame(maxWidth: 280)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(hex: GameColors.backgroundSecondary))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(
+                                                    LinearGradient(
+                                                        colors: [
+                                                            Color(hex: GameColors.gridBorder).opacity(0.5),
+                                                            Color(hex: GameColors.main).opacity(0.3)
+                                                        ],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ),
+                                                    lineWidth: 2
+                                                )
+                                        )
+                                )
                         }
                     }
                     

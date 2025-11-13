@@ -111,6 +111,51 @@ struct SettingsView: View {
                 )
                 .padding(.horizontal)
                 
+                // Volume Settings
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("サウンド設定")
+                        .font(.fantasySubheading())
+                        .foregroundColor(Color(hex: GameColors.text))
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("音量")
+                                .font(.fantasyCaption())
+                                .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                            Spacer()
+                            Text("\(Int(playerViewModel.volume * 100))%")
+                                .font(.fantasyNumber())
+                                .foregroundColor(Color(hex: GameColors.available))
+                        }
+                        
+                        Slider(value: $playerViewModel.volume, in: 0...1) { _ in
+                            playerViewModel.saveData()
+                        }
+                        .tint(Color(hex: GameColors.available))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(hex: GameColors.backgroundSecondary))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: GameColors.gridBorder).opacity(0.5),
+                                            Color(hex: GameColors.main).opacity(0.3)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 2
+                                )
+                        )
+                )
+                .padding(.horizontal)
+                
                 // About
                 VStack(alignment: .leading, spacing: 16) {
                     Text("アプリについて")
