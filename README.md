@@ -24,32 +24,47 @@
 
 ## 🛠️ 技術スタック
 
-- **フレームワーク**: React Native + Expo
-- **言語**: TypeScript
-- **状態管理**: Zustand
-- **音楽**: Expo AV
+- **フレームワーク**: SwiftUI
+- **言語**: Swift 5.9+
+- **アーキテクチャ**: MVVM + Combine
+- **音楽**: AVFoundation
 - **バックエンド**: Firebase
-- **広告**: Google AdMob
-- **課金**: Expo In-App Purchases
+- **広告**: Google Mobile Ads SDK
+- **課金**: StoreKit
+- **ランキング**: Game Center
 
 ## 📁 プロジェクト構造
 
 ```
 escape-nine-endless/
+├── EscapeNine-endless-/
+│   ├── EscapeNine-endless-/
+│   │   └── (Swift source files)
+│   └── EscapeNine-endless-.xcodeproj/
 ├── docs/
-│   └── 要件定義書_EscapeNine.md  # 詳細な要件定義
-├── DEVELOPMENT.md                 # 開発者向けドキュメント
-└── README.md                      # このファイル
+│   ├── 要件定義書_EscapeNine.md      # 詳細な要件定義
+│   └── DEVELOPMENT_SWIFT.md          # 開発者向け技術仕様
+└── README.md                          # このファイル
 ```
 
 ## 🚀 開発開始
 
-詳細な開発手順は [DEVELOPMENT.md](./DEVELOPMENT.md) を参照してください。
+### セットアップ
+
+1. Xcodeでプロジェクトを開く
+   ```bash
+   open EscapeNine-endless-/EscapeNine-endless-.xcodeproj
+   ```
+
+2. シミュレーターまたは実機で実行
+   - Xcodeで `⌘ + R` を押すか、実行ボタンをクリック
+
+詳細な開発手順は [DEVELOPMENT_SWIFT.md](./docs/DEVELOPMENT_SWIFT.md) を参照してください。
 
 ## 📝 ドキュメント
 
 - [要件定義書](./docs/要件定義書_EscapeNine.md) - ゲームの詳細仕様
-- [DEVELOPMENT.md](./DEVELOPMENT.md) - 開発者向け技術仕様
+- [DEVELOPMENT_SWIFT.md](./docs/DEVELOPMENT_SWIFT.md) - 開発者向け技術仕様
 
 ## 🎯 開発ロードマップ
 

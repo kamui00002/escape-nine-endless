@@ -227,20 +227,23 @@
 ## 技術仕様
 
 ### 開発環境
-- **フレームワーク**: React Native + Expo
-- **言語**: TypeScript
+- **フレームワーク**: SwiftUI
+- **言語**: Swift 5.9+
+- **最小iOS**: iOS 14.0
+- **IDE**: Xcode 15.0+
+- **アーキテクチャ**: MVVM + Combine
 
 ### バックエンド・サービス
 - **Firebase**:
   - Authentication (認証)
   - Firestore (ランキングデータ)
   - Analytics (分析)
-- **Google AdMob**: 広告
-- **Expo In-App Purchases**: 課金
+- **Google Mobile Ads SDK**: AdMob広告
+- **StoreKit**: アプリ内課金
 - **Game Center**: ランキング
 
 ### データ保存
-- **ローカル**: AsyncStorage
+- **ローカル**: UserDefaults / Core Data
   - 到達階層
   - 解放キャラ
   - 選択中のキャラ
