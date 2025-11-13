@@ -134,19 +134,10 @@ struct GameView: View {
                                             .stroke(Color(hex: GameColors.warning).opacity(0.5), lineWidth: 1)
                                     )
                             )
-                    }
-                    
-                    // 次の移動先が指定されていない場合の警告
-                    if viewModel.gameStatus == .playing && viewModel.pendingPlayerMove == nil {
-                        Text("次の移動先を選択してください")
-                            .font(.fantasyCaption())
-                            .foregroundColor(Color(hex: GameColors.warning))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(hex: GameColors.warning).opacity(0.1))
-                            )
+                    } else {
+                        // レイアウトの安定化のため、空のスペースを確保
+                        Color.clear
+                            .frame(height: 0)
                     }
                 }
                 
@@ -345,9 +336,13 @@ struct GameView: View {
                 floor: viewModel.currentFloor,
                 result: viewModel.gameStatus,
                 onPlayAgain: {
-                    viewModel.resetGame()
-                    isGameStarted = false
                     showResult = false
+                    // ゲームを完全にリセット
+                    viewModel.resetGame()
+                    // スタート画面を表示するためにフラグをリセット
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        isGameStarted = false
+                    }
                 },
                 onHome: {
                     dismiss()

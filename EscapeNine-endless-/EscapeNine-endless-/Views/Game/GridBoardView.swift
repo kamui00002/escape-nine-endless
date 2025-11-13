@@ -19,6 +19,7 @@ struct GridBoardView: View {
     
     var body: some View {
         VStack(spacing: 8) {
+            // レイアウトの安定化のため、固定サイズを確保
             HStack(spacing: 8) {
                 GridCellView(position: 1, isPlayer: playerPosition == 1, isEnemy: enemyPosition == 1, isAvailable: availableMoves.contains(1), isSelected: selectedMove == 1, isVisible: isCellVisible(1), isDisappeared: isCellDisappeared(1), onTap: { onCellTap(1) }, disabled: disabled)
                 GridCellView(position: 2, isPlayer: playerPosition == 2, isEnemy: enemyPosition == 2, isAvailable: availableMoves.contains(2), isSelected: selectedMove == 2, isVisible: isCellVisible(2), isDisappeared: isCellDisappeared(2), onTap: { onCellTap(2) }, disabled: disabled)

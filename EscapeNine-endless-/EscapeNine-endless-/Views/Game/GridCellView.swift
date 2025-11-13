@@ -19,7 +19,10 @@ struct GridCellView: View {
     let disabled: Bool
     
     var body: some View {
-        Button(action: onTap) {
+        Button(action: {
+            // アニメーションなしで即座に実行
+            onTap()
+        }) {
             ZStack {
                 // 消失したマス
                 if isDisappeared {
@@ -109,6 +112,7 @@ struct GridCellView: View {
             }
         }
         .disabled(disabled || !isAvailable || isDisappeared)
+        .buttonStyle(PlainButtonStyle()) // デフォルトのボタンアニメーションを無効化
     }
 }
 
