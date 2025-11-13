@@ -12,6 +12,7 @@ struct GameView: View {
     @StateObject private var playerViewModel = PlayerViewModel()
     @Environment(\.dismiss) var dismiss
     @State private var showResult = false
+    @State private var isGameStarted = false
     
     var body: some View {
         ZStack {
@@ -227,6 +228,106 @@ struct GameView: View {
                 }
             }
             
+            // Start Game Overlay
+            if !isGameStarted {
+                ZStack {
+                    Color(hex: GameColors.background).opacity(0.95)
+                        .ignoresSafeArea()
+                    
+                    // 装飾的な背景
+                    RadialGradient(
+                        colors: [
+                            Color(hex: GameColors.available).opacity(0.1),
+                            Color(hex: GameColors.background).opacity(0.9)
+                        ],
+                        center: .center,
+                        startRadius: 50,
+                        endRadius: 200
+                    )
+                    .ignoresSafeArea()
+                    
+                    VStack(spacing: 40) {
+                        // 装飾的なアイコン
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: GameColors.available).opacity(0.3),
+                                            Color(hex: GameColors.main).opacity(0.2)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 120, height: 120)
+                                .blur(radius: 20)
+                            
+                            Text("⚔️")
+                                .font(.system(size: 80))
+                        }
+                        
+                        VStack(spacing: 16) {
+                            Text("準備はできましたか？")
+                                .font(.fantasySubheading())
+                                .foregroundColor(Color(hex: GameColors.text))
+                            
+                            Text("\(viewModel.currentFloor)階層")
+                                .font(.fantasyHeading())
+                                .foregroundColor(Color(hex: GameColors.available))
+                        }
+                        
+                        Button(action: {
+                            isGameStarted = true
+                            viewModel.startGame(aiLevel: .normal)
+                        }) {
+                            HStack(spacing: 12) {
+                                Text("▶")
+                                    .font(.system(size: 24))
+                                Text("冒険を始める")
+                            }
+                            .font(.fantasyBody())
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(width: 220)
+                            .background(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.available),
+                                        Color(hex: GameColors.main)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(16)
+                            .shadow(color: Color(hex: GameColors.available).opacity(0.6), radius: 15)
+                        }
+                        
+                        Button(action: {
+                            dismiss()
+                        }) {
+                            HStack(spacing: 8) {
+                                Text("🚪")
+                                Text("戻る")
+                            }
+                            .font(.fantasyBody())
+                            .foregroundColor(Color(hex: GameColors.text))
+                            .padding()
+                            .frame(width: 220)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(hex: GameColors.backgroundSecondary))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color(hex: GameColors.gridBorder).opacity(0.5), lineWidth: 2)
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+            
             // Paused Overlay
             if viewModel.gameStatus == .paused {
                 ZStack {
@@ -292,9 +393,6 @@ struct GameView: View {
                 }
             }
         }
-        .onAppear {
-            viewModel.startGame(aiLevel: .normal)
-        }
         .onChange(of: viewModel.gameStatus) {
             if viewModel.gameStatus == .win || viewModel.gameStatus == .lose {
                 playerViewModel.updateHighestFloor(viewModel.currentFloor)
@@ -307,7 +405,7 @@ struct GameView: View {
                 result: viewModel.gameStatus,
                 onPlayAgain: {
                     viewModel.resetGame()
-                    viewModel.startGame(aiLevel: .normal)
+                    isGameStarted = false
                     showResult = false
                 },
                 onHome: {
