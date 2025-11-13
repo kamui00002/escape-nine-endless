@@ -54,9 +54,9 @@ struct Character {
         case .thief:
             skill = Skill(type: .diagonal, name: "斜め移動", description: "斜め方向に移動可能", maxUsage: 5)
         case .wizard:
-            skill = Skill(type: .invisible, name: "透明化", description: "鬼に当たっても無敵", maxUsage: 3)
+            skill = Skill(type: .invisible, name: "透明化", description: "鬼に当たっても無敵", maxUsage: 5)
         case .elf:
-            skill = Skill(type: .bind, name: "拘束", description: "鬼を1ターン停止させる", maxUsage: 3)
+            skill = Skill(type: .bind, name: "拘束", description: "鬼を1ターン停止させる", maxUsage: 5)
         }
         
         return Character(
