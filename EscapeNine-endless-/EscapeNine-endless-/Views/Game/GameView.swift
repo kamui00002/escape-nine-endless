@@ -192,6 +192,29 @@ struct GameView: View {
                         Text("次: \(viewModel.currentFloor + 1)階層")
                             .font(.fantasyBody())
                             .foregroundColor(Color(hex: GameColors.text).opacity(0.8))
+                        
+                        // スタートボタン
+                        Button(action: {
+                            viewModel.nextFloor()
+                        }) {
+                            Text("スタート")
+                                .font(.fantasyBody())
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(width: 200)
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: GameColors.available),
+                                            Color(hex: GameColors.main)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(16)
+                                .shadow(color: Color(hex: GameColors.available).opacity(0.6), radius: 15)
+                        }
                     }
                 }
             }

@@ -105,11 +105,6 @@ class GameViewModel: ObservableObject {
             // 階層クリア表示
             showFloorClear = true
             beatEngine.pause()
-            // 2秒後に次の階層へ
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.showFloorClear = false
-                self.nextFloor()
-            }
         }
         
         // 次のビートの準備
@@ -184,6 +179,9 @@ class GameViewModel: ObservableObject {
     }
     
     func nextFloor() {
+        // クリア表示を非表示
+        showFloorClear = false
+        
         currentFloor += 1
         turnCount = 0
         skillUsageCount = 0
