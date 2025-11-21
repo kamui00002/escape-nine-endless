@@ -83,12 +83,14 @@ class BeatEngine: ObservableObject {
         isPlaying = false
         timer?.invalidate()
         timer = nil
+        currentBeat = 0  // ビートカウンターをリセット
     }
-    
+
     func pause() {
         audioPlayer?.pause()
         isPlaying = false
         timer?.invalidate()
+        timer = nil  // メモリリーク防止
     }
     
     func resume() {
@@ -141,7 +143,7 @@ class BeatEngine: ObservableObject {
     
     // MARK: - BPM Change
     func changeBPM(_ newBPM: Double, volume: Double = 0.7) {
-        stop()
+        stop()  // stop()内でcurrentBeat = 0にリセット済み
         loadMusic(bpm: newBPM, volume: volume)
         play()
     }

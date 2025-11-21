@@ -14,7 +14,7 @@ class GameViewModel: ObservableObject {
     @Published var turnCount: Int = 0
     @Published var playerPosition: Int = 1
     @Published var enemyPosition: Int = 9
-    @Published var gameStatus: GameStatus = .playing
+    @Published var gameStatus: GameStatus = .idle
     @Published var skillUsageCount: Int = 0
     @Published var pendingPlayerMove: Int? = nil // 次のビートで移動する位置
     @Published var hasMovedThisBeat: Bool = false // このビートで移動したか
@@ -24,6 +24,7 @@ class GameViewModel: ObservableObject {
     @Published var isInvisible: Bool = false // 透明化状態
     @Published var enemyStopped: Bool = false // 敵が停止しているか
     @Published var isSkillActive: Bool = false // スキルがアクティブか（ダッシュ、斜め移動用）
+    @Published var consecutiveWaits: Int = 0 // 連続待機回数
     
     // MARK: - Dependencies
     private let beatEngine = BeatEngine()
@@ -87,44 +88,26 @@ class GameViewModel: ObservableObject {
         guard gameStatus == .playing else { return }
         guard beat > lastProcessedBeat else { return }
         lastProcessedBeat = beat
-        
+
+        // 新しいビートの開始時にリセット
+        hasMovedThisBeat = false
+
         // プレイヤーが移動先を指定していない場合、ゲームオーバー
         guard let nextPosition = pendingPlayerMove else {
             endGame(result: .lose)
             return
         }
-        
+
         // 移動可能かチェック（スキルを考慮）
-        var isValid = false
-        var shouldConsumeSkill = false
-        
-        if isSkillActive {
-            // スキルがアクティブな場合
-            switch currentSkill.type {
-            case .dash:
-                isValid = gameEngine.isValidDashMove(from: playerPosition, to: nextPosition)
-                shouldConsumeSkill = isValid
-            case .diagonal:
-                isValid = gameEngine.isValidDiagonalMove(from: playerPosition, to: nextPosition) || gameEngine.isValidMove(from: playerPosition, to: nextPosition)
-                shouldConsumeSkill = gameEngine.isValidDiagonalMove(from: playerPosition, to: nextPosition)
-            default:
-                isValid = gameEngine.isValidMove(from: playerPosition, to: nextPosition)
-            }
-        } else if currentSkill.type == .diagonal {
-            // 盗賊の斜め移動は常時有効
-            isValid = gameEngine.isValidDiagonalMove(from: playerPosition, to: nextPosition) || gameEngine.isValidMove(from: playerPosition, to: nextPosition)
-            shouldConsumeSkill = gameEngine.isValidDiagonalMove(from: playerPosition, to: nextPosition)
-        } else {
-            isValid = gameEngine.isValidMove(from: playerPosition, to: nextPosition)
-        }
-        
+        let (isValid, shouldConsume) = validateMove(from: playerPosition, to: nextPosition)
+
         guard isValid else {
             endGame(result: .lose)
             return
         }
-        
+
         // スキル使用回数を消費（ダッシュ、斜め移動の場合）
-        if shouldConsumeSkill && remainingSkillUses > 0 {
+        if shouldConsume && remainingSkillUses > 0 {
             skillUsageCount += 1
         }
         isSkillActive = false
@@ -134,27 +117,50 @@ class GameViewModel: ObservableObject {
             endGame(result: .lose)
             return
         }
-        
-        // プレイヤーと鬼を同時に移動
-        playerPosition = nextPosition
-        pendingPlayerMove = nil
-        hasMovedThisBeat = true
-        
-        // 敵の移動（拘束スキルを考慮）
+
+        // 【重要】同時移動の実装
+        // 鬼の次の位置を「プレイヤー移動前」に計算
+        let previousPlayerPosition = playerPosition
+        let previousEnemyPosition = enemyPosition
+        var nextEnemyPosition = enemyPosition
+
         if !enemyStopped {
-            moveEnemy()
+            let difficulty = playerViewModelInstance?.debugAILevel ?? stageManager.getDifficulty(for: currentFloor)
+            nextEnemyPosition = aiEngine.calculateNextMove(
+                from: enemyPosition,
+                target: playerPosition, // プレイヤーの「現在」の位置を使用
+                level: difficulty
+            )
         } else {
             // 拘束中は敵を移動させない
             enemyStopped = false
         }
-        
+
+        // 待機判定（連続待機カウンター更新）
+        if nextPosition == previousPlayerPosition {
+            consecutiveWaits += 1
+        } else {
+            consecutiveWaits = 0
+        }
+
+        // 両方の位置を同時に更新
+        playerPosition = nextPosition
+        enemyPosition = nextEnemyPosition
+        pendingPlayerMove = nil
+        hasMovedThisBeat = true
+
+        // すれ違い判定（プレイヤーと鬼が位置を入れ替えた場合）
+        let isCrossing = (previousPlayerPosition == nextEnemyPosition && previousEnemyPosition == nextPosition)
+
         // 衝突チェック（透明化スキルを考慮）
-        if playerPosition == enemyPosition {
+        let isCollision = (playerPosition == enemyPosition) || isCrossing
+
+        if isCollision {
             if currentSkill.type == .invisible && isInvisible && remainingSkillUses > 0 {
                 // 透明化スキルで無敵
                 skillUsageCount += 1
                 // 次のビートで透明化を解除
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Constants.invisibilityDuration) {
                     self.isInvisible = false
                 }
             } else {
@@ -162,26 +168,66 @@ class GameViewModel: ObservableObject {
                 return
             }
         }
-        
+
         // ターン進行
         turnCount += 1
-        
+
         // 10ターンで階層クリア
         if turnCount >= maxTurns {
             // 階層クリア表示
             showFloorClear = true
             beatEngine.pause()
         }
-        
-        // 次のビートの準備
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.hasMovedThisBeat = false
+
+        // hasMovedThisBeatはtrueのまま維持（次のビートでリセット）
+    }
+
+    // MARK: - Skill Validation Helpers
+    /// スキルを考慮した移動の有効性をチェック
+    /// - Returns: (isValid: 移動が有効か, shouldConsumeSkill: スキルを消費すべきか)
+    private func validateMove(from: Int, to: Int) -> (isValid: Bool, shouldConsumeSkill: Bool) {
+        var isValid = false
+        var shouldConsumeSkill = false
+
+        if isSkillActive {
+            // スキルがアクティブな場合
+            switch currentSkill.type {
+            case .dash:
+                isValid = gameEngine.isValidDashMove(from: from, to: to)
+                shouldConsumeSkill = isValid
+            case .diagonal:
+                let isDiagonal = gameEngine.isValidDiagonalMove(from: from, to: to)
+                let isNormal = gameEngine.isValidMove(from: from, to: to)
+                isValid = isDiagonal || isNormal
+                shouldConsumeSkill = isDiagonal
+            default:
+                isValid = gameEngine.isValidMove(from: from, to: to)
+            }
+        } else if currentSkill.type == .diagonal && remainingSkillUses > 0 {
+            // 盗賊の斜め移動は常時有効（スキル残数がある場合）
+            let isDiagonal = gameEngine.isValidDiagonalMove(from: from, to: to)
+            let isNormal = gameEngine.isValidMove(from: from, to: to)
+            isValid = isDiagonal || isNormal
+            shouldConsumeSkill = isDiagonal
+        } else if currentSkill.type == .diagonal {
+            // スキル切れの場合は通常移動のみ
+            isValid = gameEngine.isValidMove(from: from, to: to)
+        } else {
+            isValid = gameEngine.isValidMove(from: from, to: to)
         }
+
+        return (isValid, shouldConsumeSkill)
     }
     
     // MARK: - Game Control
     func startGame(aiLevel: AILevel) {
-        currentFloor = 1
+        // デバッグ用の開始階層を使用（設定されている場合）
+        let startFloor = playerViewModelInstance?.debugStartFloor ?? 1
+        currentFloor = max(1, min(startFloor, Constants.maxFloors))
+        
+        // デバッグ用のAI難易度を使用（設定されている場合）
+        let effectiveAILevel = playerViewModelInstance?.debugAILevel ?? aiLevel
+        
         turnCount = 0
         gameStatus = .playing
         skillUsageCount = 0
@@ -191,6 +237,7 @@ class GameViewModel: ObservableObject {
         isInvisible = false
         enemyStopped = false
         isSkillActive = false
+        consecutiveWaits = 0
         
         // ランダム配置（同じ位置にならないように）
         let playerPos = Int.random(in: 1...9)
@@ -203,13 +250,17 @@ class GameViewModel: ObservableObject {
         
         // BPM設定
         let bpm = stageManager.getBPM(for: currentFloor)
-        let bgmVolume = playerViewModelInstance?.bgmVolume ?? 0.7
+        let bgmVolume = playerViewModelInstance?.bgmVolume ?? Constants.defaultVolume
         beatEngine.loadMusic(bpm: bpm, volume: bgmVolume)
         beatEngine.play()
         
         // 特殊ルール設定
         specialRule = stageManager.getSpecialRule(for: currentFloor)
         updateDisappearedCells()
+        
+        // AI難易度を設定（StageManagerに反映）
+        // 注意: 現在のStageManagerは階層に基づいて難易度を決定するため、
+        // デバッグ用の難易度は直接AIEngineに渡す必要がある場合があります
     }
     
     // 移動先を指定（次のビートで移動）
@@ -237,10 +288,15 @@ class GameViewModel: ObservableObject {
     // 移動可能な位置を取得
     func getAvailableMoves() -> [Int] {
         var moves: [Int] = []
-        
+
+        // 待機オプション（連続待機が上限未満の場合のみ）
+        if consecutiveWaits < Constants.maxConsecutiveWaits {
+            moves.append(playerPosition)
+        }
+
         // 基本移動
         moves.append(contentsOf: gameEngine.getAvailableMoves(from: playerPosition))
-        
+
         // スキルによる追加移動
         if isSkillActive {
             switch currentSkill.type {
@@ -260,58 +316,58 @@ class GameViewModel: ObservableObject {
             let diagonalMoves = getDiagonalMoves(from: playerPosition)
             moves.append(contentsOf: diagonalMoves)
         }
-        
+
         // 消失したマスを除外
         return Array(Set(moves)).filter { !disappearedCells.contains($0) }
     }
-    
+
     private func getDashMoves(from position: Int) -> [Int] {
         var moves: [Int] = []
-        let row = (position - 1) / 3
-        let col = (position - 1) % 3
-        
+        let row = Constants.rowFromPosition(position)
+        let col = Constants.columnFromPosition(position)
+
         // 上2マス
         if row >= 2 {
-            moves.append((row - 2) * 3 + col + 1)
+            moves.append(Constants.positionFromRowColumn(row: row - 2, column: col))
         }
         // 下2マス
         if row <= 0 {
-            moves.append((row + 2) * 3 + col + 1)
+            moves.append(Constants.positionFromRowColumn(row: row + 2, column: col))
         }
         // 左2マス
         if col >= 2 {
-            moves.append(row * 3 + (col - 2) + 1)
+            moves.append(Constants.positionFromRowColumn(row: row, column: col - 2))
         }
         // 右2マス
         if col <= 0 {
-            moves.append(row * 3 + (col + 2) + 1)
+            moves.append(Constants.positionFromRowColumn(row: row, column: col + 2))
         }
-        
+
         return moves
     }
-    
+
     private func getDiagonalMoves(from position: Int) -> [Int] {
         var moves: [Int] = []
-        let row = (position - 1) / 3
-        let col = (position - 1) % 3
-        
+        let row = Constants.rowFromPosition(position)
+        let col = Constants.columnFromPosition(position)
+
         // 左上
         if row > 0 && col > 0 {
-            moves.append((row - 1) * 3 + (col - 1) + 1)
+            moves.append(Constants.positionFromRowColumn(row: row - 1, column: col - 1))
         }
         // 右上
-        if row > 0 && col < 2 {
-            moves.append((row - 1) * 3 + (col + 1) + 1)
+        if row > 0 && col < Constants.gridColumns - 1 {
+            moves.append(Constants.positionFromRowColumn(row: row - 1, column: col + 1))
         }
         // 左下
-        if row < 2 && col > 0 {
-            moves.append((row + 1) * 3 + (col - 1) + 1)
+        if row < Constants.gridRows - 1 && col > 0 {
+            moves.append(Constants.positionFromRowColumn(row: row + 1, column: col - 1))
         }
         // 右下
-        if row < 2 && col < 2 {
-            moves.append((row + 1) * 3 + (col + 1) + 1)
+        if row < Constants.gridRows - 1 && col < Constants.gridColumns - 1 {
+            moves.append(Constants.positionFromRowColumn(row: row + 1, column: col + 1))
         }
-        
+
         return moves
     }
     
@@ -348,7 +404,8 @@ class GameViewModel: ObservableObject {
     private func moveEnemy() {
         guard gameStatus == .playing else { return }
         
-        let difficulty = stageManager.getDifficulty(for: currentFloor)
+        // デバッグ用のAI難易度を使用（設定されている場合）
+        let difficulty = playerViewModelInstance?.debugAILevel ?? stageManager.getDifficulty(for: currentFloor)
         enemyPosition = aiEngine.calculateNextMove(
             from: enemyPosition,
             target: playerPosition,
@@ -363,15 +420,21 @@ class GameViewModel: ObservableObject {
     func nextFloor() {
         // クリア表示を非表示
         showFloorClear = false
-        
+
         currentFloor += 1
         turnCount = 0
-        skillUsageCount = 0
+
+        // 10階層ごとにスキル使用回数をリセット
+        if currentFloor % Constants.skillResetInterval == 1 {
+            skillUsageCount = 0
+        }
+
         pendingPlayerMove = nil
         hasMovedThisBeat = false
         isInvisible = false
         enemyStopped = false
         isSkillActive = false
+        consecutiveWaits = 0  // 連続待機カウンターをリセット
         
         // 100階層でクリア
         if currentFloor > Constants.maxFloors {
@@ -381,7 +444,7 @@ class GameViewModel: ObservableObject {
         
         // BPM変更
         let newBPM = stageManager.getBPM(for: currentFloor)
-        let bgmVolume = playerViewModelInstance?.bgmVolume ?? 0.7
+        let bgmVolume = playerViewModelInstance?.bgmVolume ?? Constants.defaultVolume
         beatEngine.changeBPM(newBPM, volume: bgmVolume)
         
         // 特殊ルール設定
@@ -412,16 +475,38 @@ class GameViewModel: ObservableObject {
     // MARK: - Special Rules
     private func updateDisappearedCells() {
         if specialRule == .disappear || specialRule == .fogDisappear {
-            // ランダムで1マス消失
-            let allCells = Set(1...9)
+            // 難易度に応じて消失マスの数を変更
+            let numberOfDisappearingCells = getNumberOfDisappearingCells(for: currentFloor)
+            let allCells = Set(1...Constants.gridSize)
             let availableCells = allCells.subtracting([playerPosition, enemyPosition])
-            if let disappearedCell = availableCells.randomElement() {
-                disappearedCells = [disappearedCell]
-            } else {
-                disappearedCells = []
+
+            var disappeared: Set<Int> = []
+            let cellsToDisappear = min(numberOfDisappearingCells, availableCells.count)
+
+            // ランダムで指定数のマスを消失
+            var remainingCells = Array(availableCells)
+            for _ in 0..<cellsToDisappear {
+                if let cell = remainingCells.randomElement() {
+                    disappeared.insert(cell)
+                    remainingCells.removeAll { $0 == cell }
+                }
             }
+
+            disappearedCells = disappeared
         } else {
             disappearedCells = []
+        }
+    }
+
+    /// 階層に応じた消失マスの数を計算（最大2マス）
+    private func getNumberOfDisappearingCells(for floor: Int) -> Int {
+        switch floor {
+        case Constants.disappearStartFloor..<70:
+            return 1 // 階層41-69: 1マス消失
+        case 70...:
+            return 2 // 階層70+: 2マス消失（上限）
+        default:
+            return 1
         }
     }
     
@@ -429,14 +514,14 @@ class GameViewModel: ObservableObject {
     func isCellVisible(_ position: Int) -> Bool {
         if specialRule == .fog || specialRule == .fogDisappear {
             // 自分の位置と隣接するマスのみ見える
-            let playerRow = (playerPosition - 1) / 3
-            let playerCol = (playerPosition - 1) % 3
-            let cellRow = (position - 1) / 3
-            let cellCol = (position - 1) % 3
-            
+            let playerRow = Constants.rowFromPosition(playerPosition)
+            let playerCol = Constants.columnFromPosition(playerPosition)
+            let cellRow = Constants.rowFromPosition(position)
+            let cellCol = Constants.columnFromPosition(position)
+
             let rowDiff = abs(cellRow - playerRow)
             let colDiff = abs(cellCol - playerCol)
-            
+
             // 自分の位置または隣接するマス（上下左右斜め）
             return (rowDiff <= 1 && colDiff <= 1)
         }
@@ -474,7 +559,7 @@ class GameViewModel: ObservableObject {
         turnCount = 0
         playerPosition = 1
         enemyPosition = 9
-        gameStatus = .playing
+        gameStatus = .idle  // リセット後はidle状態（startGameで.playingに変更）
         skillUsageCount = 0
         pendingPlayerMove = nil
         hasMovedThisBeat = false
@@ -485,6 +570,7 @@ class GameViewModel: ObservableObject {
         isInvisible = false
         enemyStopped = false
         isSkillActive = false
+        consecutiveWaits = 0
     }
 }
 

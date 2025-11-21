@@ -17,10 +17,16 @@ struct GridCellView: View {
     let isDisappeared: Bool // 消失したマスか
     let onTap: () -> Void
     let disabled: Bool
-    
+    let cellSize: CGFloat // レスポンシブ対応のセルサイズ
+    let characterSize: CGFloat // レスポンシブ対応のキャラクターサイズ
+
+    @State private var isPressed = false
+
     var body: some View {
         Button(action: {
-            // アニメーションなしで即座に実行
+            // ハプティックフィードバック
+            let impact = UIImpactFeedbackGenerator(style: .light)
+            impact.impactOccurred()
             onTap()
         }) {
             ZStack {
@@ -28,7 +34,7 @@ struct GridCellView: View {
                 if isDisappeared {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color(hex: GameColors.disappeared))
-                        .frame(width: 100, height: 100)
+                        .frame(width: cellSize, height: cellSize)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(Color(hex: GameColors.warning).opacity(0.3), lineWidth: 2)
@@ -42,7 +48,7 @@ struct GridCellView: View {
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(Color(hex: GameColors.gridBorder).opacity(0.2), lineWidth: 2)
                         )
-                        .frame(width: 100, height: 100)
+                        .frame(width: cellSize, height: cellSize)
                         .opacity(0.4)
                 }
                 // 通常のマス
@@ -56,16 +62,24 @@ struct GridCellView: View {
                                     lineWidth: isAvailable ? 4 : 2
                                 )
                         )
-                        .frame(width: 100, height: 100)
+                        .frame(width: cellSize, height: cellSize)
                         .opacity(disabled ? 0.5 : 1.0)
-                        .shadow(
-                            color: isAvailable ? Color(hex: GameColors.available).opacity(0.6) : .clear,
-                            radius: isAvailable ? 15 : 0
+                        // 移動可能なマスにパルスエフェクト
+                        .if(isAvailable) { view in
+                            view.pulse(minScale: 0.98, maxScale: 1.02, duration: 0.8)
+                        }
+                        .glow(
+                            color: isAvailable ? Color(hex: GameColors.available) : .clear,
+                            radius: isAvailable ? 15 : 0,
+                            intensity: isAvailable ? 0.8 : 0
                         )
-                        .shadow(
-                            color: isSelected ? Color(hex: GameColors.available).opacity(0.4) : .clear,
-                            radius: isSelected ? 20 : 0
+                        .glow(
+                            color: isSelected ? Color(hex: GameColors.available) : .clear,
+                            radius: isSelected ? 20 : 0,
+                            intensity: isSelected ? 0.6 : 0
                         )
+                        .scaleEffect(isPressed ? 0.95 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
                 }
                 
                 // プレイヤー（見える場合のみ）
@@ -81,12 +95,15 @@ struct GridCellView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 50, height: 50)
-                        .shadow(color: Color(hex: GameColors.player).opacity(0.8), radius: 10)
+                        .frame(width: characterSize, height: characterSize)
                         .overlay(
                             Circle()
                                 .stroke(Color(hex: GameColors.available), lineWidth: 3)
                         )
+                        // プレイヤーにグローエフェクト
+                        .glow(color: Color(hex: GameColors.player), radius: 15, intensity: 0.9)
+                        // プレイヤーに軽いパルス
+                        .pulse(minScale: 1.0, maxScale: 1.05, duration: 1.2)
                 }
                 
                 // 敵（見える場合のみ）
@@ -102,17 +119,86 @@ struct GridCellView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 50, height: 50)
-                        .shadow(color: Color(hex: GameColors.enemy).opacity(0.8), radius: 10)
+                        .frame(width: characterSize, height: characterSize)
                         .overlay(
                             Circle()
                                 .stroke(Color(hex: GameColors.warning), lineWidth: 3)
                         )
+                        // 敵にグローエフェクト（脅威を強調）
+                        .glow(color: Color(hex: GameColors.enemy), radius: 18, intensity: 1.0)
+                        // 敵にパルス（プレイヤーより速く）
+                        .pulse(minScale: 1.0, maxScale: 1.08, duration: 0.9)
                 }
             }
         }
         .disabled(disabled || !isAvailable || isDisappeared)
         .buttonStyle(PlainButtonStyle()) // デフォルトのボタンアニメーションを無効化
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(accessibilityHint)
+        .accessibilityAddTraits(accessibilityTraits)
+    }
+
+    // MARK: - Accessibility Helpers
+    private var accessibilityLabel: String {
+        var label = "マス\(position)"
+
+        if isPlayer {
+            label += "、プレイヤーの位置"
+        }
+        if isEnemy {
+            label += "、敵の位置"
+        }
+        if isDisappeared {
+            label += "、消失したマス"
+        }
+        if !isVisible {
+            label += "、霧で見えないマス"
+        }
+
+        return label
+    }
+
+    private var accessibilityHint: String {
+        if isDisappeared {
+            return "このマスには移動できません"
+        }
+        if !isVisible {
+            return "霧で見えません"
+        }
+        if isAvailable {
+            return "タップして移動先に選択"
+        }
+        return "移動できないマスです"
+    }
+
+    private var accessibilityTraits: AccessibilityTraits {
+        var traits: AccessibilityTraits = [.isButton]
+
+        if isSelected {
+            traits.insert(.isSelected)
+        }
+        if disabled || !isAvailable || isDisappeared {
+            traits.insert(.isStaticText)
+        }
+
+        return traits
+    }
+}
+
+// MARK: - View Extension for Conditional Modifiers
+extension View {
+    @ViewBuilder
+    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
     }
 }
 

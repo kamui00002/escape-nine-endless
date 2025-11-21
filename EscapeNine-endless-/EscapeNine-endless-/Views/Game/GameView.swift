@@ -31,42 +31,19 @@ struct GameView: View {
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                // 最小限のヘッダー
-                HStack {
-                    Button(action: { dismiss() }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("戻る")
-                        }
-                        .font(.fantasyCaption())
-                        .foregroundColor(Color(hex: GameColors.text))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(hex: GameColors.backgroundSecondary))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color(hex: GameColors.gridBorder).opacity(0.5), lineWidth: 1)
-                                )
-                        )
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        if viewModel.gameStatus == .playing {
-                            viewModel.pauseGame()
-                        } else if viewModel.gameStatus == .paused {
-                            viewModel.resumeGame()
-                        }
-                    }) {
-                        Text(viewModel.gameStatus == .paused ? "再開" : "一時停止")
+            GeometryReader { geometry in
+                VStack(spacing: 0) {
+                    // 最小限のヘッダー
+                    HStack {
+                        Button(action: { dismiss() }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                Text("戻る")
+                            }
                             .font(.fantasyCaption())
                             .foregroundColor(Color(hex: GameColors.text))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, ResponsiveLayout.isIPad() ? 16 : 12)
+                            .padding(.vertical, ResponsiveLayout.isIPad() ? 10 : 6)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color(hex: GameColors.backgroundSecondary))
@@ -75,16 +52,40 @@ struct GameView: View {
                                             .stroke(Color(hex: GameColors.gridBorder).opacity(0.5), lineWidth: 1)
                                     )
                             )
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            if viewModel.gameStatus == .playing {
+                                viewModel.pauseGame()
+                            } else if viewModel.gameStatus == .paused {
+                                viewModel.resumeGame()
+                            }
+                        }) {
+                            Text(viewModel.gameStatus == .paused ? "再開" : "一時停止")
+                                .font(.fantasyCaption())
+                                .foregroundColor(Color(hex: GameColors.text))
+                                .padding(.horizontal, ResponsiveLayout.isIPad() ? 16 : 12)
+                                .padding(.vertical, ResponsiveLayout.isIPad() ? 10 : 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color(hex: GameColors.backgroundSecondary))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color(hex: GameColors.gridBorder).opacity(0.5), lineWidth: 1)
+                                        )
+                                )
+                        }
                     }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
-                
-                // メインコンテンツ（中央配置）
-                Spacer()
-                
-                VStack(spacing: 20) {
+                    .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
+                    .padding(.top, ResponsiveLayout.isIPad() ? 16 : 10)
+                    .padding(.bottom, ResponsiveLayout.isIPad() ? 12 : 8)
+                    
+                    // メインコンテンツ（中央配置）
+                    Spacer()
+                    
+                    VStack(spacing: ResponsiveLayout.isIPad() ? 30 : 20) {
                     // BPM Info（コンパクトに）
                     BPMInfoView(
                         floor: viewModel.currentFloor,
@@ -146,12 +147,13 @@ struct GameView: View {
                     
                     // スキルボタン（ダッシュ、透明化の場合）
                     if viewModel.currentSkill.type == .dash || viewModel.currentSkill.type == .invisible {
-                        Button(action: {
-                            viewModel.activateSkill()
-                        }) {
+                        GeometryReader { geometry in
+                            let buttonWidth = ResponsiveLayout.buttonWidth(for: geometry)
                             let isActive = (viewModel.currentSkill.type == .dash && viewModel.isSkillActive) || (viewModel.currentSkill.type == .invisible && viewModel.isInvisible)
                             
-                            return AnyView(
+                            Button(action: {
+                                viewModel.activateSkill()
+                            }) {
                                 HStack(spacing: 8) {
                                     Text(viewModel.currentSkill.name)
                                         .font(.fantasyBody())
@@ -169,7 +171,7 @@ struct GameView: View {
                                 }
                                 .foregroundColor(.white)
                                 .padding()
-                                .frame(maxWidth: 200)
+                                .frame(maxWidth: buttonWidth)
                                 .background(
                                     isActive ?
                                     LinearGradient(
@@ -203,9 +205,11 @@ struct GameView: View {
                                     RoundedRectangle(cornerRadius: 12)
                                         .stroke(isActive ? Color(hex: GameColors.success) : Color.clear, lineWidth: 2)
                                 )
-                            )
+                            }
+                            .disabled(viewModel.remainingSkillUses <= 0 || viewModel.gameStatus != .playing)
+                            .frame(maxWidth: .infinity)
                         }
-                        .disabled(viewModel.remainingSkillUses <= 0 || viewModel.gameStatus != .playing)
+                        .frame(height: ResponsiveLayout.isIPad() ? 60 : 50)
                     }
                     
                     // 特殊ルール表示
@@ -228,11 +232,12 @@ struct GameView: View {
                         Color.clear
                             .frame(height: 0)
                     }
+                    }
+                    
+                    Spacer()
                 }
-                
-                Spacer()
+                .padding(ResponsiveLayout.padding(for: geometry))
             }
-            .padding()
             
             // Floor Clear Overlay
             if viewModel.showFloorClear {
@@ -240,7 +245,11 @@ struct GameView: View {
                     // 背景
                     Color(hex: GameColors.background).opacity(0.95)
                         .ignoresSafeArea()
-                    
+
+                    // 紙吹雪エフェクト
+                    CelebrationEffect()
+                        .ignoresSafeArea()
+
                     // 装飾的な背景
                     RadialGradient(
                         colors: [
@@ -254,13 +263,23 @@ struct GameView: View {
                     .ignoresSafeArea()
                     
                     VStack(spacing: 30) {
-                        Text("\(viewModel.currentFloor)階層")
+                        AnimatedNumber(value: viewModel.currentFloor, duration: 0.5)
                             .font(.fantasyHeading())
                             .foregroundColor(Color(hex: GameColors.available))
-                        
+                            .overlay(
+                                Text("\(viewModel.currentFloor)階層")
+                                    .font(.fantasyHeading())
+                                    .foregroundColor(.clear)
+                            )
+                            .glow(color: Color(hex: GameColors.available), radius: 25, intensity: 1.0)
+                            .bounceIn(delay: 0.1)
+
                         Text("クリア！")
                             .font(.fantasySubheading())
                             .foregroundColor(Color(hex: GameColors.textSecondary))
+                            .glow(color: Color(hex: GameColors.textSecondary), radius: 15, intensity: 0.7)
+                            .pulse(minScale: 1.0, maxScale: 1.1, duration: 0.8)
+                            .bounceIn(delay: 0.3)
                         
                         // 区切り線
                         Rectangle()
@@ -281,7 +300,8 @@ struct GameView: View {
                         Text("次: \(viewModel.currentFloor + 1)階層")
                             .font(.fantasyBody())
                             .foregroundColor(Color(hex: GameColors.text).opacity(0.8))
-                        
+                            .slideIn(from: .bottom, delay: 0.5)
+
                         // スタートボタン
                         Button(action: {
                             viewModel.nextFloor()
@@ -302,8 +322,11 @@ struct GameView: View {
                                     )
                                 )
                                 .cornerRadius(16)
-                                .shadow(color: Color(hex: GameColors.available).opacity(0.6), radius: 15)
+                                .glow(color: Color(hex: GameColors.available), radius: 20, intensity: 0.9)
                         }
+                        .pressableButton(scale: 0.96, shadowRadius: 12)
+                        .pulse(minScale: 1.0, maxScale: 1.05, duration: 1.5)
+                        .bounceIn(delay: 0.7)
                     }
                 }
             }
@@ -451,13 +474,11 @@ struct GameView: View {
                 floor: viewModel.currentFloor,
                 result: viewModel.gameStatus,
                 onPlayAgain: {
-                    showResult = false
                     // ゲームを完全にリセット
                     viewModel.resetGame()
-                    // スタート画面を表示するためにフラグをリセット
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        isGameStarted = false
-                    }
+                    // 状態を同期的にリセットしてUIの不整合を防ぐ
+                    isGameStarted = false
+                    showResult = false
                 },
                 onHome: {
                     dismiss()

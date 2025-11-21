@@ -9,6 +9,7 @@ import SwiftUI
 
 struct CharacterSelectionView: View {
     @StateObject private var playerViewModel = PlayerViewModel()
+    @StateObject private var purchaseManager = PurchaseManager.shared
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -28,7 +29,7 @@ struct CharacterSelectionView: View {
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .frame(height: 120)
+                    .frame(height: ResponsiveLayout.isIPad() ? 140 : 120)
                     .overlay(
                         HStack {
                             Button(action: { dismiss() }) {
@@ -66,32 +67,49 @@ struct CharacterSelectionView: View {
                 }
                 
                 // Content area
-                ScrollView {
-                    VStack(spacing: 20) {
-                        ForEach(CharacterType.allCases, id: \.self) { characterType in
-                            CharacterCardView(
-                                characterType: characterType,
-                                isUnlocked: playerViewModel.unlockedCharacters.contains(characterType),
-                                isSelected: playerViewModel.selectedCharacter == characterType,
-                                highestFloor: playerViewModel.highestFloor,
-                                onSelect: {
-                                    if playerViewModel.unlockedCharacters.contains(characterType) {
-                                        playerViewModel.selectCharacter(characterType)
+                GeometryReader { geometry in
+                    ScrollView {
+                        VStack(spacing: ResponsiveLayout.isIPad() ? 30 : 20) {
+                            ForEach(CharacterType.allCases, id: \.self) { characterType in
+                                CharacterCardView(
+                                    characterType: characterType,
+                                    isUnlocked: playerViewModel.unlockedCharacters.contains(characterType) || playerViewModel.debugUnlockAllCharacters,
+                                    isSelected: playerViewModel.selectedCharacter == characterType,
+                                    highestFloor: playerViewModel.highestFloor,
+                                    onSelect: {
+                                        if playerViewModel.unlockedCharacters.contains(characterType) || playerViewModel.debugUnlockAllCharacters {
+                                            playerViewModel.selectCharacter(characterType)
+                                        }
+                                    },
+                                    onPurchase: {
+                                        // 管理者用設定が有効な場合は、購入処理をスキップして直接アンロック
+                                        if playerViewModel.debugUnlockAllCharacters {
+                                            playerViewModel.unlockCharacter(characterType)
+                                            playerViewModel.selectCharacter(characterType)
+                                        } else {
+                                            // StoreKit課金処理
+                                            Task {
+                                                let success = await purchaseManager.purchaseCharacter(characterType)
+                                                if success {
+                                                    playerViewModel.unlockCharacter(characterType)
+                                                    playerViewModel.selectCharacter(characterType)
+                                                }
+                                            }
+                                        }
                                     }
-                                },
-                                onPurchase: {
-                                    // TODO: 課金処理
-                                }
-                            )
+                                )
+                            }
                         }
+                        .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
+                        .padding(.top, ResponsiveLayout.isIPad() ? 20 : 16)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 16)
                 }
             }
         }
     }
 }
+        .purchaseAlert()
+        .purchaseLoadingOverlay()
 
 struct CharacterCardView: View {
     let characterType: CharacterType
@@ -102,16 +120,7 @@ struct CharacterCardView: View {
     let onPurchase: () -> Void
     
     var skill: Skill {
-        switch characterType {
-        case .hero:
-            return Skill(type: .dash, name: "ダッシュ", description: "2マス移動できる", maxUsage: 5)
-        case .thief:
-            return Skill(type: .diagonal, name: "斜め移動", description: "斜め方向に移動可能", maxUsage: 5)
-        case .wizard:
-            return Skill(type: .invisible, name: "透明化", description: "鬼に当たっても無敵", maxUsage: 5)
-        case .elf:
-            return Skill(type: .bind, name: "拘束", description: "鬼を1ターン停止させる", maxUsage: 5)
-        }
+        Character.getCharacter(for: characterType).skill
     }
     
     var body: some View {

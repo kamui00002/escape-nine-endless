@@ -8,6 +8,7 @@
 import Foundation
 
 enum GameStatus {
+    case idle      // ゲーム開始前・リセット後
     case playing
     case paused
     case win
