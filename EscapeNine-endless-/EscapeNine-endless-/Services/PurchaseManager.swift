@@ -77,7 +77,7 @@ class PurchaseManager: ObservableObject {
         let productID: ProductID
         
         switch characterType {
-        case .mage:
+        case .wizard:
             productID = .characterMage
         case .elf:
             productID = .characterElf
@@ -112,7 +112,7 @@ class PurchaseManager: ObservableObject {
     /// キャラクターの価格を取得
     func characterPrice(_ characterType: CharacterType) -> String {
         switch characterType {
-        case .mage:
+        case .wizard:
             return storeKitService.priceString(for: .characterMage)
         case .elf:
             return storeKitService.priceString(for: .characterElf)
@@ -166,8 +166,8 @@ class PurchaseManager: ObservableObject {
         }
         
         // キャラクターの復元を通知
-        if storeKitService.isCharacterPurchased(.mage) {
-            NotificationCenter.default.post(name: .characterPurchased, object: CharacterType.mage)
+        if storeKitService.isCharacterPurchased(.wizard) {
+            NotificationCenter.default.post(name: .characterPurchased, object: CharacterType.wizard)
         }
         if storeKitService.isCharacterPurchased(.elf) {
             NotificationCenter.default.post(name: .characterPurchased, object: CharacterType.elf)

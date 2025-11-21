@@ -12,9 +12,11 @@ struct ResultView: View {
     let result: GameStatus
     let onPlayAgain: () -> Void
     let onHome: () -> Void
-    
+
     @StateObject private var playerViewModel = PlayerViewModel()
-    
+    @StateObject private var adMobService = AdMobService.shared
+    @State private var adShown = false
+
     var body: some View {
         ZStack {
             // 背景
@@ -140,6 +142,19 @@ struct ResultView: View {
                 Spacer()
             }
             .padding()
+        }
+        .onAppear {
+            // インタースティシャル広告を表示（1回のみ）
+            if !adShown {
+                adShown = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    InterstitialAdPresenter.show { success in
+                        if success {
+                            print("[ResultView] インタースティシャル広告表示成功")
+                        }
+                    }
+                }
+            }
         }
     }
 }

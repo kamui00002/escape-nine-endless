@@ -170,7 +170,7 @@ class StoreKitService: ObservableObject {
     /// キャラクターが購入済みかどうか
     func isCharacterPurchased(_ characterType: CharacterType) -> Bool {
         switch characterType {
-        case .mage:
+        case .wizard:
             return isPurchased(.characterMage)
         case .elf:
             return isPurchased(.characterElf)

@@ -9,11 +9,12 @@ import SwiftUI
 
 struct HomeView: View {
     @StateObject private var playerViewModel = PlayerViewModel()
+    @StateObject private var adMobService = AdMobService.shared
     @State private var showGame = false
     @State private var showRanking = false
     @State private var showSettings = false
     @State private var showCharacterSelection = false
-    
+
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
@@ -203,6 +204,12 @@ struct HomeView: View {
                         Spacer()
                     }
                     .padding(ResponsiveLayout.padding(for: geometry))
+
+                    // バナー広告（画面下部）
+                    VStack {
+                        Spacer()
+                        BannerAdView()
+                    }
                 }
             }
             .navigationDestination(isPresented: $showGame) {

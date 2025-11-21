@@ -106,10 +106,10 @@ struct CharacterSelectionView: View {
                 }
             }
         }
-    }
-}
         .purchaseAlert()
         .purchaseLoadingOverlay()
+    }
+}
 
 struct CharacterCardView: View {
     let characterType: CharacterType
