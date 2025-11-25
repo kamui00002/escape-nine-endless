@@ -42,5 +42,21 @@ struct Floor {
             return .hard
         }
     }
+    
+    /// 階層に応じた敵のスプライト名を取得
+    static func getEnemySprite(for floor: Int) -> String {
+        switch floor {
+        case 1...25:
+            return "red_oni"
+        case 26...50:
+            return "blue_oni"
+        case 51...75:
+            return "skeleton"
+        case 76...100:
+            return "dragon"
+        default:
+            return "red_oni" // フォールバック
+        }
+    }
 }
 

@@ -90,7 +90,23 @@ struct GridCellView: View {
                         Image(sprite)
                             .resizable()
                             .scaledToFit()
-                            .frame(width: characterSize, height: characterSize)
+                            .frame(width: characterSize * 0.9, height: characterSize * 0.9)
+                            .clipShape(Circle())  // 円形にクリップして背景を隠す
+                            .background(
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(hex: GameColors.player).opacity(0.3),
+                                                Color(hex: GameColors.player).opacity(0.1)
+                                            ],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                                    .frame(width: characterSize, height: characterSize)
+                            )
+                            .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
                             // プレイヤーにグローエフェクト
                             .glow(color: Color(hex: GameColors.player), radius: 15, intensity: 0.9)
                             // プレイヤーに軽いパルス
@@ -124,7 +140,23 @@ struct GridCellView: View {
                         Image(sprite)
                             .resizable()
                             .scaledToFit()
-                            .frame(width: characterSize, height: characterSize)
+                            .frame(width: characterSize * 0.9, height: characterSize * 0.9)
+                            .clipShape(Circle())  // 円形にクリップして背景を隠す
+                            .background(
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(hex: GameColors.enemy).opacity(0.3),
+                                                Color(hex: GameColors.enemy).opacity(0.1)
+                                            ],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                                    .frame(width: characterSize, height: characterSize)
+                            )
+                            .shadow(color: Color(hex: GameColors.enemy).opacity(0.4), radius: 5, x: 0, y: 2)
                             // 敵にグローエフェクト（脅威を強調）
                             .glow(color: Color(hex: GameColors.enemy), radius: 18, intensity: 1.0)
                             // 敵にパルス（プレイヤーより速く）

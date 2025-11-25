@@ -164,6 +164,63 @@ struct CharacterCardView: View {
                 }
             }
             
+            // キャラクター画像
+            HStack {
+                Spacer()
+                ZStack {
+                    // 背景グラデーション
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: GameColors.main).opacity(0.2),
+                                    Color(hex: GameColors.accent).opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(
+                            width: ResponsiveLayout.isIPad() ? 160 : 110,
+                            height: ResponsiveLayout.isIPad() ? 160 : 110
+                        )
+                    
+                    // キャラクター画像
+                    Image(characterType.rawValue)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(
+                            width: ResponsiveLayout.isIPad() ? 140 : 95,
+                            height: ResponsiveLayout.isIPad() ? 140 : 95
+                        )
+                        .clipShape(Circle())  // 円形にクリップ
+                        .opacity(isUnlocked ? 1.0 : 0.4)
+                        .shadow(
+                            color: isUnlocked ? Color(hex: GameColors.main).opacity(0.3) : Color.clear,
+                            radius: 8,
+                            x: 0,
+                            y: 4
+                        )
+                    
+                    // ロックオーバーレイ
+                    if !isUnlocked {
+                        ZStack {
+                            Circle()
+                                .fill(Color.black.opacity(0.6))
+                                .frame(
+                                    width: ResponsiveLayout.isIPad() ? 140 : 95,
+                                    height: ResponsiveLayout.isIPad() ? 140 : 95
+                                )
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: ResponsiveLayout.isIPad() ? 40 : 30))
+                                .foregroundColor(Color(hex: GameColors.warning))
+                        }
+                    }
+                }
+                Spacer()
+            }
+            .padding(.vertical, 8)
+            
             // スキル情報
             VStack(alignment: .leading, spacing: 8) {
                 Text("スキル: \(skill.name)")

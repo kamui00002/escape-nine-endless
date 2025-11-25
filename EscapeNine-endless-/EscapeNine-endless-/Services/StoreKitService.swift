@@ -13,7 +13,7 @@ import Combine
 enum ProductID: String, CaseIterable {
     case characterMage = "com.escapenine.character.mage"      // 魔法使い ¥240
     case characterElf = "com.escapenine.character.elf"        // エルフ ¥240
-    case removeAds = "com.escapenine.removeads"               // 広告削除 ¥480
+    case removeAds = "com.escapenine.removeads"               // 広告削除 ¥240
     
     var displayName: String {
         switch self {

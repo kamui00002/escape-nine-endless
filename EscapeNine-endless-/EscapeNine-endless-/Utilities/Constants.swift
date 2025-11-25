@@ -23,10 +23,10 @@ enum Constants {
     static let beatCheckInterval = 0.01 // 10msごとにチェック
     static let invisibilityDuration = 0.1 // 透明化スキルの持続時間（秒）
 
-    // BPM Settings（ゲームバランス改善版: 80→180、10階層ごとに10BPM上昇）
-    static let minBPM = 80.0
-    static let maxBPM = 180.0
-    static let bpmIncrement = 10.0
+    // BPM Settings（要件定義書準拠: 60→240、10階層ごとに20BPM上昇）
+    static let minBPM = 60.0
+    static let maxBPM = 240.0
+    static let bpmIncrement = 20.0
 
     // Skill Settings
     static let skillResetInterval = 10  // 10階層ごとにスキルリセット

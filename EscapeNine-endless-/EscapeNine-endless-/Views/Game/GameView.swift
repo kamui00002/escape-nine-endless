@@ -13,6 +13,7 @@ struct GameView: View {
     @Environment(\.dismiss) var dismiss
     @State private var showResult = false
     @State private var isGameStarted = false
+    @State private var selectedAILevel: AILevel = .normal // プレイヤーが選択したAI難易度
     
     init() {
         // ViewModelにPlayerViewModelを設定
@@ -142,7 +143,9 @@ struct GameView: View {
                                 viewModel.bindEnemy()
                             }
                         },
-                        disabled: viewModel.gameStatus != .playing
+                        disabled: viewModel.gameStatus != .playing,
+                        playerSprite: viewModel.currentCharacter.spriteName,
+                        enemySprite: Floor.getEnemySprite(for: viewModel.currentFloor)
                     )
                     
                     // スキルボタン（ダッシュ、透明化の場合）
@@ -354,15 +357,44 @@ struct GameView: View {
                             Text("準備はできましたか？")
                                 .font(.fantasySubheading())
                                 .foregroundColor(Color(hex: GameColors.text))
-                            
+
                             Text("\(viewModel.currentFloor)階層")
                                 .font(.fantasyHeading())
                                 .foregroundColor(Color(hex: GameColors.available))
                         }
-                        
+
+                        // AI難易度選択
+                        VStack(spacing: 12) {
+                            Text("鬼の強さを選ぶ")
+                                .font(.fantasyCaption())
+                                .foregroundColor(Color(hex: GameColors.text))
+
+                            HStack(spacing: 12) {
+                                ForEach(AILevel.allCases, id: \.self) { level in
+                                    Button(action: {
+                                        selectedAILevel = level
+                                    }) {
+                                        Text(level.rawValue)
+                                            .font(.fantasyCaption())
+                                            .foregroundColor(selectedAILevel == level ? .white : Color(hex: GameColors.text))
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(selectedAILevel == level ? Color(hex: GameColors.available) : Color(hex: GameColors.backgroundSecondary))
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(Color(hex: GameColors.gridBorder).opacity(0.5), lineWidth: 1)
+                                            )
+                                    }
+                                }
+                            }
+                        }
+
                         Button(action: {
                             isGameStarted = true
-                            viewModel.startGame(aiLevel: .normal)
+                            viewModel.startGame(aiLevel: selectedAILevel)
                         }) {
                             Text("冒険を始める")
                                 .font(.fantasyBody())

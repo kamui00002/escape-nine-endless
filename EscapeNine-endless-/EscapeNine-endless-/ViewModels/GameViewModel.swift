@@ -25,7 +25,10 @@ class GameViewModel: ObservableObject {
     @Published var enemyStopped: Bool = false // 敵が停止しているか
     @Published var isSkillActive: Bool = false // スキルがアクティブか（ダッシュ、斜め移動用）
     @Published var consecutiveWaits: Int = 0 // 連続待機回数
-    
+
+    // MARK: - Game Settings
+    private var selectedAILevel: AILevel = .normal // プレイヤーが選択したAI難易度（全階層で固定）
+
     // MARK: - Dependencies
     private let beatEngine = BeatEngine()
     private let gameEngine = GameEngine.shared
@@ -125,11 +128,11 @@ class GameViewModel: ObservableObject {
         var nextEnemyPosition = enemyPosition
 
         if !enemyStopped {
-            let difficulty = playerViewModelInstance?.debugAILevel ?? stageManager.getDifficulty(for: currentFloor)
+            // 選択されたAI難易度を使用（全階層で固定）
             nextEnemyPosition = aiEngine.calculateNextMove(
                 from: enemyPosition,
                 target: playerPosition, // プレイヤーの「現在」の位置を使用
-                level: difficulty
+                level: selectedAILevel
             )
         } else {
             // 拘束中は敵を移動させない
@@ -156,12 +159,13 @@ class GameViewModel: ObservableObject {
         let isCollision = (playerPosition == enemyPosition) || isCrossing
 
         if isCollision {
-            if currentSkill.type == .invisible && isInvisible && remainingSkillUses > 0 {
-                // 透明化スキルで無敵
+            if currentSkill.type == .invisible && remainingSkillUses > 0 {
+                // 透明化スキル: 常時有効、衝突時に自動消費
                 skillUsageCount += 1
-                // 次のビートで透明化を解除
-                DispatchQueue.main.asyncAfter(deadline: .now() + Constants.invisibilityDuration) {
-                    self.isInvisible = false
+                // 視覚効果用にフラグを一時的にON
+                isInvisible = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + Constants.invisibilityDuration) { [weak self] in
+                    self?.isInvisible = false
                 }
             } else {
                 endGame(result: .lose)
@@ -225,20 +229,20 @@ class GameViewModel: ObservableObject {
         let startFloor = playerViewModelInstance?.debugStartFloor ?? 1
         currentFloor = max(1, min(startFloor, Constants.maxFloors))
         
+        // AI難易度を保存（全階層で固定）
         // デバッグ用のAI難易度を使用（設定されている場合）
-        let effectiveAILevel = playerViewModelInstance?.debugAILevel ?? aiLevel
-        
+        selectedAILevel = playerViewModelInstance?.debugAILevel ?? aiLevel
+
         turnCount = 0
         gameStatus = .playing
         skillUsageCount = 0
-        pendingPlayerMove = nil
         hasMovedThisBeat = false
         lastProcessedBeat = 0
         isInvisible = false
         enemyStopped = false
         isSkillActive = false
         consecutiveWaits = 0
-        
+
         // ランダム配置（同じ位置にならないように）
         let playerPos = Int.random(in: 1...9)
         var enemyPos = Int.random(in: 1...9)
@@ -247,6 +251,9 @@ class GameViewModel: ObservableObject {
         }
         playerPosition = playerPos
         enemyPosition = enemyPos
+
+        // 初期位置を設定（最初のビートで即ゲームオーバーにならないように）
+        pendingPlayerMove = playerPosition
         
         // BPM設定
         let bpm = stageManager.getBPM(for: currentFloor)
@@ -257,30 +264,34 @@ class GameViewModel: ObservableObject {
         // 特殊ルール設定
         specialRule = stageManager.getSpecialRule(for: currentFloor)
         updateDisappearedCells()
-        
-        // AI難易度を設定（StageManagerに反映）
-        // 注意: 現在のStageManagerは階層に基づいて難易度を決定するため、
-        // デバッグ用の難易度は直接AIEngineに渡す必要がある場合があります
     }
     
     // 移動先を指定（次のビートで移動）
     func selectMove(to position: Int) {
         guard gameStatus == .playing else { return }
         guard !hasMovedThisBeat else { return } // 既にこのビートで移動済み
-        
+
+        // ビートタイミングチェック（音ゲー要素の核心）
+        // 注意: 初回の移動（階層開始直後）は例外として許可
+        if currentBeat > 0 && !beatEngine.checkMoveTiming() {
+            // タイミングミスでゲームオーバー
+            endGame(result: .lose)
+            return
+        }
+
         // 移動可能な位置を取得（スキルを考慮）
         let availableMoves = getAvailableMoves()
-        
+
         // 移動可能かチェック
         guard availableMoves.contains(position) else {
             return
         }
-        
+
         // 消失したマスに入っていないかチェック
         guard !disappearedCells.contains(position) else {
             return
         }
-        
+
         // 次のビートで移動する位置を設定
         pendingPlayerMove = position
     }
@@ -403,13 +414,12 @@ class GameViewModel: ObservableObject {
     
     private func moveEnemy() {
         guard gameStatus == .playing else { return }
-        
-        // デバッグ用のAI難易度を使用（設定されている場合）
-        let difficulty = playerViewModelInstance?.debugAILevel ?? stageManager.getDifficulty(for: currentFloor)
+
+        // 選択されたAI難易度を使用（全階層で固定）
         enemyPosition = aiEngine.calculateNextMove(
             from: enemyPosition,
             target: playerPosition,
-            level: difficulty
+            level: selectedAILevel
         )
         
         if enemyPosition == playerPosition {
@@ -457,9 +467,10 @@ class GameViewModel: ObservableObject {
             // 消失したマスが多すぎる場合のフォールバック
             playerPosition = 1
             enemyPosition = 9
+            pendingPlayerMove = playerPosition
             return
         }
-        
+
         let playerPos = availablePositions.randomElement()!
         var enemyPos = availablePositions.randomElement()!
         while enemyPos == playerPos {
@@ -467,7 +478,10 @@ class GameViewModel: ObservableObject {
         }
         playerPosition = playerPos
         enemyPosition = enemyPos
-        
+
+        // 初期位置を設定（次の階層開始時に即ゲームオーバーにならないように）
+        pendingPlayerMove = playerPosition
+
         // 次の階層の準備ができたら再開
         beatEngine.resume()
     }
