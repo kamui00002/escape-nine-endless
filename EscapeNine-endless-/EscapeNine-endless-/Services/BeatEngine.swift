@@ -20,6 +20,7 @@ class BeatEngine: ObservableObject {
     private var beatInterval: TimeInterval = 1.0
     private var timer: Timer?
     private var lastBeatTime: Date = Date()
+    private var isFirstBeat: Bool = true  // 初回ビート判定用
     
     // MARK: - Constants
     private let timingTolerance: Double = Constants.timingTolerance
@@ -84,6 +85,7 @@ class BeatEngine: ObservableObject {
         timer?.invalidate()
         timer = nil
         currentBeat = 0  // ビートカウンターをリセット
+        isFirstBeat = true  // 初回ビートフラグをリセット
     }
 
     func pause() {
@@ -102,6 +104,7 @@ class BeatEngine: ObservableObject {
     // MARK: - Beat Detection
     private func startBeatDetection() {
         lastBeatTime = Date()
+        isFirstBeat = true  // 初回ビートフラグをリセット
         
         // 高精度タイマー(10msごとにチェック)
         timer = Timer.scheduledTimer(
@@ -116,9 +119,13 @@ class BeatEngine: ObservableObject {
         let now = Date()
         let elapsed = now.timeIntervalSince(lastBeatTime)
         
-        if elapsed >= beatInterval {
+        // 初回ビートは2倍の時間待つ（プレイヤーに猶予時間を与える）
+        let requiredInterval = isFirstBeat ? (beatInterval * 2.0) : beatInterval
+        
+        if elapsed >= requiredInterval {
             onBeat()
             lastBeatTime = now
+            isFirstBeat = false  // 2回目以降は通常のインターバル
         }
     }
     
