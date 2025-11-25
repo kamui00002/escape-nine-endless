@@ -19,9 +19,9 @@ class GameEngine {
             return false
         }
         
-        // 同じマスは移動不可
+        // 待機を許可（同じマスにとどまる）
         if currentPosition == newPosition {
-            return false
+            return true  // 待機は有効な選択肢
         }
         
         // グリッドの位置関係を計算
