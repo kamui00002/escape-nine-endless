@@ -19,6 +19,8 @@ struct GridCellView: View {
     let disabled: Bool
     let cellSize: CGFloat // レスポンシブ対応のセルサイズ
     let characterSize: CGFloat // レスポンシブ対応のキャラクターサイズ
+    let playerSprite: String? // プレイヤーのスプライト名
+    let enemySprite: String? // 敵のスプライト名
 
     @State private var isPressed = false
 
@@ -84,50 +86,70 @@ struct GridCellView: View {
                 
                 // プレイヤー（見える場合のみ）
                 if isPlayer && isVisible {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: GameColors.player),
-                                    Color(hex: GameColors.success)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                    if let sprite = playerSprite {
+                        Image(sprite)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: characterSize, height: characterSize)
+                            // プレイヤーにグローエフェクト
+                            .glow(color: Color(hex: GameColors.player), radius: 15, intensity: 0.9)
+                            // プレイヤーに軽いパルス
+                            .pulse(minScale: 1.0, maxScale: 1.05, duration: 1.2)
+                    } else {
+                        // フォールバック: 元のCircle表示
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.player),
+                                        Color(hex: GameColors.success)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                        .frame(width: characterSize, height: characterSize)
-                        .overlay(
-                            Circle()
-                                .stroke(Color(hex: GameColors.available), lineWidth: 3)
-                        )
-                        // プレイヤーにグローエフェクト
-                        .glow(color: Color(hex: GameColors.player), radius: 15, intensity: 0.9)
-                        // プレイヤーに軽いパルス
-                        .pulse(minScale: 1.0, maxScale: 1.05, duration: 1.2)
+                            .frame(width: characterSize, height: characterSize)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color(hex: GameColors.available), lineWidth: 3)
+                            )
+                            .glow(color: Color(hex: GameColors.player), radius: 15, intensity: 0.9)
+                            .pulse(minScale: 1.0, maxScale: 1.05, duration: 1.2)
+                    }
                 }
                 
                 // 敵（見える場合のみ）
                 if isEnemy && isVisible {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: GameColors.enemy),
-                                    Color(hex: GameColors.warning)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                    if let sprite = enemySprite {
+                        Image(sprite)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: characterSize, height: characterSize)
+                            // 敵にグローエフェクト（脅威を強調）
+                            .glow(color: Color(hex: GameColors.enemy), radius: 18, intensity: 1.0)
+                            // 敵にパルス（プレイヤーより速く）
+                            .pulse(minScale: 1.0, maxScale: 1.08, duration: 0.9)
+                    } else {
+                        // フォールバック: 元のCircle表示
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.enemy),
+                                        Color(hex: GameColors.warning)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                        .frame(width: characterSize, height: characterSize)
-                        .overlay(
-                            Circle()
-                                .stroke(Color(hex: GameColors.warning), lineWidth: 3)
-                        )
-                        // 敵にグローエフェクト（脅威を強調）
-                        .glow(color: Color(hex: GameColors.enemy), radius: 18, intensity: 1.0)
-                        // 敵にパルス（プレイヤーより速く）
-                        .pulse(minScale: 1.0, maxScale: 1.08, duration: 0.9)
+                            .frame(width: characterSize, height: characterSize)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color(hex: GameColors.warning), lineWidth: 3)
+                            )
+                            .glow(color: Color(hex: GameColors.enemy), radius: 18, intensity: 1.0)
+                            .pulse(minScale: 1.0, maxScale: 1.08, duration: 0.9)
+                    }
                 }
             }
         }
