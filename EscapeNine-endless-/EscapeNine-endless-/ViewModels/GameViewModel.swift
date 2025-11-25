@@ -27,10 +27,10 @@ class GameViewModel: ObservableObject {
     @Published var consecutiveWaits: Int = 0 // 連続待機回数
 
     // MARK: - Game Settings
-    private var selectedAILevel: AILevel = .normal // プレイヤーが選択したAI難易度（全階層で固定）
+    private var selectedAILevel: AILevel = .easy // プレイヤーが選択したAI難易度（全階層で固定、初心者向けにEasyをデフォルト）
 
     // MARK: - Dependencies
-    private let beatEngine = BeatEngine()
+    private let audioManager = AudioManager.shared
     private let gameEngine = GameEngine.shared
     private let aiEngine = AIEngine.shared
     private let stageManager = StageManager.shared
@@ -65,11 +65,11 @@ class GameViewModel: ObservableObject {
     
     // MARK: - Computed Properties
     var currentBeat: Int {
-        beatEngine.currentBeat
+        audioManager.currentBeat
     }
     
     var isPlaying: Bool {
-        beatEngine.isPlaying
+        audioManager.isPlaying
     }
     
     // MARK: - Initialization
@@ -79,7 +79,7 @@ class GameViewModel: ObservableObject {
     
     // MARK: - Setup
     private func setupBeatObserver() {
-        beatEngine.$currentBeat
+        audioManager.beatPublisher
             .sink { [weak self] beat in
                 self?.onBeat(beat)
             }
@@ -151,6 +151,9 @@ class GameViewModel: ObservableObject {
         enemyPosition = nextEnemyPosition
         pendingPlayerMove = nil
         hasMovedThisBeat = true
+        
+        // 移動効果音
+        audioManager.playSoundEffect(.move)
 
         // すれ違い判定（プレイヤーと鬼が位置を入れ替えた場合）
         let isCrossing = (previousPlayerPosition == nextEnemyPosition && previousEnemyPosition == nextPosition)
@@ -180,7 +183,10 @@ class GameViewModel: ObservableObject {
         if turnCount >= maxTurns {
             // 階層クリア表示
             showFloorClear = true
-            beatEngine.pause()
+            audioManager.pauseBGM()
+            
+            // フロアクリア効果音
+            audioManager.playSoundEffect(.floorClear)
         }
 
         // hasMovedThisBeatはtrueのまま維持（次のビートでリセット）
@@ -257,9 +263,7 @@ class GameViewModel: ObservableObject {
         
         // BPM設定
         let bpm = stageManager.getBPM(for: currentFloor)
-        let bgmVolume = playerViewModelInstance?.bgmVolume ?? Constants.defaultVolume
-        beatEngine.loadMusic(bpm: bpm, volume: bgmVolume)
-        beatEngine.play()
+        audioManager.startBGM(bpm: bpm)
         
         // 特殊ルール設定
         specialRule = stageManager.getSpecialRule(for: currentFloor)
@@ -270,14 +274,6 @@ class GameViewModel: ObservableObject {
     func selectMove(to position: Int) {
         guard gameStatus == .playing else { return }
         guard !hasMovedThisBeat else { return } // 既にこのビートで移動済み
-
-        // ビートタイミングチェック（音ゲー要素の核心）
-        // 注意: 初回の移動（階層開始直後）は例外として許可
-        if currentBeat > 0 && !beatEngine.checkMoveTiming() {
-            // タイミングミスでゲームオーバー
-            endGame(result: .lose)
-            return
-        }
 
         // 移動可能な位置を取得（スキルを考慮）
         let availableMoves = getAvailableMoves()
@@ -387,6 +383,9 @@ class GameViewModel: ObservableObject {
         guard gameStatus == .playing else { return }
         guard remainingSkillUses > 0 else { return }
         
+        // スキル効果音
+        audioManager.playSoundEffect(.skill)
+        
         switch currentSkill.type {
         case .dash:
             // ダッシュ: 次の移動で2マス移動可能
@@ -407,6 +406,9 @@ class GameViewModel: ObservableObject {
         guard gameStatus == .playing else { return }
         guard currentSkill.type == .bind else { return }
         guard remainingSkillUses > 0 else { return }
+        
+        // スキル効果音
+        audioManager.playSoundEffect(.skill)
         
         enemyStopped = true
         skillUsageCount += 1
@@ -454,8 +456,7 @@ class GameViewModel: ObservableObject {
         
         // BPM変更
         let newBPM = stageManager.getBPM(for: currentFloor)
-        let bgmVolume = playerViewModelInstance?.bgmVolume ?? Constants.defaultVolume
-        beatEngine.changeBPM(newBPM, volume: bgmVolume)
+        audioManager.changeBPM(newBPM)
         
         // 特殊ルール設定
         specialRule = stageManager.getSpecialRule(for: currentFloor)
@@ -483,7 +484,7 @@ class GameViewModel: ObservableObject {
         pendingPlayerMove = playerPosition
 
         // 次の階層の準備ができたら再開
-        beatEngine.resume()
+        audioManager.resumeBGM()
     }
     
     // MARK: - Special Rules
@@ -549,7 +550,12 @@ class GameViewModel: ObservableObject {
     
     func endGame(result: GameStatus) {
         gameStatus = result
-        beatEngine.stop()
+        audioManager.stopBGM()
+        
+        // ゲームオーバー効果音
+        if result == .lose {
+            audioManager.playSoundEffect(.gameOver)
+        }
         
         // スコア送信
         if result == .win || result == .lose {
@@ -559,16 +565,16 @@ class GameViewModel: ObservableObject {
     
     func pauseGame() {
         gameStatus = .paused
-        beatEngine.pause()
+        audioManager.pauseBGM()
     }
     
     func resumeGame() {
         gameStatus = .playing
-        beatEngine.resume()
+        audioManager.resumeBGM()
     }
     
     func resetGame() {
-        beatEngine.stop()
+        audioManager.stopBGM()
         currentFloor = 1
         turnCount = 0
         playerPosition = 1

@@ -14,8 +14,16 @@ class PlayerViewModel: ObservableObject {
     @Published var unlockedCharacters: [CharacterType] = [.hero]
     @Published var selectedCharacter: CharacterType = .hero
     @Published var adRemoved: Bool = false
-    @Published var bgmVolume: Double = Constants.defaultVolume // BGM音量（0.0-1.0）
-    @Published var seVolume: Double = Constants.defaultVolume // 効果音量（0.0-1.0）
+    @Published var bgmVolume: Double = Constants.defaultVolume {
+        didSet {
+            AudioManager.shared.setBGMVolume(bgmVolume)
+        }
+    }
+    @Published var seVolume: Double = Constants.defaultVolume {
+        didSet {
+            AudioManager.shared.setSFXVolume(seVolume)
+        }
+    }
     
     // MARK: - Debug/Admin Properties (管理者用 - 後で削除可能)
     @Published var debugStartFloor: Int = 1 // デバッグ用開始階層

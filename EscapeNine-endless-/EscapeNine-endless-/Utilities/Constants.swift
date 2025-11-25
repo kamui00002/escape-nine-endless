@@ -18,8 +18,8 @@ enum Constants {
     static let maxTurns = 10
     static let maxSkillUsage = 5
 
-    // Timing
-    static let timingTolerance = 0.15 // ±15%の誤差許容
+    // Timing（初心者向けに大幅緩和）
+    static let timingTolerance = 0.6 // ±60%の誤差許容（初心者向けに緩和）
     static let beatCheckInterval = 0.01 // 10msごとにチェック
     static let invisibilityDuration = 0.1 // 透明化スキルの持続時間（秒）
 
@@ -31,8 +31,8 @@ enum Constants {
     // Skill Settings
     static let skillResetInterval = 10  // 10階層ごとにスキルリセット
 
-    // Wait Settings
-    static let maxConsecutiveWaits = 2  // 連続待機の最大回数
+    // Wait Settings（初心者向けに緩和）
+    static let maxConsecutiveWaits = 5  // 連続待機の最大回数（考える時間を確保）
 
     // Floor Ranges for Special Rules（要件定義書準拠）
     static let fogStartFloor = 21        // 霧マップ: 階層21-40

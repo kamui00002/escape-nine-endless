@@ -13,7 +13,7 @@ struct GameView: View {
     @Environment(\.dismiss) var dismiss
     @State private var showResult = false
     @State private var isGameStarted = false
-    @State private var selectedAILevel: AILevel = .normal // プレイヤーが選択したAI難易度
+    @State private var selectedAILevel: AILevel = .easy // プレイヤーが選択したAI難易度（初心者向けにEasyをデフォルト）
     
     init() {
         // ViewModelにPlayerViewModelを設定
