@@ -66,10 +66,6 @@ struct GridCellView: View {
                         )
                         .frame(width: cellSize, height: cellSize)
                         .opacity(disabled ? 0.5 : 1.0)
-                        // 移動可能なマスにパルスエフェクト
-                        .if(isAvailable) { view in
-                            view.pulse(minScale: 0.98, maxScale: 1.02, duration: 0.8)
-                        }
                         .glow(
                             color: isAvailable ? Color(hex: GameColors.available) : .clear,
                             radius: isAvailable ? 15 : 0,

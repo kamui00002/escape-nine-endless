@@ -14,10 +14,11 @@ class AudioManager: ObservableObject {
     // MARK: - Published Properties
     @Published var isBGMEnabled: Bool = true {
         didSet {
+            // BGMのON/OFFは音量だけを変更（ビートエンジンは動かし続ける）
             if isBGMEnabled {
-                resumeBGM()
+                beatEngine.setVolume(bgmVolume)
             } else {
-                pauseBGM()
+                beatEngine.setVolume(0.0)
             }
         }
     }
@@ -67,17 +68,25 @@ class AudioManager: ObservableObject {
     
     // MARK: - User Preferences
     private func loadUserPreferences() {
-        isBGMEnabled = UserDefaults.standard.bool(forKey: "isBGMEnabled")
-        isSFXEnabled = UserDefaults.standard.bool(forKey: "isSFXEnabled")
-        bgmVolume = UserDefaults.standard.double(forKey: "bgmVolume")
-        sfxVolume = UserDefaults.standard.double(forKey: "sfxVolume")
+        // 初回起動チェック
+        let isFirstLaunch = !UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
         
-        // デフォルト値設定（初回起動時）
-        if bgmVolume == 0 && sfxVolume == 0 {
-            bgmVolume = 0.7
-            sfxVolume = 0.8
+        if isFirstLaunch {
+            // デフォルト値を設定（初回起動時）
             isBGMEnabled = true
             isSFXEnabled = true
+            bgmVolume = 0.7
+            sfxVolume = 0.8
+            
+            // 初回起動フラグを保存
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            saveUserPreferences()
+        } else {
+            // 保存された設定を読み込み
+            isBGMEnabled = UserDefaults.standard.bool(forKey: "isBGMEnabled")
+            isSFXEnabled = UserDefaults.standard.bool(forKey: "isSFXEnabled")
+            bgmVolume = UserDefaults.standard.double(forKey: "bgmVolume")
+            sfxVolume = UserDefaults.standard.double(forKey: "sfxVolume")
         }
     }
     
@@ -121,8 +130,9 @@ class AudioManager: ObservableObject {
     
     // MARK: - BGM Control
     func startBGM(bpm: Double) {
-        guard isBGMEnabled else { return }
-        beatEngine.loadMusic(bpm: bpm, volume: bgmVolume)
+        // BGMが無効でもビートエンジンは動かす（ゲームロジックのため）
+        let volume = isBGMEnabled ? bgmVolume : 0.0
+        beatEngine.loadMusic(bpm: bpm, volume: volume)
         beatEngine.play()
     }
     
@@ -135,13 +145,20 @@ class AudioManager: ObservableObject {
     }
     
     func resumeBGM() {
-        guard isBGMEnabled else { return }
+        // BGMが無効でもビートエンジンは再開（ゲームロジックのため）
         beatEngine.resume()
+        // 音量だけ調整
+        if isBGMEnabled {
+            beatEngine.setVolume(bgmVolume)
+        } else {
+            beatEngine.setVolume(0.0)
+        }
     }
     
     func changeBPM(_ newBPM: Double) {
-        guard isBGMEnabled else { return }
-        beatEngine.changeBPM(newBPM, volume: bgmVolume)
+        // BGMが無効でもビートエンジンのBPMは変更（ゲームロジックのため）
+        let volume = isBGMEnabled ? bgmVolume : 0.0
+        beatEngine.changeBPM(newBPM, volume: volume)
     }
     
     func setBGMVolume(_ volume: Double) {
@@ -182,6 +199,11 @@ class AudioManager: ObservableObject {
     
     func checkMoveTiming() -> Bool {
         beatEngine.checkMoveTiming()
+    }
+    
+    /// 次のビートまでの残り時間（0.0〜1.0の割合）
+    func timeUntilNextBeat() -> Double {
+        beatEngine.timeUntilNextBeat()
     }
     
     // BeatEngineのPublisherをそのまま公開

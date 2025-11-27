@@ -25,6 +25,7 @@ class GameViewModel: ObservableObject {
     @Published var enemyStopped: Bool = false // 敵が停止しているか
     @Published var isSkillActive: Bool = false // スキルがアクティブか（ダッシュ、斜め移動用）
     @Published var consecutiveWaits: Int = 0 // 連続待機回数
+    @Published var showSkillReset: Bool = false // スキルリセット通知
 
     // MARK: - Game Settings
     private var selectedAILevel: AILevel = .easy // プレイヤーが選択したAI難易度（全階層で固定、初心者向けにEasyをデフォルト）
@@ -273,7 +274,7 @@ class GameViewModel: ObservableObject {
     // 移動先を指定（次のビートで移動）
     func selectMove(to position: Int) {
         guard gameStatus == .playing else { return }
-        guard !hasMovedThisBeat else { return } // 既にこのビートで移動済み
+        // hasMovedThisBeatチェックを削除：プレイヤーは次のビートまで何度でも移動先を変更できる
 
         // 移動可能な位置を取得（スキルを考慮）
         let availableMoves = getAvailableMoves()
@@ -338,7 +339,7 @@ class GameViewModel: ObservableObject {
             moves.append(Constants.positionFromRowColumn(row: row - 2, column: col))
         }
         // 下2マス
-        if row <= 0 {
+        if row <= Constants.gridRows - 3 {
             moves.append(Constants.positionFromRowColumn(row: row + 2, column: col))
         }
         // 左2マス
@@ -346,7 +347,7 @@ class GameViewModel: ObservableObject {
             moves.append(Constants.positionFromRowColumn(row: row, column: col - 2))
         }
         // 右2マス
-        if col <= 0 {
+        if col <= Constants.gridColumns - 3 {
             moves.append(Constants.positionFromRowColumn(row: row, column: col + 2))
         }
 
@@ -439,6 +440,11 @@ class GameViewModel: ObservableObject {
         // 10階層ごとにスキル使用回数をリセット
         if currentFloor % Constants.skillResetInterval == 1 {
             skillUsageCount = 0
+            showSkillReset = true
+            // 3秒後に通知を非表示
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.showSkillReset = false
+            }
         }
 
         pendingPlayerMove = nil
@@ -527,6 +533,11 @@ class GameViewModel: ObservableObject {
     
     // 霧マップ: プレイヤーから見えるマスかどうか
     func isCellVisible(_ position: Int) -> Bool {
+        // 消失マスは常に見える（プレイヤーが避けられるように）
+        if disappearedCells.contains(position) {
+            return true
+        }
+        
         if specialRule == .fog || specialRule == .fogDisappear {
             // 自分の位置と隣接するマスのみ見える
             let playerRow = Constants.rowFromPosition(playerPosition)
@@ -587,6 +598,7 @@ class GameViewModel: ObservableObject {
         specialRule = .none
         disappearedCells = []
         showFloorClear = false
+        showSkillReset = false
         isInvisible = false
         enemyStopped = false
         isSkillActive = false

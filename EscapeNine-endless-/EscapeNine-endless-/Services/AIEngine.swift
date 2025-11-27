@@ -32,8 +32,8 @@ class AIEngine {
     private func easyAI(enemyPosition: Int, playerPosition: Int) -> Int {
         let availableMoves = GameEngine.shared.getAvailableMoves(from: enemyPosition)
 
-        // 30%の確率でプレイヤーに近づく、70%はランダム移動
-        if Double.random(in: 0...1) < 0.3 {
+        // 50%の確率でプレイヤーに近づく、50%はランダム移動（初心者向けバランス調整）
+        if Double.random(in: 0...1) < 0.5 {
             if let moveTowardsPlayer = getMoveTowardsPlayer(
                 from: enemyPosition,
                 target: playerPosition,
@@ -43,7 +43,7 @@ class AIEngine {
             }
         }
 
-        // ランダム移動（70%の確率）
+        // ランダム移動（50%の確率）
         return availableMoves.randomElement() ?? availableMoves[0]
     }
     

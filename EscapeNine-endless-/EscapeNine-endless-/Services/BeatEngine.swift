@@ -123,9 +123,16 @@ class BeatEngine: ObservableObject {
         let requiredInterval = isFirstBeat ? (beatInterval * 2.0) : beatInterval
         
         if elapsed >= requiredInterval {
+            // ビート発火前にフラグを更新（次回から通常インターバル）
+            if isFirstBeat {
+                print("🎵 初回ビート発火（猶予時間: \(elapsed)秒）")
+                isFirstBeat = false
+            }
+            
+            lastBeatTime = now  // ビート時刻を更新
             onBeat()
-            lastBeatTime = now
-            isFirstBeat = false  // 2回目以降は通常のインターバル
+            
+            print("🎵 ビート #\(currentBeat) 発火（経過時間: \(elapsed)秒、間隔: \(requiredInterval)秒）")
         }
     }
     
@@ -146,6 +153,15 @@ class BeatEngine: ObservableObject {
         let tolerance = beatInterval * timingTolerance
         
         return timeDiff <= tolerance
+    }
+    
+    /// 次のビートまでの残り時間（0.0〜1.0の割合）
+    func timeUntilNextBeat() -> Double {
+        let now = Date()
+        let elapsed = now.timeIntervalSince(lastBeatTime)
+        let requiredInterval = isFirstBeat ? (beatInterval * 2.0) : beatInterval
+        let remaining = max(0, requiredInterval - elapsed)
+        return remaining / requiredInterval
     }
     
     // MARK: - BPM Change

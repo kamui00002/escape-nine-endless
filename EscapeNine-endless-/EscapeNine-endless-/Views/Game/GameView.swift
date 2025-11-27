@@ -334,6 +334,38 @@ struct GameView: View {
                 }
             }
             
+            // Skill Reset Notification
+            if viewModel.showSkillReset {
+                VStack {
+                    Spacer().frame(height: 100)
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(Color(hex: GameColors.success))
+                        Text("スキル回復！")
+                            .font(.fantasyBody())
+                            .foregroundColor(Color(hex: GameColors.text))
+                        Image(systemName: "sparkles")
+                            .foregroundColor(Color(hex: GameColors.success))
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(hex: GameColors.backgroundSecondary))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(hex: GameColors.success), lineWidth: 2)
+                            )
+                    )
+                    .glow(color: Color(hex: GameColors.success), radius: 15, intensity: 0.8)
+                    .bounceIn(delay: 0)
+                    .transition(.scale.combined(with: .opacity))
+                    
+                    Spacer()
+                }
+            }
+            
             // Start Game Overlay
             if !isGameStarted {
                 ZStack {
