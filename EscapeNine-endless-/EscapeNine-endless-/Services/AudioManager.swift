@@ -45,6 +45,8 @@ class AudioManager: ObservableObject {
         case floorClear = "floor_clear"
         case buttonTap = "button_tap"
         case warning = "warning"
+        case countdown = "countdown"
+        case gameStart = "game_start"
     }
     
     // MARK: - Initialization
@@ -99,7 +101,7 @@ class AudioManager: ObservableObject {
     
     // MARK: - Preload Sound Effects
     private func preloadSoundEffects() {
-        let effects: [SoundEffect] = [.move, .skill, .gameOver, .floorClear, .buttonTap, .warning]
+        let effects: [SoundEffect] = [.move, .skill, .gameOver, .floorClear, .buttonTap, .warning, .countdown, .gameStart]
         
         for effect in effects {
             // 効果音ファイルを探す（wav, mp3, m4a）

@@ -102,7 +102,10 @@ struct ResultView: View {
                 
                 // Buttons
                 VStack(spacing: 16) {
-                    Button(action: onPlayAgain) {
+                    Button(action: { 
+                        AudioManager.shared.playSoundEffect(.buttonTap)
+                        onPlayAgain()
+                    }) {
                         Text("再挑戦")
                             .font(.fantasyBody())
                             .foregroundColor(.white)
@@ -122,7 +125,10 @@ struct ResultView: View {
                             .shadow(color: Color(hex: GameColors.available).opacity(0.6), radius: 15)
                     }
                     
-                    Button(action: onHome) {
+                    Button(action: { 
+                        AudioManager.shared.playSoundEffect(.buttonTap)
+                        onHome()
+                    }) {
                         Text("ホームへ")
                             .font(.fantasyBody())
                             .foregroundColor(Color(hex: GameColors.text))

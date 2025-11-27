@@ -72,6 +72,7 @@ struct HomeView: View {
                         // Buttons
                         VStack(spacing: CGFloat(spacing)) {
                             Button(action: {
+                                AudioManager.shared.playSoundEffect(.buttonTap)
                                 showGame = true
                             }) {
                                 Text("冒険を始める")
@@ -97,6 +98,7 @@ struct HomeView: View {
                             .pulse(minScale: 1.0, maxScale: 1.02, duration: 2.0)
                             
                             Button(action: {
+                                AudioManager.shared.playSoundEffect(.buttonTap)
                                 showCharacterSelection = true
                             }) {
                                 Text("キャラクター")
@@ -127,6 +129,7 @@ struct HomeView: View {
                             .slideIn(from: .leading, delay: 0.7)
                             
                             Button(action: {
+                                AudioManager.shared.playSoundEffect(.buttonTap)
                                 showRanking = true
                             }) {
                                 Text("ランキング")
@@ -157,6 +160,7 @@ struct HomeView: View {
                             .slideIn(from: .leading, delay: 0.8)
                             
                             Button(action: {
+                                AudioManager.shared.playSoundEffect(.buttonTap)
                                 showSettings = true
                             }) {
                                 Text("設定")

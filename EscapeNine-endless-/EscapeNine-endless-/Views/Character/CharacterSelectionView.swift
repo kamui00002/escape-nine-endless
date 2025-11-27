@@ -32,7 +32,10 @@ struct CharacterSelectionView: View {
                     .frame(height: ResponsiveLayout.isIPad() ? 140 : 120)
                     .overlay(
                         HStack {
-                            Button(action: { dismiss() }) {
+                            Button(action: { 
+                                AudioManager.shared.playSoundEffect(.buttonTap)
+                                dismiss() 
+                            }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "chevron.left")
                                     Text("戻る")
@@ -78,10 +81,12 @@ struct CharacterSelectionView: View {
                                     highestFloor: playerViewModel.highestFloor,
                                     onSelect: {
                                         if playerViewModel.unlockedCharacters.contains(characterType) || playerViewModel.debugUnlockAllCharacters {
+                                            AudioManager.shared.playSoundEffect(.buttonTap)
                                             playerViewModel.selectCharacter(characterType)
                                         }
                                     },
                                     onPurchase: {
+                                        AudioManager.shared.playSoundEffect(.buttonTap)
                                         // 管理者用設定が有効な場合は、購入処理をスキップして直接アンロック
                                         if playerViewModel.debugUnlockAllCharacters {
                                             playerViewModel.unlockCharacter(characterType)
@@ -275,6 +280,7 @@ struct CharacterCardView: View {
                 Button(action: {
                     if characterType == .thief {
                         // 盗賊の場合は何もしない（10階層クリアで自動解放）
+                        AudioManager.shared.playSoundEffect(.buttonTap)
                     } else {
                         onPurchase()
                     }

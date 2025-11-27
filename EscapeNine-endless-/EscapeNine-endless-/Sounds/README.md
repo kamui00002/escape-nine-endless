@@ -85,10 +85,62 @@ Sounds/
 
 - [x] AudioManager作成完了
 - [x] Soundsフォルダ作成
+- [x] 効果音ファイル生成完了（8ファイル）
 - [ ] BGMファイル追加（4ファイル）
-- [ ] 効果音ファイル追加（6ファイル）
-- [ ] Xcodeプロジェクトに登録
+- [ ] Xcodeプロジェクトに効果音を登録（手動作業が必要）
 
 ---
 
-**準備が整ったら**: ファイルを配置後、Xcodeでビルドして動作確認してください。
+## 🎉 生成済みファイル
+
+以下の効果音ファイルが生成されています：
+
+```
+EscapeNine-endless-/EscapeNine-endless-/Sounds/SFX/
+├── button_tap.wav (6.9KB) - ボタンタップ音
+├── countdown.wav (26KB) - カウントダウン音
+├── floor_clear.wav (86KB) - フロアクリア音
+├── game_start.wav (103KB) - ゲームスタート音
+├── gameover.wav (103KB) - ゲームオーバー音
+├── move.wav (8.7KB) - 移動音
+├── skill.wav (69KB) - スキル使用音
+└── warning.wav (52KB) - 警告音
+```
+
+## 🔧 Xcodeプロジェクトへの追加手順
+
+効果音ファイルをXcodeプロジェクトに追加するには、以下の手順を実行してください：
+
+1. Xcodeでプロジェクトを開く
+2. **プロジェクトナビゲーター**（左サイドバー）で `EscapeNine-endless-` グループを右クリック
+3. **Add Files to "EscapeNine-endless-"...** を選択
+4. `Sounds` フォルダ全体を選択
+5. **Options** セクションで以下を確認：
+   - ✅ **Copy items if needed** にチェック
+   - ✅ **Create groups** を選択（Create folder referencesではない）
+   - ✅ **Add to targets** で `EscapeNine-endless-` にチェック
+6. **Add** をクリック
+
+これにより、Soundsフォルダとその中のすべての効果音ファイルがプロジェクトに追加されます。
+
+## 🧪 動作確認
+
+プロジェクトにファイルを追加したら、以下を確認してください：
+
+1. **ビルドエラーがないことを確認**
+   ```bash
+   xcodebuild -scheme EscapeNine-endless- -destination 'id=5B405E6E-0F9F-4715-A97C-D2E85987CB53' build
+   ```
+
+2. **効果音が再生されることを確認**
+   - ゲームを起動
+   - ボタンをタップ → ボタンタップ音が鳴る
+   - ゲームを開始 → ゲームスタート音が鳴る
+   - 移動する → 移動音が鳴る
+   - スキルを使用 → スキル音が鳴る
+   - フロアをクリア → フロアクリア音が鳴る
+   - ゲームオーバー → ゲームオーバー音が鳴る
+
+---
+
+**準備が整ったら**: 上記の手順に従ってXcodeでファイルを追加し、ビルドして動作確認してください。

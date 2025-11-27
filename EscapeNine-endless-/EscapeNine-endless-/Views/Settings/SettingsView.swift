@@ -39,7 +39,10 @@ struct SettingsView: View {
                         .frame(height: ResponsiveLayout.isIPad() ? 100 : 80)
                         .overlay(
                             HStack {
-                                Button(action: { dismiss() }) {
+                                Button(action: { 
+                                    AudioManager.shared.playSoundEffect(.buttonTap)
+                                    dismiss() 
+                                }) {
                                     HStack(spacing: 4) {
                                         Image(systemName: "chevron.left")
                                         Text("戻る")
@@ -278,6 +281,7 @@ struct SettingsView: View {
                                                     )
                                             } else {
                                                 Button(action: {
+                                                    AudioManager.shared.playSoundEffect(.buttonTap)
                                                     Task {
                                                         _ = await purchaseManager.purchaseAdRemoval()
                                                     }
@@ -308,6 +312,7 @@ struct SettingsView: View {
                                     
                                     // 購入の復元
                                     Button(action: {
+                                        AudioManager.shared.playSoundEffect(.buttonTap)
                                         Task {
                                             await purchaseManager.restorePurchases()
                                         }

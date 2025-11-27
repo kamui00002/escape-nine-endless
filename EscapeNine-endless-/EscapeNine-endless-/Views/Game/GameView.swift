@@ -36,7 +36,10 @@ struct GameView: View {
                 VStack(spacing: 0) {
                     // 最小限のヘッダー
                     HStack {
-                        Button(action: { dismiss() }) {
+                        Button(action: { 
+                            AudioManager.shared.playSoundEffect(.buttonTap)
+                            dismiss() 
+                        }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "chevron.left")
                                 Text("戻る")
@@ -425,6 +428,7 @@ struct GameView: View {
                         }
 
                         Button(action: {
+                            AudioManager.shared.playSoundEffect(.buttonTap)
                             isGameStarted = true
                             viewModel.startGame(aiLevel: selectedAILevel)
                         }) {

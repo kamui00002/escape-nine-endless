@@ -262,6 +262,9 @@ class GameViewModel: ObservableObject {
         // 初期位置を設定（最初のビートで即ゲームオーバーにならないように）
         pendingPlayerMove = playerPosition
         
+        // ゲームスタート効果音
+        audioManager.playSoundEffect(.gameStart)
+        
         // BPM設定
         let bpm = stageManager.getBPM(for: currentFloor)
         audioManager.startBGM(bpm: bpm)
