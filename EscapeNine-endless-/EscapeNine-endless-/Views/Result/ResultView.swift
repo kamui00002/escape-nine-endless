@@ -15,11 +15,12 @@ struct ResultView: View {
 
     @StateObject private var playerViewModel = PlayerViewModel()
     @StateObject private var adMobService = AdMobService.shared
+    @StateObject private var achievementManager = AchievementManager.shared
     @State private var adShown = false
 
     var body: some View {
         ZStack {
-            // 背景
+            // Background
             LinearGradient(
                 colors: [
                     Color(hex: GameColors.background),
@@ -29,11 +30,17 @@ struct ResultView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-            
-            VStack(spacing: 40) {
+
+            // Celebration effect on win
+            if result == .win {
+                CelebrationEffect()
+                    .ignoresSafeArea()
+            }
+
+            VStack(spacing: 30) {
                 Spacer()
-                
-                // Result Text
+
+                // Result Title
                 Text(result == .win ? "VICTORY!" : "DEFEAT")
                     .font(.fantasyTitle())
                     .foregroundColor(result == .win ? Color(hex: GameColors.success) : Color(hex: GameColors.warning))
@@ -58,51 +65,78 @@ struct ResultView: View {
                         .mask(Text(result == .win ? "VICTORY!" : "DEFEAT").font(.fantasyTitle()))
                     )
                     .shadow(color: (result == .win ? Color(hex: GameColors.success) : Color(hex: GameColors.warning)).opacity(0.5), radius: 15)
-                
-                // Floor
-                VStack(spacing: 8) {
-                    Text("到達階層")
-                        .font(.fantasyCaption())
-                        .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
-                    
-                    Text("\(floor)")
-                        .font(.fantasyNumber())
-                        .foregroundColor(Color(hex: GameColors.available))
+                    .bounceIn(delay: 0.1)
+
+                // Stats
+                VStack(spacing: 16) {
+                    // Floor reached
+                    VStack(spacing: 4) {
+                        Text("到達階層")
+                            .font(.fantasyCaption())
+                            .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+
+                        AnimatedNumber(value: floor, duration: 0.8)
+                            .font(.fantasyNumber())
+                            .foregroundColor(Color(hex: GameColors.available))
+                            .glow(color: Color(hex: GameColors.available), radius: 8, intensity: 0.4)
+                    }
+
+                    // Character used
+                    HStack(spacing: 8) {
+                        Text("使用キャラクター")
+                            .font(.fantasyCaption())
+                            .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                        Text(playerViewModel.selectedCharacter.name)
+                            .font(.fantasyBody())
+                            .foregroundColor(Color(hex: GameColors.textSecondary))
+                    }
+
+                    // New Record
+                    if floor > playerViewModel.highestFloor {
+                        Text("NEW RECORD!")
+                            .font(.fantasySubheading())
+                            .foregroundColor(Color(hex: GameColors.available))
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color(hex: GameColors.available).opacity(0.15))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color(hex: GameColors.available).opacity(0.5), lineWidth: 2)
+                                    )
+                            )
+                            .shimmer(duration: 2.0)
+                            .bounceIn(delay: 0.3)
+                    }
+
+                    // Best score
+                    VStack(spacing: 2) {
+                        Text("最高記録")
+                            .font(.fantasyCaption())
+                            .foregroundColor(Color(hex: GameColors.text).opacity(0.5))
+                        Text("\(max(floor, playerViewModel.highestFloor))階層")
+                            .font(.fantasyCaption())
+                            .foregroundColor(Color(hex: GameColors.textSecondary))
+                    }
                 }
-                
-                // New Record
-                if floor > playerViewModel.highestFloor {
-                    Text("新記録達成！")
-                        .font(.fantasySubheading())
-                        .foregroundColor(Color(hex: GameColors.available))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(hex: GameColors.available).opacity(0.2))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color(hex: GameColors.available).opacity(0.5), lineWidth: 2)
-                                )
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(hex: GameColors.backgroundSecondary))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color(hex: GameColors.gridBorder).opacity(0.3), lineWidth: 1)
                         )
-                }
-                
-                // Highest Floor
-                VStack(spacing: 4) {
-                    Text("最高到達階層")
-                        .font(.fantasyCaption())
-                        .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
-                    
-                    Text("\(playerViewModel.highestFloor)")
-                        .font(.fantasyNumber())
-                        .foregroundColor(Color(hex: GameColors.textSecondary))
-                }
-                
+                )
+                .padding(.horizontal, 40)
+                .slideIn(from: .bottom, delay: 0.4)
+
                 Spacer()
-                
+
                 // Buttons
                 VStack(spacing: 16) {
-                    Button(action: { 
+                    Button(action: {
                         AudioManager.shared.playSoundEffect(.buttonTap)
                         onPlayAgain()
                     }) {
@@ -124,8 +158,9 @@ struct ResultView: View {
                             .cornerRadius(16)
                             .shadow(color: Color(hex: GameColors.available).opacity(0.6), radius: 15)
                     }
-                    
-                    Button(action: { 
+                    .pressableButton(scale: 0.96, shadowRadius: 12)
+
+                    Button(action: {
                         AudioManager.shared.playSoundEffect(.buttonTap)
                         onHome()
                     }) {
@@ -144,24 +179,29 @@ struct ResultView: View {
                             )
                     }
                 }
-                
+                .slideIn(from: .bottom, delay: 0.6)
+
                 Spacer()
             }
             .padding()
+
+            // Achievement popup
+            if let achievement = achievementManager.newlyUnlockedAchievement {
+                VStack {
+                    AchievementPopupView(achievement: achievement)
+                        .padding(.top, 60)
+                    Spacer()
+                }
+            }
         }
         .onAppear {
-            // インタースティシャル広告を表示（1回のみ）
+            // Show interstitial ad (once)
             if !adShown {
                 adShown = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    InterstitialAdPresenter.show { success in
-                        if success {
-                            print("[ResultView] インタースティシャル広告表示成功")
-                        }
-                    }
+                    InterstitialAdPresenter.show { _ in }
                 }
             }
         }
     }
 }
-
