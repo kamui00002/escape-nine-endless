@@ -13,20 +13,21 @@ struct BeatIndicatorView: View {
     @State private var pulse: Bool = false
     @State private var progress: Double = 1.0
     @State private var timer: Timer?
-    @EnvironmentObject var audioManager: AudioManager
-    
+
+    private let audioManager = AudioManager.shared
+
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
-                // プログレスバー（背景）
+                // Progress ring background
                 Circle()
                     .stroke(
                         Color(hex: GameColors.gridBorder).opacity(0.3),
                         lineWidth: 6
                     )
                     .frame(width: 80, height: 80)
-                
-                // プログレスバー（カウントダウン）
+
+                // Progress ring countdown
                 Circle()
                     .trim(from: 0, to: progress)
                     .stroke(
@@ -43,8 +44,8 @@ struct BeatIndicatorView: View {
                     .frame(width: 80, height: 80)
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 0.05), value: progress)
-                
-                // 外側の光るリング（ビート時）
+
+                // Outer glow ring (on beat)
                 Circle()
                     .stroke(
                         LinearGradient(
@@ -60,8 +61,8 @@ struct BeatIndicatorView: View {
                     .frame(width: 70, height: 70)
                     .scaleEffect(pulse ? 1.2 : 1.0)
                     .opacity(pulse ? 0.3 : 0.6)
-                
-                // メインの円
+
+                // Main circle
                 Circle()
                     .fill(
                         LinearGradient(
@@ -76,17 +77,23 @@ struct BeatIndicatorView: View {
                     .frame(width: 50, height: 50)
                     .scaleEffect(scale)
                     .shadow(color: Color(hex: GameColors.available).opacity(0.8), radius: 15)
-                
-                // カウントダウンテキスト
-                Text(String(format: "%.1f", progress))
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+
+                // Beat number
+                Text("\(currentBeat)")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                    .opacity(progress < 0.3 ? 1.0 : 0.7)
             }
-            
-            Text("ビート: \(currentBeat)")
-                .font(.fantasyCaption())
-                .foregroundColor(Color(hex: GameColors.textSecondary))
+
+            // Turn indicator (shows as dots)
+            HStack(spacing: 4) {
+                ForEach(1...Constants.maxTurns, id: \.self) { turn in
+                    Circle()
+                        .fill(turn <= currentBeat % (Constants.maxTurns + 1)
+                              ? Color(hex: GameColors.available)
+                              : Color(hex: GameColors.gridBorder).opacity(0.3))
+                        .frame(width: 6, height: 6)
+                }
+            }
         }
         .onAppear {
             startTimer()
@@ -108,17 +115,16 @@ struct BeatIndicatorView: View {
             }
         }
     }
-    
+
     // MARK: - Timer Management
     private func startTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
             progress = audioManager.timeUntilNextBeat()
         }
     }
-    
+
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
     }
 }
-

@@ -352,7 +352,8 @@ struct SettingsView: View {
                             )
                             .padding(.horizontal)
                             
-                            // MARK: - Debug/Admin Section (管理者用 - 後で削除可能)
+                            #if DEBUG
+                            // MARK: - Debug/Admin Section
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("管理者用設定")
                                     .font(.fantasySubheading())
@@ -371,7 +372,7 @@ struct SettingsView: View {
                                             }
                                         }
                                         .pickerStyle(MenuPickerStyle())
-                                        .onChange(of: playerViewModel.debugStartFloor) { _ in
+                                        .onChange(of: playerViewModel.debugStartFloor) {
                                             playerViewModel.saveData()
                                         }
                                     }
@@ -391,7 +392,7 @@ struct SettingsView: View {
                                             }
                                         }
                                         .pickerStyle(SegmentedPickerStyle())
-                                        .onChange(of: playerViewModel.debugAILevel) { _ in
+                                        .onChange(of: playerViewModel.debugAILevel) {
                                             playerViewModel.saveData()
                                         }
                                     }
@@ -446,6 +447,7 @@ struct SettingsView: View {
                                     )
                             )
                             .padding(.horizontal)
+                            #endif
                         }
                         .padding(.top, ResponsiveLayout.isIPad() ? 16 : 12)
                         .padding(.bottom, 20)

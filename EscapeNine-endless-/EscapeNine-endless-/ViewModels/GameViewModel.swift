@@ -22,7 +22,7 @@ class GameViewModel: ObservableObject {
     @Published var disappearedCells: Set<Int> = [] // 消失したマス
     @Published var showFloorClear: Bool = false // 階層クリア表示
     @Published var isInvisible: Bool = false // 透明化状態
-    @Published var enemyStopped: Bool = false // 敵が停止しているか
+    @Published var enemyStoppedTurns: Int = 0 // 敵が停止している残りターン数
     @Published var isSkillActive: Bool = false // スキルがアクティブか（ダッシュ、斜め移動用）
     @Published var consecutiveWaits: Int = 0 // 連続待機回数
     @Published var showSkillReset: Bool = false // スキルリセット通知
@@ -44,7 +44,10 @@ class GameViewModel: ObservableObject {
     private weak var playerViewModelInstance: PlayerViewModel?
     
     var currentCharacter: Character {
-        let vm = playerViewModelInstance ?? PlayerViewModel()
+        guard let vm = playerViewModelInstance else {
+            print("⚠️ Warning: PlayerViewModel is not set yet. Using default hero character.")
+            return Character.getCharacter(for: .hero) // デフォルト値
+        }
         return Character.getCharacter(for: vm.selectedCharacter)
     }
     
@@ -81,6 +84,7 @@ class GameViewModel: ObservableObject {
     // MARK: - Setup
     private func setupBeatObserver() {
         audioManager.beatPublisher
+            .receive(on: DispatchQueue.main)  // メインスレッドで実行を保証（UI更新のため）
             .sink { [weak self] beat in
                 self?.onBeat(beat)
             }
@@ -128,16 +132,16 @@ class GameViewModel: ObservableObject {
         let previousEnemyPosition = enemyPosition
         var nextEnemyPosition = enemyPosition
 
-        if !enemyStopped {
+        if enemyStoppedTurns > 0 {
+            // 拘束中は敵を移動させず、残りターン数を減らす
+            enemyStoppedTurns -= 1
+        } else {
             // 選択されたAI難易度を使用（全階層で固定）
             nextEnemyPosition = aiEngine.calculateNextMove(
                 from: enemyPosition,
                 target: playerPosition, // プレイヤーの「現在」の位置を使用
                 level: selectedAILevel
             )
-        } else {
-            // 拘束中は敵を移動させない
-            enemyStopped = false
         }
 
         // 待機判定（連続待機カウンター更新）
@@ -233,12 +237,20 @@ class GameViewModel: ObservableObject {
     // MARK: - Game Control
     func startGame(aiLevel: AILevel) {
         // デバッグ用の開始階層を使用（設定されている場合）
+        #if DEBUG
         let startFloor = playerViewModelInstance?.debugStartFloor ?? 1
+        #else
+        let startFloor = 1
+        #endif
         currentFloor = max(1, min(startFloor, Constants.maxFloors))
-        
+
         // AI難易度を保存（全階層で固定）
         // デバッグ用のAI難易度を使用（設定されている場合）
+        #if DEBUG
         selectedAILevel = playerViewModelInstance?.debugAILevel ?? aiLevel
+        #else
+        selectedAILevel = aiLevel
+        #endif
 
         turnCount = 0
         gameStatus = .playing
@@ -246,7 +258,7 @@ class GameViewModel: ObservableObject {
         hasMovedThisBeat = false
         lastProcessedBeat = 0
         isInvisible = false
-        enemyStopped = false
+        enemyStoppedTurns = 0
         isSkillActive = false
         consecutiveWaits = 0
 
@@ -414,7 +426,7 @@ class GameViewModel: ObservableObject {
         // スキル効果音
         audioManager.playSoundEffect(.skill)
         
-        enemyStopped = true
+        enemyStoppedTurns = 2  // 2ターン停止
         skillUsageCount += 1
     }
     
@@ -453,7 +465,7 @@ class GameViewModel: ObservableObject {
         pendingPlayerMove = nil
         hasMovedThisBeat = false
         isInvisible = false
-        enemyStopped = false
+        enemyStoppedTurns = 0
         isSkillActive = false
         consecutiveWaits = 0  // 連続待機カウンターをリセット
         
@@ -571,9 +583,27 @@ class GameViewModel: ObservableObject {
             audioManager.playSoundEffect(.gameOver)
         }
         
-        // スコア送信
+        // スコア送信（ローカル + Game Center）
         if result == .win || result == .lose {
-            RankingService.shared.submitScore(floor: currentFloor)
+            RankingService.shared.submitScore(
+                floor: currentFloor,
+                characterType: currentCharacter.type.rawValue
+            )
+            Task {
+                await GameCenterService.shared.submitScore(floor: currentFloor)
+            }
+        }
+        
+        // 実績チェック（勝利時のみ）
+        if result == .win {
+            let skillUsed = skillUsageCount > 0
+            let currentBPM = stageManager.getBPM(for: currentFloor)
+            AchievementManager.shared.checkAchievements(
+                floor: currentFloor,
+                skillUsed: skillUsed,
+                currentBPM: currentBPM,
+                gameWon: true
+            )
         }
     }
     
@@ -603,7 +633,7 @@ class GameViewModel: ObservableObject {
         showFloorClear = false
         showSkillReset = false
         isInvisible = false
-        enemyStopped = false
+        enemyStoppedTurns = 0
         isSkillActive = false
         consecutiveWaits = 0
     }

@@ -14,6 +14,9 @@ struct HomeView: View {
     @State private var showRanking = false
     @State private var showSettings = false
     @State private var showCharacterSelection = false
+    @State private var showShop = false
+    @State private var showAchievements = false
+    @State private var showTutorial = !UserDefaults.standard.bool(forKey: "tutorialCompleted")
 
     var body: some View {
         NavigationStack {
@@ -158,7 +161,70 @@ struct HomeView: View {
                             }
                             .pressableButton()
                             .slideIn(from: .leading, delay: 0.8)
-                            
+
+                            Button(action: {
+                                AudioManager.shared.playSoundEffect(.buttonTap)
+                                showShop = true
+                            }) {
+                                Text("ショップ")
+                                    .font(.fantasyBody())
+                                    .foregroundColor(Color(hex: GameColors.text))
+                                    .frame(maxWidth: buttonWidth)
+                                    .padding(ResponsiveLayout.isIPad() ? 18 : 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(hex: GameColors.backgroundSecondary))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .stroke(
+                                                        LinearGradient(
+                                                            colors: [
+                                                                Color(hex: GameColors.gridBorder).opacity(0.5),
+                                                                Color(hex: GameColors.main).opacity(0.3)
+                                                            ],
+                                                            startPoint: .topLeading,
+                                                            endPoint: .bottomTrailing
+                                                        ),
+                                                        lineWidth: 2
+                                                    )
+                                            )
+                                    )
+                            }
+                            .pressableButton()
+                            .slideIn(from: .leading, delay: 0.85)
+
+                            Button(action: {
+                                AudioManager.shared.playSoundEffect(.buttonTap)
+                                showAchievements = true
+                            }) {
+                                Text("実績")
+                                    .font(.fantasyBody())
+                                    .foregroundColor(Color(hex: GameColors.text))
+                                    .frame(maxWidth: buttonWidth)
+                                    .padding(ResponsiveLayout.isIPad() ? 18 : 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(hex: GameColors.backgroundSecondary))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .stroke(
+                                                        LinearGradient(
+                                                            colors: [
+                                                                Color(hex: GameColors.gridBorder).opacity(0.5),
+                                                                Color(hex: GameColors.main).opacity(0.3)
+                                                            ],
+                                                            startPoint: .topLeading,
+                                                            endPoint: .bottomTrailing
+                                                        ),
+                                                        lineWidth: 2
+                                                    )
+                                            )
+                                    )
+                            }
+                            .pressableButton()
+                            .slideIn(from: .leading, delay: 0.9)
+
+                            // Settings button
                             Button(action: {
                                 AudioManager.shared.playSoundEffect(.buttonTap)
                                 showSettings = true
@@ -189,6 +255,7 @@ struct HomeView: View {
                             }
                             .pressableButton()
                             .slideIn(from: .leading, delay: 0.9)
+
                         }
                         
                         // Highest Floor
@@ -227,6 +294,17 @@ struct HomeView: View {
             }
             .navigationDestination(isPresented: $showCharacterSelection) {
                 CharacterSelectionView()
+            }
+            .navigationDestination(isPresented: $showShop) {
+                ShopView()
+            }
+            .sheet(isPresented: $showAchievements) {
+                AchievementListView()
+            }
+        }
+        .overlay {
+            if showTutorial {
+                TutorialOverlayView(isShowing: $showTutorial)
             }
         }
     }

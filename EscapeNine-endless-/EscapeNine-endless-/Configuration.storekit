@@ -1,0 +1,65 @@
+{
+  "identifier" : "EscapeNineEndless",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "240",
+      "familyShareable" : false,
+      "internalID" : "1",
+      "localizations" : [
+        {
+          "description" : "透明化スキルを持つ魔法使いキャラクター",
+          "displayName" : "魔法使い",
+          "locale" : "ja"
+        }
+      ],
+      "productID" : "com.escapenine.character.mage",
+      "referenceName" : "Character Mage",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "240",
+      "familyShareable" : false,
+      "internalID" : "2",
+      "localizations" : [
+        {
+          "description" : "拘束スキルを持つエルフキャラクター",
+          "displayName" : "エルフ",
+          "locale" : "ja"
+        }
+      ],
+      "productID" : "com.escapenine.character.elf",
+      "referenceName" : "Character Elf",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "480",
+      "familyShareable" : false,
+      "internalID" : "3",
+      "localizations" : [
+        {
+          "description" : "すべての広告を非表示にします",
+          "displayName" : "広告削除",
+          "locale" : "ja"
+        }
+      ],
+      "productID" : "com.escapenine.removeads",
+      "referenceName" : "Remove Ads",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "",
+    "_lastSynchronizedDate" : ""
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
