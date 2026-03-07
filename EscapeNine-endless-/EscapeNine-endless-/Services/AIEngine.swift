@@ -32,8 +32,9 @@ class AIEngine {
     private func easyAI(enemyPosition: Int, playerPosition: Int) -> Int {
         let availableMoves = GameEngine.shared.getAvailableMoves(from: enemyPosition)
 
-        // 50%の確率でプレイヤーに近づく、50%はランダム移動（初心者向けバランス調整）
-        if Double.random(in: 0...1) < 0.5 {
+        let roll = Double.random(in: 0...1)
+        if roll < Constants.easyAIChaseChance {
+            // 追跡確率でプレイヤーに近づく
             if let moveTowardsPlayer = getMoveTowardsPlayer(
                 from: enemyPosition,
                 target: playerPosition,
@@ -41,9 +42,18 @@ class AIEngine {
             ) {
                 return moveTowardsPlayer
             }
+        } else if roll < Constants.easyAIChaseChance + Constants.easyAIFleeChance {
+            // 逃走確率でプレイヤーから離れる（逃げやすくする）
+            if let moveAwayFromPlayer = getMoveAwayFromPlayer(
+                from: enemyPosition,
+                target: playerPosition,
+                availableMoves: availableMoves
+            ) {
+                return moveAwayFromPlayer
+            }
         }
 
-        // ランダム移動（50%の確率）
+        // 残り65%はランダム移動
         return availableMoves.randomElement() ?? availableMoves[0]
     }
     
@@ -111,6 +121,31 @@ class AIEngine {
     }
     
     // MARK: - Helper
+    /// プレイヤーから最も離れる方向への移動先を返す
+    private func getMoveAwayFromPlayer(
+        from enemyPosition: Int,
+        target playerPosition: Int,
+        availableMoves: [Int]
+    ) -> Int? {
+        let playerRow = (playerPosition - 1) / 3
+        let playerCol = (playerPosition - 1) % 3
+
+        var bestMove: Int?
+        var maxDistance = -1
+
+        for move in availableMoves {
+            let moveRow = (move - 1) / 3
+            let moveCol = (move - 1) % 3
+            let distance = abs(moveRow - playerRow) + abs(moveCol - playerCol)
+            if distance > maxDistance {
+                maxDistance = distance
+                bestMove = move
+            }
+        }
+
+        return bestMove
+    }
+
     private func getMoveTowardsPlayer(
         from enemyPosition: Int,
         target playerPosition: Int,

@@ -16,32 +16,55 @@ enum Constants {
     // Game Progress
     static let maxFloors = 100
     static let maxTurns = 10
-    static let maxSkillUsage = 5
+    static let maxSkillUsage = 5  // レガシー（キャラ別定数を優先）
 
-    // Timing（初心者向けに大幅緩和）
-    static let timingTolerance = 0.6 // ±60%の誤差許容（初心者向けに緩和）
+    // Timing（BPM連動で動的計算）
+    static let timingToleranceLow = 0.6    // BPM < 100: ±60%
+    static let timingToleranceMid = 0.45   // BPM 100-150: ±45%
+    static let timingToleranceHigh = 0.35  // BPM > 150: ±35%
     static let beatCheckInterval = 0.01 // 10msごとにチェック
     static let invisibilityDuration = 0.1 // 透明化スキルの持続時間（秒）
 
-    // BPM Settings（要件定義書準拠: 60→240、10階層ごとに20BPM上昇）
-    static let minBPM = 60.0
-    static let maxBPM = 240.0
-    static let bpmIncrement = 20.0
+    // BPM曲線（べき乗曲線: BPM = start + (end - start) * (floor/99)^exponent）
+    static let bpmCurveStart = 70.0      // Floor 1
+    static let bpmCurveEnd = 200.0       // Floor 100
+    static let bpmCurveExponent = 1.4    // 序盤緩やか→終盤急加速
 
     // Skill Settings
     static let skillResetInterval = 10  // 10階層ごとにスキルリセット
 
-    // Wait Settings（初心者向けに緩和）
-    static let maxConsecutiveWaits = 5  // 連続待機の最大回数（考える時間を確保）
+    // Skill Usage per Character
+    static let heroSkillMaxUsage = 3
+    static let thiefSkillMaxUsage = 5
+    static let wizardSkillMaxUsage = 7
+    static let elfSkillMaxUsage = 4
+    static let bindDurationTurns = 2
+
+    // Turn Countdown Settings（1ターンあたりのカウントダウン）
+    static let turnCountdownBeats = 3      // 1ターンあたりのカウントダウンビート数
+    static let gameStartCountdownBeats = 3 // ゲーム開始カウントダウン
+
+    // Countdown Audio
+    static let countdownLowFrequency = 440.0   // カウントダウン低音周波数
+    static let countdownHighFrequency = 880.0  // カウントダウン高音周波数
 
     // Floor Ranges for Special Rules（要件定義書準拠）
     static let fogStartFloor = 21        // 霧マップ: 階層21-40
     static let disappearStartFloor = 41  // マス消失: 階層41-60
     static let combinedRulesStartFloor = 61  // 霧+消失: 階層61-100
 
-    // AI Difficulty Ranges
-    static let normalDifficultyStartFloor = 21
-    static let hardDifficultyStartFloor = 51
+    // AI Difficulty Ranges（自然難易度の閾値）
+    static let aiNaturalNormalFloor = 16
+    static let aiNaturalHardFloor = 36
+
+    // Easy AI行動確率
+    static let easyAIChaseChance = 0.15
+    static let easyAIFleeChance = 0.20
+
+    // 消失マス段階（階層→消失マス数）
+    static let disappearCellStages: [(floor: Int, count: Int)] = [
+        (86, 4), (71, 3), (56, 2), (41, 1)
+    ]
 
     // Character Unlock
     static let thiefUnlockFloor = 10
@@ -51,6 +74,17 @@ enum Constants {
 
     // Audio
     static let defaultVolume = 0.7
+
+    // BPM連動タイミング許容値
+    static func timingTolerance(for bpm: Double) -> Double {
+        if bpm < 100 {
+            return timingToleranceLow
+        } else if bpm <= 150 {
+            return timingToleranceMid
+        } else {
+            return timingToleranceHigh
+        }
+    }
 
     // Grid Position Helpers
     static func rowFromPosition(_ position: Int) -> Int {

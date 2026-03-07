@@ -26,7 +26,9 @@ class AudioManager: ObservableObject {
     @Published var isSFXEnabled: Bool = true
     @Published var bgmVolume: Double = 0.7 {
         didSet {
-            beatEngine.setVolume(bgmVolume)
+            if isBGMEnabled {
+                beatEngine.setVolume(bgmVolume)
+            }
         }
     }
     
@@ -190,6 +192,29 @@ class AudioManager: ObservableObject {
         saveUserPreferences()
     }
     
+    // MARK: - Turn Countdown
+    var turnCountdown: Int {
+        beatEngine.turnCountdown
+    }
+
+    var turnCountdownPublisher: AnyPublisher<Int, Never> {
+        beatEngine.$turnCountdown.eraseToAnyPublisher()
+    }
+
+    func resetTurnCountdown() {
+        beatEngine.resetTurnCountdown()
+    }
+
+    func setTurnCountdownBeats(_ count: Int) {
+        beatEngine.setTurnCountdownBeats(count)
+    }
+
+    // MARK: - Turn Deadline Callback
+    var onTurnDeadline: (() -> Void)? {
+        get { beatEngine.onTurnDeadline }
+        set { beatEngine.onTurnDeadline = newValue }
+    }
+
     // MARK: - Beat Engine Access
     var currentBeat: Int {
         beatEngine.currentBeat

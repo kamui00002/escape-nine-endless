@@ -21,6 +21,11 @@ enum AILevel: String, CaseIterable {
     case hard = "Hard"
 }
 
+enum DefeatReason {
+    case caughtByEnemy  // 敵に捕まった
+    case timeOut        // 時間切れ（移動しなかった）
+}
+
 enum SpecialRule {
     case none
     case fog

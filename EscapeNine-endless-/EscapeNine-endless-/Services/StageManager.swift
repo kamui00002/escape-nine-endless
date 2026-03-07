@@ -21,7 +21,7 @@ class StageManager {
     }
     
     func getDifficulty(for floor: Int) -> AILevel {
-        return Floor.getDifficulty(for: floor)
+        return Floor.getNaturalDifficulty(for: floor)
     }
     
     func getFloorDescription(for floor: Int) -> String {

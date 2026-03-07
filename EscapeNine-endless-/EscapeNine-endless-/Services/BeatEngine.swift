@@ -14,12 +14,20 @@ class BeatEngine: ObservableObject {
     @Published var currentBeat: Int = 0
     @Published var isPlaying: Bool = false
 
+    // MARK: - Turn Countdown (3→2→1→ターン処理)
+    @Published private(set) var turnCountdown: Int = Constants.turnCountdownBeats
+
+    // MARK: - Configurable Turn Countdown Beats
+    private(set) var turnCountdownBeats: Int = Constants.turnCountdownBeats
+
+    // MARK: - Callback
+    var onTurnDeadline: (() -> Void)?
+
     // MARK: - Private Properties
     private var bpm: Double = 60
     private var beatInterval: TimeInterval = 1.0
     private var timer: Timer?
     private var lastBeatTime: Date = Date()
-    private var isFirstBeat: Bool = true
     private var volume: Float = 0.7
 
     // MARK: - Audio Engine (Metronome)
@@ -29,7 +37,6 @@ class BeatEngine: ObservableObject {
     private var accentBuffer: AVAudioPCMBuffer?
 
     // MARK: - Constants
-    private let timingTolerance: Double = Constants.timingTolerance
     private let beatCheckInterval: TimeInterval = Constants.beatCheckInterval
 
     // MARK: - Initialization
@@ -125,7 +132,6 @@ class BeatEngine: ObservableObject {
     // MARK: - Playback Control
     func play() {
         isPlaying = true
-        isFirstBeat = true
         startBeatDetection()
     }
 
@@ -134,7 +140,7 @@ class BeatEngine: ObservableObject {
         timer?.invalidate()
         timer = nil
         currentBeat = 0
-        isFirstBeat = true
+        turnCountdown = turnCountdownBeats
     }
 
     func pause() {
@@ -145,8 +151,17 @@ class BeatEngine: ObservableObject {
 
     func resume() {
         isPlaying = true
-        isFirstBeat = false
         startBeatDetection()
+    }
+
+    // MARK: - Turn Countdown Configuration
+    func setTurnCountdownBeats(_ count: Int) {
+        turnCountdownBeats = max(1, min(count, 10))
+    }
+
+    // MARK: - Turn Countdown Reset
+    func resetTurnCountdown() {
+        turnCountdown = turnCountdownBeats
     }
 
     // MARK: - Beat Detection
@@ -171,37 +186,41 @@ class BeatEngine: ObservableObject {
         let now = Date()
         let elapsed = now.timeIntervalSince(lastBeatTime)
 
-        let requiredInterval = isFirstBeat ? (beatInterval * 2.0) : beatInterval
-
-        if elapsed >= requiredInterval {
-            if isFirstBeat {
-                isFirstBeat = false
-            }
-
+        if elapsed >= beatInterval {
             lastBeatTime = now
             onBeat()
         }
     }
 
     private func onBeat() {
+        // ターンカウントダウン処理
         DispatchQueue.main.async {
             self.currentBeat += 1
         }
 
-        // Play metronome tick (accent on beat 1 of every 4)
-        let isAccent = (currentBeat % 4 == 0)
+        turnCountdown -= 1
+
+        // Play metronome tick (accent when countdown reaches 1)
+        let isAccent = (turnCountdown == 0)
         playTick(accent: isAccent)
 
         // Haptic feedback
-        let generator = UIImpactFeedbackGenerator(style: isAccent ? .medium : .light)
+        let generator = UIImpactFeedbackGenerator(style: turnCountdown == 0 ? .heavy : .light)
         generator.impactOccurred()
+
+        // カウントダウンが0に達したらターン処理を発火
+        if turnCountdown <= 0 {
+            onTurnDeadline?()
+            turnCountdown = turnCountdownBeats
+        }
     }
 
     // MARK: - Timing Check
     func checkMoveTiming() -> Bool {
         let now = Date()
         let timeDiff = abs(now.timeIntervalSince(lastBeatTime))
-        let tolerance = beatInterval * timingTolerance
+        let dynamicTolerance = Constants.timingTolerance(for: bpm)
+        let tolerance = beatInterval * dynamicTolerance
 
         return timeDiff <= tolerance
     }
@@ -210,9 +229,8 @@ class BeatEngine: ObservableObject {
     func timeUntilNextBeat() -> Double {
         let now = Date()
         let elapsed = now.timeIntervalSince(lastBeatTime)
-        let requiredInterval = isFirstBeat ? (beatInterval * 2.0) : beatInterval
-        let remaining = max(0, requiredInterval - elapsed)
-        return remaining / requiredInterval
+        let remaining = max(0, beatInterval - elapsed)
+        return remaining / beatInterval
     }
 
     // MARK: - BPM Change
