@@ -23,11 +23,11 @@ struct GridCellView: View {
     let enemySprite: String? // 敵のスプライト名
 
     @State private var isPressed = false
+    @State private var availablePulse = false
 
     var body: some View {
         Button(action: {
-            // ハプティックフィードバック
-            let impact = UIImpactFeedbackGenerator(style: .light)
+            let impact = UIImpactFeedbackGenerator(style: isAvailable ? .medium : .light)
             impact.impactOccurred()
             onTap()
         }) {
@@ -35,11 +35,25 @@ struct GridCellView: View {
                 // 消失したマス
                 if isDisappeared {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(hex: GameColors.disappeared))
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: GameColors.disappeared),
+                                    Color(hex: GameColors.disappeared).opacity(0.7)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: cellSize, height: cellSize)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(Color(hex: GameColors.warning).opacity(0.3), lineWidth: 2)
+                        )
+                        .overlay(
+                            Image(systemName: "xmark")
+                                .font(.system(size: cellSize * 0.25, weight: .thin))
+                                .foregroundColor(Color(hex: GameColors.warning).opacity(0.3))
                         )
                 }
                 // 霧で見えないマス
@@ -52,32 +66,95 @@ struct GridCellView: View {
                         )
                         .frame(width: cellSize, height: cellSize)
                         .opacity(0.4)
+                        .overlay(
+                            Image(systemName: "cloud.fog.fill")
+                                .font(.system(size: cellSize * 0.2))
+                                .foregroundColor(Color(hex: GameColors.text).opacity(0.15))
+                        )
                 }
                 // 通常のマス
                 else {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? Color(hex: GameColors.available).opacity(0.3) : Color(hex: GameColors.grid))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(
-                                    isAvailable ? Color(hex: GameColors.available) : Color(hex: GameColors.gridBorder),
-                                    lineWidth: isAvailable ? 4 : 2
+                    ZStack {
+                        // ベースのグリッドセル
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                isSelected
+                                ? LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.available).opacity(0.35),
+                                        Color(hex: GameColors.available).opacity(0.15)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 )
-                        )
-                        .frame(width: cellSize, height: cellSize)
-                        .opacity(disabled ? 0.5 : 1.0)
-                        .glow(
-                            color: isAvailable ? Color(hex: GameColors.available) : .clear,
-                            radius: isAvailable ? 15 : 0,
-                            intensity: isAvailable ? 0.8 : 0
-                        )
-                        .glow(
-                            color: isSelected ? Color(hex: GameColors.available) : .clear,
-                            radius: isSelected ? 20 : 0,
-                            intensity: isSelected ? 0.6 : 0
-                        )
-                        .scaleEffect(isPressed ? 0.95 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+                                : LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.grid),
+                                        Color(hex: GameColors.grid).opacity(0.85)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        isAvailable
+                                        ? LinearGradient(
+                                            colors: [
+                                                Color(hex: GameColors.available),
+                                                Color(hex: GameColors.available).opacity(0.6)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                        : LinearGradient(
+                                            colors: [
+                                                Color(hex: GameColors.gridBorder),
+                                                Color(hex: GameColors.gridBorder).opacity(0.5)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: isAvailable ? 3 : 1.5
+                                    )
+                            )
+                            .frame(width: cellSize, height: cellSize)
+
+                        // 移動可能マスの内側パルス
+                        if isAvailable && !disabled {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(hex: GameColors.available).opacity(0.1))
+                                .frame(width: cellSize - 4, height: cellSize - 4)
+                                .scaleEffect(availablePulse ? 1.0 : 0.85)
+                                .opacity(availablePulse ? 0.0 : 0.4)
+                                .animation(
+                                    .easeInOut(duration: 1.2).repeatForever(autoreverses: false),
+                                    value: availablePulse
+                                )
+                        }
+
+                        // 選択済みチェックマーク
+                        if isSelected {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.system(size: cellSize * 0.2, weight: .bold))
+                                .foregroundColor(Color(hex: GameColors.available))
+                                .offset(x: cellSize * 0.3, y: -cellSize * 0.3)
+                        }
+                    }
+                    .opacity(disabled ? 0.5 : 1.0)
+                    .glow(
+                        color: isAvailable ? Color(hex: GameColors.available) : .clear,
+                        radius: isAvailable ? 12 : 0,
+                        intensity: isAvailable ? 0.6 : 0
+                    )
+                    .glow(
+                        color: isSelected ? Color(hex: GameColors.available) : .clear,
+                        radius: isSelected ? 18 : 0,
+                        intensity: isSelected ? 0.5 : 0
+                    )
+                    .scaleEffect(isPressed ? 0.93 : 1.0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isPressed)
                 }
                 
                 // プレイヤー（見える場合のみ）
@@ -191,6 +268,9 @@ struct GridCellView: View {
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(accessibilityTraits)
+        .onAppear {
+            availablePulse = true
+        }
     }
 
     // MARK: - Accessibility Helpers

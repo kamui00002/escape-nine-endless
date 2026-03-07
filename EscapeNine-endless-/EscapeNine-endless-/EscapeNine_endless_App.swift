@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct EscapeNine_endless_App: App {
     @StateObject private var purchaseManager = PurchaseManager.shared
+    @StateObject private var gameCenterService = GameCenterService.shared
 
     init() {
         // TODO: Firebase初期化（Firebase SDKを追加後に有効化）
@@ -20,15 +21,17 @@ struct EscapeNine_endless_App: App {
         // import GoogleMobileAds
         // GADMobileAds.sharedInstance().start(completionHandler: nil)
 
-        print("[App] アプリ起動 - 収益化サービス準備完了（モック）")
+        print("[App] アプリ起動")
     }
 
     var body: some Scene {
         WindowGroup {
             HomeView()
                 .task {
-                    // PurchaseManagerの初期化（StoreKit商品読み込みなど）
+                    // PurchaseManagerの初期化
                     await purchaseManager.initialize()
+                    // Game Center認証
+                    gameCenterService.authenticate()
                 }
         }
     }

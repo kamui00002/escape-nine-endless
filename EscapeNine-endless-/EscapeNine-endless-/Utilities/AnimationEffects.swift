@@ -357,3 +357,132 @@ struct ConfettiPiece: View {
             }
     }
 }
+
+// MARK: - Skill Effects
+
+/// スキル発動時の全画面フラッシュエフェクト
+struct SkillFlashEffect: View {
+    let color: Color
+    @State private var opacity: Double = 0.7
+    
+    var body: some View {
+        color
+            .opacity(opacity)
+            .ignoresSafeArea()
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    opacity = 0
+                }
+            }
+    }
+}
+
+/// 移動成功時のパーティクルエフェクト
+struct MoveSuccessParticles: View {
+    @State private var isAnimating = false
+    let particleCount = 8
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                ForEach(0..<particleCount, id: \.self) { index in
+                    Circle()
+                        .fill(Color(hex: GameColors.available))
+                        .frame(width: 6, height: 6)
+                        .offset(
+                            x: isAnimating ? cos(Double(index) * .pi / 4) * 30 : 0,
+                            y: isAnimating ? sin(Double(index) * .pi / 4) * 30 : 0
+                        )
+                        .opacity(isAnimating ? 0 : 1)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.6)) {
+                    isAnimating = true
+                }
+            }
+        }
+        .frame(width: 60, height: 60)
+    }
+}
+
+/// ゲームオーバー時のシェイクエフェクト（強化版）
+struct GameOverShake: GeometryEffect {
+    var shakes: CGFloat
+    
+    var animatableData: CGFloat {
+        get { shakes }
+        set { shakes = newValue }
+    }
+    
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let translation = 15 * sin(shakes * .pi * 2)
+        return ProjectionTransform(
+            CGAffineTransform(translationX: translation, y: 0)
+        )
+    }
+}
+
+// MARK: - Defeat Effects
+
+/// 敵に捕まった時の赤フラッシュエフェクト
+struct CaughtFlashEffect: View {
+    @State private var opacity: Double = 0.6
+
+    var body: some View {
+        Color(hex: GameColors.warning)
+            .opacity(opacity)
+            .ignoresSafeArea()
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.8)) {
+                    opacity = 0
+                }
+            }
+    }
+}
+
+/// 時間切れ時のフェードアウトエフェクト
+struct TimeOutFadeEffect: ViewModifier {
+    @State private var opacity: Double = 1.0
+    @State private var scale: CGFloat = 1.0
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(opacity)
+            .scaleEffect(scale)
+            .onAppear {
+                withAnimation(.easeIn(duration: 1.0)) {
+                    opacity = 0.2
+                    scale = 0.8
+                }
+            }
+    }
+}
+
+extension View {
+    /// 時間切れフェードアウトを適用
+    func timeOutFade() -> some View {
+        modifier(TimeOutFadeEffect())
+    }
+}
+
+// MARK: - Helper Extensions
+
+extension View {
+    /// スキルフラッシュエフェクトを適用
+    func skillFlash(isActive: Bool, color: Color = Color(hex: GameColors.main)) -> some View {
+        overlay(
+            Group {
+                if isActive {
+                    SkillFlashEffect(color: color)
+                }
+            }
+        )
+    }
+    
+    /// ゲームオーバーシェイクを適用
+    func gameOverShake(trigger: Bool) -> some View {
+        modifier(GameOverShake(shakes: trigger ? 5 : 0))
+    }
+}

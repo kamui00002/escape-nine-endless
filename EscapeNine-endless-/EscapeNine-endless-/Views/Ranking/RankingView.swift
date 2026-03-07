@@ -10,6 +10,7 @@ import SwiftUI
 struct RankingView: View {
     @StateObject private var viewModel = RankingViewModel()
     @StateObject private var playerViewModel = PlayerViewModel()
+    @StateObject private var gameCenterService = GameCenterService.shared
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -110,9 +111,42 @@ struct RankingView: View {
                     .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
                     .padding(.top, 8)
                     .padding(.bottom, 8)
-                    
-                    // Global Ranking
-                    Text("世界ランキング")
+
+                    // Game Center Button
+                    if gameCenterService.isAuthenticated {
+                        Button(action: {
+                            AudioManager.shared.playSoundEffect(.buttonTap)
+                            gameCenterService.presentLeaderboard()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "globe")
+                                Text("世界ランキング (Game Center)")
+                            }
+                            .font(.fantasyBody())
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(12)
+                            .background(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.available),
+                                        Color(hex: GameColors.main)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(12)
+                        }
+                        .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
+                        .padding(.bottom, 8)
+                        .sheet(isPresented: $gameCenterService.showLeaderboard) {
+                            GameCenterLeaderboardView()
+                        }
+                    }
+
+                    // Local Ranking
+                    Text("プレイ履歴")
                         .font(.fantasySubheading())
                         .foregroundColor(Color(hex: GameColors.text))
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -179,26 +213,35 @@ struct RankingView: View {
                         Spacer()
                     } else {
                         List(viewModel.rankings.indices, id: \.self) { index in
+                            let entry = viewModel.rankings[index]
                             HStack {
                                 Text("#\(index + 1)")
                                     .font(.fantasyNumber())
-                                    .foregroundColor(Color(hex: GameColors.available))
+                                    .foregroundColor(
+                                        index == 0 ? Color(hex: GameColors.available) :
+                                        index == 1 ? Color(hex: GameColors.textSecondary) :
+                                        index == 2 ? Color(hex: GameColors.main) :
+                                        Color(hex: GameColors.text).opacity(0.7)
+                                    )
                                     .frame(width: ResponsiveLayout.isIPad() ? 80 : 60)
-                                
-                                Text(viewModel.rankings[index].playerName)
-                                    .font(.fantasyBody())
-                                    .foregroundColor(Color(hex: GameColors.text))
-                                
-                                Spacer()
-                                
-                                HStack(spacing: 4) {
-                                    Text("\(viewModel.rankings[index].floor)")
-                                        .font(.fantasyNumber())
-                                        .foregroundColor(Color(hex: GameColors.textSecondary))
-                                    Text("階層")
-                                        .font(.fantasyCaption())
-                                        .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 6) {
+                                        Text(characterEmoji(for: entry.characterType))
+                                        Text("\(entry.floor)階層")
+                                            .font(.fantasyBody())
+                                            .foregroundColor(Color(hex: GameColors.text))
+                                    }
+                                    Text(entry.formattedDate)
+                                        .font(.system(size: 10))
+                                        .foregroundColor(Color(hex: GameColors.text).opacity(0.5))
                                 }
+
+                                Spacer()
+
+                                Text("\(entry.floor)")
+                                    .font(.fantasyNumber())
+                                    .foregroundColor(Color(hex: GameColors.textSecondary))
                             }
                             .listRowBackground(
                                 RoundedRectangle(cornerRadius: 8)
@@ -220,6 +263,16 @@ struct RankingView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func characterEmoji(for type: String) -> String {
+        switch type {
+        case "hero": return "🗡️"
+        case "thief": return "🗡️"
+        case "wizard": return "🔮"
+        case "elf": return "🏹"
+        default: return "⚔️"
+        }
     }
 }
 

@@ -17,6 +17,14 @@ class RankingViewModel: ObservableObject {
 
     // MARK: - Dependencies
     private let rankingService = RankingService.shared
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        // Observe ranking changes
+        rankingService.$rankings
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$rankings)
+    }
 
     // MARK: - Methods
     func fetchRankings() async {
@@ -26,36 +34,16 @@ class RankingViewModel: ObservableObject {
             hasError = false
         }
 
-        do {
-            let fetchedRankings = await rankingService.getRankings()
+        let fetchedRankings = await rankingService.getRankings()
 
-            await MainActor.run {
-                rankings = fetchedRankings
-                isLoading = false
-            }
-        } catch {
-            await MainActor.run {
-                errorMessage = "ランキングの取得に失敗しました: \(error.localizedDescription)"
-                hasError = true
-                isLoading = false
-                rankings = []
-            }
+        await MainActor.run {
+            rankings = fetchedRankings
+            isLoading = false
         }
     }
 
-    func submitScore(floor: Int, playerName: String) {
-        rankingService.submitScore(floor: floor)
-    }
-
-    /// エラーをクリア
-    func clearError() {
-        errorMessage = nil
-        hasError = false
-    }
-
-    /// ランキングを再取得
+    /// Retry fetch
     func retry() async {
         await fetchRankings()
     }
 }
-

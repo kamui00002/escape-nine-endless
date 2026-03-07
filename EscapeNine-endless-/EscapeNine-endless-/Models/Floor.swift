@@ -14,11 +14,12 @@ struct Floor {
     let aiLevel: AILevel
     
     static func calculateBPM(for floor: Int) -> Double {
-        let bpmRange = Int((Constants.maxBPM - Constants.minBPM) / Constants.bpmIncrement)
-        let floorsPerBPM = Constants.maxFloors / bpmRange
-
-        let bpmIndex = min((floor - 1) / floorsPerBPM, bpmRange)
-        return Constants.minBPM + (Double(bpmIndex) * Constants.bpmIncrement)
+        // べき乗曲線: BPM = start + (end - start) * (floor/99)^exponent
+        // 序盤は緩やか、終盤に急加速
+        let clampedFloor = max(1, min(floor, Constants.maxFloors))
+        let ratio = Double(clampedFloor - 1) / 99.0
+        let scaled = pow(ratio, Constants.bpmCurveExponent)
+        return Constants.bpmCurveStart + (Constants.bpmCurveEnd - Constants.bpmCurveStart) * scaled
     }
 
     static func getSpecialRule(for floor: Int) -> SpecialRule {
@@ -33,13 +34,41 @@ struct Floor {
         }
     }
     
-    static func getDifficulty(for floor: Int) -> AILevel {
-        if floor < Constants.normalDifficultyStartFloor {
+    /// 階層の自然難易度を取得
+    static func getNaturalDifficulty(for floor: Int) -> AILevel {
+        if floor < Constants.aiNaturalNormalFloor {
             return .easy
-        } else if floor < Constants.hardDifficultyStartFloor {
+        } else if floor < Constants.aiNaturalHardFloor {
             return .normal
         } else {
             return .hard
+        }
+    }
+
+    /// プレイヤー選択を考慮した実効AI難易度を取得
+    /// - Easy選択: 自然難易度より1段下
+    /// - Normal選択: 自然難易度と一致
+    /// - Hard選択: 自然難易度より1段上
+    static func getEffectiveAILevel(for floor: Int, playerSelection: AILevel) -> AILevel {
+        let natural = getNaturalDifficulty(for: floor)
+
+        switch playerSelection {
+        case .easy:
+            // 1段下げる
+            switch natural {
+            case .easy: return .easy
+            case .normal: return .easy
+            case .hard: return .normal
+            }
+        case .normal:
+            return natural
+        case .hard:
+            // 1段上げる
+            switch natural {
+            case .easy: return .normal
+            case .normal: return .hard
+            case .hard: return .hard
+            }
         }
     }
     

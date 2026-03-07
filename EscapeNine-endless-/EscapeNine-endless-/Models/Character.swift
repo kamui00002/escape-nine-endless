@@ -50,13 +50,13 @@ struct Character {
         let skill: Skill
         switch type {
         case .hero:
-            skill = Skill(type: .dash, name: "ダッシュ", description: "2マス移動できる", maxUsage: Constants.maxSkillUsage)
+            skill = Skill(type: .dash, name: "ダッシュ", description: "2マス移動できる", maxUsage: Constants.heroSkillMaxUsage)
         case .thief:
-            skill = Skill(type: .diagonal, name: "斜め移動", description: "斜め方向に移動可能", maxUsage: Constants.maxSkillUsage)
+            skill = Skill(type: .diagonal, name: "斜め移動", description: "斜め方向に移動可能", maxUsage: Constants.thiefSkillMaxUsage)
         case .wizard:
-            skill = Skill(type: .invisible, name: "透明化", description: "鬼に当たっても無敵", maxUsage: Constants.maxSkillUsage)
+            skill = Skill(type: .invisible, name: "透明化", description: "鬼に当たっても無敵", maxUsage: Constants.wizardSkillMaxUsage)
         case .elf:
-            skill = Skill(type: .bind, name: "拘束", description: "鬼を1ターン停止させる", maxUsage: Constants.maxSkillUsage)
+            skill = Skill(type: .bind, name: "拘束", description: "鬼を\(Constants.bindDurationTurns)ターン停止させる", maxUsage: Constants.elfSkillMaxUsage)
         }
         
         return Character(

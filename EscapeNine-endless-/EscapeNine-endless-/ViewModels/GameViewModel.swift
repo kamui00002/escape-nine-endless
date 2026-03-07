@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 import Combine
 
 class GameViewModel: ObservableObject {
@@ -16,16 +17,26 @@ class GameViewModel: ObservableObject {
     @Published var enemyPosition: Int = 9
     @Published var gameStatus: GameStatus = .idle
     @Published var skillUsageCount: Int = 0
-    @Published var pendingPlayerMove: Int? = nil // 次のビートで移動する位置
-    @Published var hasMovedThisBeat: Bool = false // このビートで移動したか
+    @Published var pendingPlayerMove: Int? = nil // 次のターンで移動する位置
+    @Published var hasMovedThisTurn: Bool = false // このターンで移動先を選択したか
     @Published var specialRule: SpecialRule = .none // 現在の特殊ルール
     @Published var disappearedCells: Set<Int> = [] // 消失したマス
     @Published var showFloorClear: Bool = false // 階層クリア表示
     @Published var isInvisible: Bool = false // 透明化状態
-    @Published var enemyStopped: Bool = false // 敵が停止しているか
+    @Published var enemyStoppedTurns: Int = 0 // 敵が停止している残りターン数
     @Published var isSkillActive: Bool = false // スキルがアクティブか（ダッシュ、斜め移動用）
-    @Published var consecutiveWaits: Int = 0 // 連続待機回数
     @Published var showSkillReset: Bool = false // スキルリセット通知
+
+    // MARK: - Countdown Properties
+    @Published var turnCountdown: Int = Constants.turnCountdownBeats // ターンカウントダウン(3→2→1)
+    @Published var gameStartCountdown: Int = 0 // ゲーム開始カウントダウン(3→2→1→0)
+    @Published var isGameStartCountdownActive: Bool = false // ゲーム開始カウントダウン中か
+
+    // MARK: - Defeat Reason
+    @Published var defeatReason: DefeatReason? = nil
+
+    // MARK: - Game Over Overlay
+    @Published var showGameOverOverlay: Bool = false
 
     // MARK: - Game Settings
     private var selectedAILevel: AILevel = .easy // プレイヤーが選択したAI難易度（全階層で固定、初心者向けにEasyをデフォルト）
@@ -35,70 +46,89 @@ class GameViewModel: ObservableObject {
     private let gameEngine = GameEngine.shared
     private let aiEngine = AIEngine.shared
     private let stageManager = StageManager.shared
-    
+
     // MARK: - Constants
     private let maxTurns = Constants.maxTurns
     private let maxSkillUsage = Constants.maxSkillUsage
-    
+
     // MARK: - Character & Skill
     private weak var playerViewModelInstance: PlayerViewModel?
-    
+
     var currentCharacter: Character {
-        let vm = playerViewModelInstance ?? PlayerViewModel()
+        guard let vm = playerViewModelInstance else {
+            print("Warning: PlayerViewModel is not set yet. Using default hero character.")
+            return Character.getCharacter(for: .hero) // デフォルト値
+        }
         return Character.getCharacter(for: vm.selectedCharacter)
     }
-    
+
     var currentSkill: Skill {
         currentCharacter.skill
     }
-    
+
     var remainingSkillUses: Int {
         currentSkill.maxUsage - skillUsageCount
     }
-    
+
     func setPlayerViewModel(_ viewModel: PlayerViewModel) {
         playerViewModelInstance = viewModel
     }
-    
+
+    // MARK: - Game Start Countdown Timer
+    private var gameStartCountdownTimer: Timer?
+
     // MARK: - Combine
     private var cancellables = Set<AnyCancellable>()
-    private var lastProcessedBeat: Int = 0
-    
+
     // MARK: - Computed Properties
     var currentBeat: Int {
         audioManager.currentBeat
     }
-    
+
     var isPlaying: Bool {
         audioManager.isPlaying
     }
-    
+
     // MARK: - Initialization
     init() {
-        setupBeatObserver()
+        setupObservers()
+        setupTurnDeadlineCallback()
     }
-    
+
     // MARK: - Setup
-    private func setupBeatObserver() {
-        audioManager.beatPublisher
-            .sink { [weak self] beat in
-                self?.onBeat(beat)
+    private func setupObservers() {
+        // ターンカウントダウンをUIに反映
+        audioManager.turnCountdownPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] remaining in
+                self?.turnCountdown = remaining
             }
             .store(in: &cancellables)
     }
-    
-    // MARK: - Beat Handler
-    private func onBeat(_ beat: Int) {
+
+    private func setupTurnDeadlineCallback() {
+        audioManager.onTurnDeadline = { [weak self] in
+            DispatchQueue.main.async {
+                self?.onTurnDeadline()
+            }
+        }
+    }
+
+    // MARK: - Turn Deadline Handler
+    private func onTurnDeadline() {
         guard gameStatus == .playing else { return }
-        guard beat > lastProcessedBeat else { return }
-        lastProcessedBeat = beat
+        guard !isGameStartCountdownActive else { return }
 
-        // 新しいビートの開始時にリセット
-        hasMovedThisBeat = false
-
-        // プレイヤーが移動先を指定していない場合、ゲームオーバー
+        // 移動先が選択されていない → 時間切れゲームオーバー
         guard let nextPosition = pendingPlayerMove else {
-            endGame(result: .lose)
+            defeatReason = .timeOut
+            showGameOverOverlay = true
+            audioManager.pauseBGM()
+            // 1.5秒後にゲーム終了
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.showGameOverOverlay = false
+                self?.endGame(result: .lose)
+            }
             return
         }
 
@@ -106,7 +136,13 @@ class GameViewModel: ObservableObject {
         let (isValid, shouldConsume) = validateMove(from: playerPosition, to: nextPosition)
 
         guard isValid else {
-            endGame(result: .lose)
+            defeatReason = .caughtByEnemy
+            showGameOverOverlay = true
+            audioManager.pauseBGM()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.showGameOverOverlay = false
+                self?.endGame(result: .lose)
+            }
             return
         }
 
@@ -115,10 +151,16 @@ class GameViewModel: ObservableObject {
             skillUsageCount += 1
         }
         isSkillActive = false
-        
+
         // 消失したマスに入っていないかチェック
         if disappearedCells.contains(nextPosition) {
-            endGame(result: .lose)
+            defeatReason = .caughtByEnemy
+            showGameOverOverlay = true
+            audioManager.pauseBGM()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.showGameOverOverlay = false
+                self?.endGame(result: .lose)
+            }
             return
         }
 
@@ -128,31 +170,25 @@ class GameViewModel: ObservableObject {
         let previousEnemyPosition = enemyPosition
         var nextEnemyPosition = enemyPosition
 
-        if !enemyStopped {
-            // 選択されたAI難易度を使用（全階層で固定）
+        if enemyStoppedTurns > 0 {
+            // 拘束中は敵を移動させず、残りターン数を減らす
+            enemyStoppedTurns -= 1
+        } else {
+            // 階層に応じたAI難易度を使用
+            let effectiveAI = Floor.getEffectiveAILevel(for: currentFloor, playerSelection: selectedAILevel)
             nextEnemyPosition = aiEngine.calculateNextMove(
                 from: enemyPosition,
-                target: playerPosition, // プレイヤーの「現在」の位置を使用
-                level: selectedAILevel
+                target: playerPosition,
+                level: effectiveAI
             )
-        } else {
-            // 拘束中は敵を移動させない
-            enemyStopped = false
-        }
-
-        // 待機判定（連続待機カウンター更新）
-        if nextPosition == previousPlayerPosition {
-            consecutiveWaits += 1
-        } else {
-            consecutiveWaits = 0
         }
 
         // 両方の位置を同時に更新
         playerPosition = nextPosition
         enemyPosition = nextEnemyPosition
         pendingPlayerMove = nil
-        hasMovedThisBeat = true
-        
+        hasMovedThisTurn = false
+
         // 移動効果音
         audioManager.playSoundEffect(.move)
 
@@ -172,7 +208,13 @@ class GameViewModel: ObservableObject {
                     self?.isInvisible = false
                 }
             } else {
-                endGame(result: .lose)
+                defeatReason = .caughtByEnemy
+                showGameOverOverlay = true
+                audioManager.pauseBGM()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    self?.showGameOverOverlay = false
+                    self?.endGame(result: .lose)
+                }
                 return
             }
         }
@@ -185,12 +227,10 @@ class GameViewModel: ObservableObject {
             // 階層クリア表示
             showFloorClear = true
             audioManager.pauseBGM()
-            
+
             // フロアクリア効果音
             audioManager.playSoundEffect(.floorClear)
         }
-
-        // hasMovedThisBeatはtrueのまま維持（次のビートでリセット）
     }
 
     // MARK: - Skill Validation Helpers
@@ -229,26 +269,77 @@ class GameViewModel: ObservableObject {
 
         return (isValid, shouldConsumeSkill)
     }
-    
+
+    // MARK: - Game Start Countdown (独立タイマー、1秒間隔固定)
+    private func startGameStartCountdown(completion: @escaping () -> Void) {
+        #if DEBUG
+        // デバッグ: カウントダウンスキップ
+        if playerViewModelInstance?.debugSkipStartCountdown == true {
+            isGameStartCountdownActive = false
+            gameStartCountdown = 0
+            completion()
+            return
+        }
+        #endif
+
+        isGameStartCountdownActive = true
+        gameStartCountdown = Constants.gameStartCountdownBeats
+
+        gameStartCountdownTimer?.invalidate()
+        gameStartCountdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            DispatchQueue.main.async {
+                self.gameStartCountdown -= 1
+                // Haptic feedback
+                let generator = UIImpactFeedbackGenerator(style: .heavy)
+                generator.impactOccurred()
+
+                if self.gameStartCountdown <= 0 {
+                    timer.invalidate()
+                    self.gameStartCountdownTimer = nil
+                    // GO! 表示を0.5秒後に消す
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        self?.isGameStartCountdownActive = false
+                    }
+                    completion()
+                }
+            }
+        }
+    }
+
     // MARK: - Game Control
     func startGame(aiLevel: AILevel) {
         // デバッグ用の開始階層を使用（設定されている場合）
+        #if DEBUG
         let startFloor = playerViewModelInstance?.debugStartFloor ?? 1
+        #else
+        let startFloor = 1
+        #endif
         currentFloor = max(1, min(startFloor, Constants.maxFloors))
-        
+
         // AI難易度を保存（全階層で固定）
         // デバッグ用のAI難易度を使用（設定されている場合）
+        #if DEBUG
         selectedAILevel = playerViewModelInstance?.debugAILevel ?? aiLevel
+        #else
+        selectedAILevel = aiLevel
+        #endif
 
         turnCount = 0
         gameStatus = .playing
         skillUsageCount = 0
-        hasMovedThisBeat = false
-        lastProcessedBeat = 0
+        hasMovedThisTurn = false
         isInvisible = false
-        enemyStopped = false
+        enemyStoppedTurns = 0
         isSkillActive = false
-        consecutiveWaits = 0
+        defeatReason = nil
+        showGameOverOverlay = false
+
+        // ターンカウントダウンを初期化
+        turnCountdown = Constants.turnCountdownBeats
 
         // ランダム配置（同じ位置にならないように）
         let playerPos = Int.random(in: 1...9)
@@ -259,25 +350,40 @@ class GameViewModel: ObservableObject {
         playerPosition = playerPos
         enemyPosition = enemyPos
 
-        // 初期位置を設定（最初のビートで即ゲームオーバーにならないように）
-        pendingPlayerMove = playerPosition
-        
+        // 初回ターンも移動必須（pendingPlayerMoveはnil）
+        pendingPlayerMove = nil
+
         // ゲームスタート効果音
         audioManager.playSoundEffect(.gameStart)
-        
+
         // BPM設定
-        let bpm = stageManager.getBPM(for: currentFloor)
-        audioManager.startBGM(bpm: bpm)
-        
+        var bpm = stageManager.getBPM(for: currentFloor)
+        #if DEBUG
+        if let overrideBPM = playerViewModelInstance?.debugBPMOverride, overrideBPM > 0 {
+            bpm = overrideBPM
+        }
+        // デバッグ用ターンカウントダウンビート数を適用
+        let debugBeats = playerViewModelInstance?.debugTurnCountdownBeats ?? Constants.turnCountdownBeats
+        audioManager.setTurnCountdownBeats(debugBeats)
+        turnCountdown = debugBeats
+        #endif
+
         // 特殊ルール設定
         specialRule = stageManager.getSpecialRule(for: currentFloor)
         updateDisappearedCells()
+
+        // ゲーム開始カウントダウン → 完了後にBeatEngine開始
+        startGameStartCountdown { [weak self] in
+            guard let self = self else { return }
+            self.audioManager.resetTurnCountdown()
+            self.audioManager.startBGM(bpm: bpm)
+        }
     }
-    
-    // 移動先を指定（次のビートで移動）
+
+    // 移動先を指定（次のターンで移動）
     func selectMove(to position: Int) {
         guard gameStatus == .playing else { return }
-        // hasMovedThisBeatチェックを削除：プレイヤーは次のビートまで何度でも移動先を変更できる
+        guard !isGameStartCountdownActive else { return }
 
         // 移動可能な位置を取得（スキルを考慮）
         let availableMoves = getAvailableMoves()
@@ -292,20 +398,16 @@ class GameViewModel: ObservableObject {
             return
         }
 
-        // 次のビートで移動する位置を設定
+        // 次のターンで移動する位置を設定
         pendingPlayerMove = position
+        hasMovedThisTurn = true
     }
-    
-    // 移動可能な位置を取得
+
+    // 移動可能な位置を取得（現在位置を除外 = 必須移動）
     func getAvailableMoves() -> [Int] {
         var moves: [Int] = []
 
-        // 待機オプション（連続待機が上限未満の場合のみ）
-        if consecutiveWaits < Constants.maxConsecutiveWaits {
-            moves.append(playerPosition)
-        }
-
-        // 基本移動
+        // 基本移動（現在位置は含めない = 必須移動）
         moves.append(contentsOf: gameEngine.getAvailableMoves(from: playerPosition))
 
         // スキルによる追加移動
@@ -328,8 +430,8 @@ class GameViewModel: ObservableObject {
             moves.append(contentsOf: diagonalMoves)
         }
 
-        // 消失したマスを除外
-        return Array(Set(moves)).filter { !disappearedCells.contains($0) }
+        // 消失したマスを除外、現在位置を除外
+        return Array(Set(moves)).filter { !disappearedCells.contains($0) && $0 != playerPosition }
     }
 
     private func getDashMoves(from position: Int) -> [Int] {
@@ -381,15 +483,15 @@ class GameViewModel: ObservableObject {
 
         return moves
     }
-    
+
     // MARK: - Skill Actions
     func activateSkill() {
         guard gameStatus == .playing else { return }
         guard remainingSkillUses > 0 else { return }
-        
+
         // スキル効果音
         audioManager.playSoundEffect(.skill)
-        
+
         switch currentSkill.type {
         case .dash:
             // ダッシュ: 次の移動で2マス移動可能
@@ -398,41 +500,26 @@ class GameViewModel: ObservableObject {
             // 斜め移動: 常時有効なので何もしない
             break
         case .invisible:
-            // 透明化: アクティブにする
-            isInvisible = true
+            // 透明化: 衝突時に自動発動するため、手動アクティベーション不要
+            break
         case .bind:
             // 拘束: 敵を停止させる（敵をタップした時に発動）
             break
         }
     }
-    
+
     func bindEnemy() {
         guard gameStatus == .playing else { return }
         guard currentSkill.type == .bind else { return }
         guard remainingSkillUses > 0 else { return }
-        
+
         // スキル効果音
         audioManager.playSoundEffect(.skill)
-        
-        enemyStopped = true
+
+        enemyStoppedTurns = Constants.bindDurationTurns
         skillUsageCount += 1
     }
-    
-    private func moveEnemy() {
-        guard gameStatus == .playing else { return }
 
-        // 選択されたAI難易度を使用（全階層で固定）
-        enemyPosition = aiEngine.calculateNextMove(
-            from: enemyPosition,
-            target: playerPosition,
-            level: selectedAILevel
-        )
-        
-        if enemyPosition == playerPosition {
-            endGame(result: .lose)
-        }
-    }
-    
     func nextFloor() {
         // クリア表示を非表示
         showFloorClear = false
@@ -451,33 +538,40 @@ class GameViewModel: ObservableObject {
         }
 
         pendingPlayerMove = nil
-        hasMovedThisBeat = false
+        hasMovedThisTurn = false
         isInvisible = false
-        enemyStopped = false
+        enemyStoppedTurns = 0
         isSkillActive = false
-        consecutiveWaits = 0  // 連続待機カウンターをリセット
-        
+        defeatReason = nil
+        showGameOverOverlay = false
+
         // 100階層でクリア
         if currentFloor > Constants.maxFloors {
             endGame(result: .win)
             return
         }
-        
-        // BPM変更
-        let newBPM = stageManager.getBPM(for: currentFloor)
-        audioManager.changeBPM(newBPM)
-        
+
+        // BPM設定
+        var newBPM = stageManager.getBPM(for: currentFloor)
+        #if DEBUG
+        if let overrideBPM = playerViewModelInstance?.debugBPMOverride, overrideBPM > 0 {
+            newBPM = overrideBPM
+        }
+        let debugBeats = playerViewModelInstance?.debugTurnCountdownBeats ?? Constants.turnCountdownBeats
+        audioManager.setTurnCountdownBeats(debugBeats)
+        turnCountdown = debugBeats
+        #endif
+
         // 特殊ルール設定
         specialRule = stageManager.getSpecialRule(for: currentFloor)
         updateDisappearedCells()
-        
+
         // ランダム配置（消失したマスを避ける）
         let availablePositions = Array(1...9).filter { !disappearedCells.contains($0) }
         guard availablePositions.count >= 2 else {
             // 消失したマスが多すぎる場合のフォールバック
             playerPosition = 1
             enemyPosition = 9
-            pendingPlayerMove = playerPosition
             return
         }
 
@@ -489,13 +583,20 @@ class GameViewModel: ObservableObject {
         playerPosition = playerPos
         enemyPosition = enemyPos
 
-        // 初期位置を設定（次の階層開始時に即ゲームオーバーにならないように）
-        pendingPlayerMove = playerPosition
+        // 初回ターンも移動必須
+        pendingPlayerMove = nil
 
-        // 次の階層の準備ができたら再開
-        audioManager.resumeBGM()
+        // BGMを停止（カウントダウン後に再開）
+        audioManager.stopBGM()
+
+        // ゲーム開始カウントダウン → 完了後にBeatEngine開始
+        startGameStartCountdown { [weak self] in
+            guard let self = self else { return }
+            self.audioManager.resetTurnCountdown()
+            self.audioManager.startBGM(bpm: newBPM)
+        }
     }
-    
+
     // MARK: - Special Rules
     private func updateDisappearedCells() {
         if specialRule == .disappear || specialRule == .fogDisappear {
@@ -522,25 +623,23 @@ class GameViewModel: ObservableObject {
         }
     }
 
-    /// 階層に応じた消失マスの数を計算（最大2マス）
+    /// 階層に応じた消失マスの数を計算（段階的スケーリング）
     private func getNumberOfDisappearingCells(for floor: Int) -> Int {
-        switch floor {
-        case Constants.disappearStartFloor..<70:
-            return 1 // 階層41-69: 1マス消失
-        case 70...:
-            return 2 // 階層70+: 2マス消失（上限）
-        default:
-            return 1
+        for stage in Constants.disappearCellStages {
+            if floor >= stage.floor {
+                return stage.count
+            }
         }
+        return 1
     }
-    
+
     // 霧マップ: プレイヤーから見えるマスかどうか
     func isCellVisible(_ position: Int) -> Bool {
         // 消失マスは常に見える（プレイヤーが避けられるように）
         if disappearedCells.contains(position) {
             return true
         }
-        
+
         if specialRule == .fog || specialRule == .fogDisappear {
             // 自分の位置と隣接するマスのみ見える
             let playerRow = Constants.rowFromPosition(playerPosition)
@@ -556,38 +655,58 @@ class GameViewModel: ObservableObject {
         }
         return true // 霧がない場合は全て見える
     }
-    
+
     // マスが消失しているか
     func isCellDisappeared(_ position: Int) -> Bool {
         return disappearedCells.contains(position)
     }
-    
+
     func endGame(result: GameStatus) {
         gameStatus = result
         audioManager.stopBGM()
-        
+
         // ゲームオーバー効果音
         if result == .lose {
             audioManager.playSoundEffect(.gameOver)
         }
-        
-        // スコア送信
+
+        // スコア送信（ローカル + Game Center）
         if result == .win || result == .lose {
-            RankingService.shared.submitScore(floor: currentFloor)
+            RankingService.shared.submitScore(
+                floor: currentFloor,
+                characterType: currentCharacter.type.rawValue
+            )
+            Task {
+                await GameCenterService.shared.submitScore(floor: currentFloor)
+            }
+        }
+
+        // 実績チェック（勝利時のみ）
+        if result == .win {
+            let skillUsed = skillUsageCount > 0
+            let currentBPM = stageManager.getBPM(for: currentFloor)
+            AchievementManager.shared.checkAchievements(
+                floor: currentFloor,
+                skillUsed: skillUsed,
+                currentBPM: currentBPM,
+                gameWon: true
+            )
         }
     }
-    
+
     func pauseGame() {
         gameStatus = .paused
         audioManager.pauseBGM()
     }
-    
+
     func resumeGame() {
         gameStatus = .playing
         audioManager.resumeBGM()
     }
-    
+
     func resetGame() {
+        gameStartCountdownTimer?.invalidate()
+        gameStartCountdownTimer = nil
         audioManager.stopBGM()
         currentFloor = 1
         turnCount = 0
@@ -596,16 +715,18 @@ class GameViewModel: ObservableObject {
         gameStatus = .idle  // リセット後はidle状態（startGameで.playingに変更）
         skillUsageCount = 0
         pendingPlayerMove = nil
-        hasMovedThisBeat = false
-        lastProcessedBeat = 0
+        hasMovedThisTurn = false
         specialRule = .none
         disappearedCells = []
         showFloorClear = false
         showSkillReset = false
         isInvisible = false
-        enemyStopped = false
+        enemyStoppedTurns = 0
         isSkillActive = false
-        consecutiveWaits = 0
+        defeatReason = nil
+        showGameOverOverlay = false
+        turnCountdown = Constants.turnCountdownBeats
+        gameStartCountdown = 0
+        isGameStartCountdownActive = false
     }
 }
-

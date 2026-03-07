@@ -25,10 +25,15 @@ class PlayerViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Debug/Admin Properties (管理者用 - 後で削除可能)
+    // MARK: - Debug/Admin Properties (デバッグビルドのみ有効)
+    #if DEBUG
     @Published var debugStartFloor: Int = 1 // デバッグ用開始階層
     @Published var debugAILevel: AILevel = .normal // デバッグ用AI難易度
     @Published var debugUnlockAllCharacters: Bool = false // 全キャラクターアンロック
+    @Published var debugBPMOverride: Double = 0 // 0=フロア曲線使用、0以外=固定BPM
+    @Published var debugTurnCountdownBeats: Int = 3 // ターンカウントダウンビート数(1-10)
+    @Published var debugSkipStartCountdown: Bool = false // ゲーム開始カウントダウンスキップ
+    #endif
     
     // MARK: - UserDefaults Keys
     private let highestFloorKey = "highestFloor"
@@ -40,6 +45,9 @@ class PlayerViewModel: ObservableObject {
     private let debugStartFloorKey = "debugStartFloor"
     private let debugAILevelKey = "debugAILevel"
     private let debugUnlockAllCharactersKey = "debugUnlockAllCharacters"
+    private let debugBPMOverrideKey = "debugBPMOverride"
+    private let debugTurnCountdownBeatsKey = "debugTurnCountdownBeats"
+    private let debugSkipStartCountdownKey = "debugSkipStartCountdown"
     
     // MARK: - Initialization
     init() {
@@ -69,6 +77,7 @@ class PlayerViewModel: ObservableObject {
             seVolume = Constants.defaultVolume // デフォルト値
         }
         
+        #if DEBUG
         // デバッグ設定の読み込み
         debugStartFloor = UserDefaults.standard.integer(forKey: debugStartFloorKey)
         if debugStartFloor == 0 {
@@ -81,11 +90,21 @@ class PlayerViewModel: ObservableObject {
         }
         
         debugUnlockAllCharacters = UserDefaults.standard.bool(forKey: debugUnlockAllCharactersKey)
-        
+
+        debugBPMOverride = UserDefaults.standard.double(forKey: debugBPMOverrideKey)
+
+        debugTurnCountdownBeats = UserDefaults.standard.integer(forKey: debugTurnCountdownBeatsKey)
+        if debugTurnCountdownBeats == 0 {
+            debugTurnCountdownBeats = 3 // デフォルト値
+        }
+
+        debugSkipStartCountdown = UserDefaults.standard.bool(forKey: debugSkipStartCountdownKey)
+
         // 全キャラクターアンロックが有効な場合
         if debugUnlockAllCharacters {
             unlockedCharacters = CharacterType.allCases
         }
+        #endif
     }
     
     func saveData() {
@@ -95,12 +114,18 @@ class PlayerViewModel: ObservableObject {
         UserDefaults.standard.set(adRemoved, forKey: adRemovedKey)
         UserDefaults.standard.set(bgmVolume, forKey: bgmVolumeKey)
         UserDefaults.standard.set(seVolume, forKey: seVolumeKey)
+        #if DEBUG
         UserDefaults.standard.set(debugStartFloor, forKey: debugStartFloorKey)
         UserDefaults.standard.set(debugAILevel.rawValue, forKey: debugAILevelKey)
         UserDefaults.standard.set(debugUnlockAllCharacters, forKey: debugUnlockAllCharactersKey)
+        UserDefaults.standard.set(debugBPMOverride, forKey: debugBPMOverrideKey)
+        UserDefaults.standard.set(debugTurnCountdownBeats, forKey: debugTurnCountdownBeatsKey)
+        UserDefaults.standard.set(debugSkipStartCountdown, forKey: debugSkipStartCountdownKey)
+        #endif
     }
     
-    // MARK: - Debug/Admin Functions (管理者用 - 後で削除可能)
+    #if DEBUG
+    // MARK: - Debug/Admin Functions (デバッグビルドのみ有効)
     func toggleUnlockAllCharacters() {
         debugUnlockAllCharacters.toggle()
         if debugUnlockAllCharacters {
@@ -115,6 +140,7 @@ class PlayerViewModel: ObservableObject {
         }
         saveData()
     }
+    #endif
     
     // MARK: - Character Management
     func unlockCharacter(_ character: CharacterType) {
@@ -125,11 +151,19 @@ class PlayerViewModel: ObservableObject {
     }
     
     func selectCharacter(_ character: CharacterType) {
-        // 管理者用設定が有効な場合、またはアンロック済みの場合は選択可能
+        #if DEBUG
+        // デバッグビルド: 管理者用設定が有効な場合、またはアンロック済みの場合は選択可能
         if debugUnlockAllCharacters || unlockedCharacters.contains(character) {
             selectedCharacter = character
             saveData()
         }
+        #else
+        // リリースビルド: アンロック済みの場合のみ選択可能
+        if unlockedCharacters.contains(character) {
+            selectedCharacter = character
+            saveData()
+        }
+        #endif
     }
     
     func updateHighestFloor(_ floor: Int) {
