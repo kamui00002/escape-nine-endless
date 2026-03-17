@@ -129,7 +129,7 @@ struct TutorialOverlayView: View {
     private var welcomePage: some View {
         VStack(spacing: 20) {
             Image(systemName: "music.note")
-                .font(.system(size: 60))
+                .font(.system(size: ResponsiveLayout.isIPad() ? 72 : 60))
                 .foregroundColor(Color(hex: GameColors.available))
 
             Text("ようこそ！")
@@ -153,7 +153,7 @@ struct TutorialOverlayView: View {
     private var movementPage: some View {
         VStack(spacing: 20) {
             Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 60))
+                .font(.system(size: ResponsiveLayout.isIPad() ? 72 : 60))
                 .foregroundColor(Color(hex: GameColors.available))
 
             Text("移動方法")
@@ -177,7 +177,7 @@ struct TutorialOverlayView: View {
     private var beatTimingPage: some View {
         VStack(spacing: 20) {
             Image(systemName: "metronome.fill")
-                .font(.system(size: 60))
+                .font(.system(size: ResponsiveLayout.isIPad() ? 72 : 60))
                 .foregroundColor(Color(hex: GameColors.available))
 
             Text("ビートタイミング")
@@ -238,7 +238,7 @@ struct TutorialOverlayView: View {
     private var skillPage: some View {
         VStack(spacing: 20) {
             Image(systemName: "sparkles")
-                .font(.system(size: 60))
+                .font(.system(size: ResponsiveLayout.isIPad() ? 72 : 60))
                 .foregroundColor(Color(hex: GameColors.available))
 
             Text("スキル")
@@ -290,7 +290,7 @@ struct TutorialOverlayView: View {
     private var specialRulesPage: some View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 60))
+                .font(.system(size: ResponsiveLayout.isIPad() ? 72 : 60))
                 .foregroundColor(Color(hex: GameColors.warning))
 
             Text("特殊ルール")
@@ -355,7 +355,7 @@ struct TutorialOverlayView: View {
     private var startPage: some View {
         VStack(spacing: 20) {
             Image(systemName: "flag.fill")
-                .font(.system(size: 60))
+                .font(.system(size: ResponsiveLayout.isIPad() ? 72 : 60))
                 .foregroundColor(Color(hex: GameColors.success))
 
             Text("さあ始めよう！")
@@ -410,7 +410,7 @@ struct TutorialOverlayView: View {
                                 isEnemy ? Color(hex: GameColors.enemy).opacity(0.7) :
                                 Color(hex: GameColors.grid)
                             )
-                            .frame(width: 36, height: 36)
+                            .frame(width: ResponsiveLayout.isIPad() ? 50 : 36, height: ResponsiveLayout.isIPad() ? 50 : 36)
                             .overlay(
                                 Group {
                                     if isPlayer {
@@ -449,7 +449,7 @@ struct TutorialOverlayView: View {
                                 isAvailable ? Color(hex: GameColors.available).opacity(0.4) :
                                 Color(hex: GameColors.grid)
                             )
-                            .frame(width: 36, height: 36)
+                            .frame(width: ResponsiveLayout.isIPad() ? 50 : 36, height: ResponsiveLayout.isIPad() ? 50 : 36)
                             .overlay(
                                 Group {
                                     if isPlayer {

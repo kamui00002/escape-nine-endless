@@ -164,7 +164,7 @@ struct RankingView: View {
                         Spacer()
                         VStack(spacing: 16) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 48))
+                                .font(.system(size: ResponsiveLayout.isIPad() ? 58 : 48))
                                 .foregroundColor(Color(hex: GameColors.warning))
 
                             if let errorMessage = viewModel.errorMessage {
@@ -203,7 +203,7 @@ struct RankingView: View {
                         Spacer()
                         VStack(spacing: 12) {
                             Image(systemName: "chart.bar.fill")
-                                .font(.system(size: 48))
+                                .font(.system(size: ResponsiveLayout.isIPad() ? 58 : 48))
                                 .foregroundColor(Color(hex: GameColors.text).opacity(0.5))
 
                             Text("まだランキングがありません")

@@ -41,19 +41,8 @@ class BeatEngine: ObservableObject {
 
     // MARK: - Initialization
     init() {
-        setupAudioSession()
+        // AudioSession は AudioManager で一元管理
         setupAudioEngine()
-    }
-
-    // MARK: - Audio Session Setup
-    private func setupAudioSession() {
-        do {
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try audioSession.setActive(true)
-        } catch {
-            print("Audio Session setup failed: \(error)")
-        }
     }
 
     // MARK: - Audio Engine Setup (Programmatic Metronome)
@@ -193,25 +182,25 @@ class BeatEngine: ObservableObject {
     }
 
     private func onBeat() {
-        // ターンカウントダウン処理
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+
             self.currentBeat += 1
-        }
+            self.turnCountdown -= 1
 
-        turnCountdown -= 1
+            // Play metronome tick (accent when countdown reaches 1)
+            let isAccent = (self.turnCountdown == 0)
+            self.playTick(accent: isAccent)
 
-        // Play metronome tick (accent when countdown reaches 1)
-        let isAccent = (turnCountdown == 0)
-        playTick(accent: isAccent)
+            // Haptic feedback
+            let generator = UIImpactFeedbackGenerator(style: self.turnCountdown == 0 ? .heavy : .light)
+            generator.impactOccurred()
 
-        // Haptic feedback
-        let generator = UIImpactFeedbackGenerator(style: turnCountdown == 0 ? .heavy : .light)
-        generator.impactOccurred()
-
-        // カウントダウンが0に達したらターン処理を発火
-        if turnCountdown <= 0 {
-            onTurnDeadline?()
-            turnCountdown = turnCountdownBeats
+            // カウントダウンが0に達したらターン処理を発火
+            if self.turnCountdown <= 0 {
+                self.onTurnDeadline?()
+                self.turnCountdown = self.turnCountdownBeats
+            }
         }
     }
 

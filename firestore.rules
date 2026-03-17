@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    match /rankings/{userId} {
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated()
+        && isOwner(userId)
+        && request.resource.data.keys().hasAll(['userId', 'displayName', 'floor', 'characterType', 'timestamp'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.floor is int
+        && request.resource.data.floor >= 1
+        && request.resource.data.floor <= 100
+        && request.resource.data.characterType in ['hero', 'thief', 'wizard', 'elf'];
+
+      allow update: if isAuthenticated()
+        && isOwner(userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.floor >= resource.data.floor;
+
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

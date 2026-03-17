@@ -74,6 +74,27 @@ struct ResponsiveLayout {
             return 20
         }
     }
+
+    // ビートインジケーターサイズ（外枠リング）
+    static func beatIndicatorSize(for geometry: GeometryProxy) -> CGFloat {
+        let cellSize = gridCellSize(for: geometry)
+        // セルサイズの75%をベースに
+        return cellSize * 0.75
+    }
+
+    // BPMInfoView のパディング
+    static func bpmInfoPadding(for geometry: GeometryProxy) -> (horizontal: CGFloat, vertical: CGFloat) {
+        if isIPad() {
+            return (horizontal: 36, vertical: 16)
+        } else {
+            return (horizontal: 24, vertical: 12)
+        }
+    }
+
+    // BPMInfoView のディバイダー高さ
+    static func dividerHeight(for geometry: GeometryProxy) -> CGFloat {
+        return isIPad() ? 50 : 40
+    }
 }
 
 

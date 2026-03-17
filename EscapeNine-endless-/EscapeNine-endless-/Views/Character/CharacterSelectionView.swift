@@ -67,6 +67,8 @@ struct CharacterSelectionView: View {
                 }
             }
         }
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
         .purchaseAlert()
         .purchaseLoadingOverlay()
     }

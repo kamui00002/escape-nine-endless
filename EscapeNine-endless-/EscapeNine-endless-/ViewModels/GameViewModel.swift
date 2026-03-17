@@ -9,6 +9,7 @@ import SwiftUI
 import UIKit
 import Combine
 
+@MainActor
 class GameViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var currentFloor: Int = 1
@@ -95,6 +96,11 @@ class GameViewModel: ObservableObject {
         setupTurnDeadlineCallback()
     }
 
+    deinit {
+        gameStartCountdownTimer?.invalidate()
+        gameStartCountdownTimer = nil
+    }
+
     // MARK: - Setup
     private func setupObservers() {
         // ターンカウントダウンをUIに反映
@@ -108,7 +114,7 @@ class GameViewModel: ObservableObject {
 
     private func setupTurnDeadlineCallback() {
         audioManager.onTurnDeadline = { [weak self] in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self?.onTurnDeadline()
             }
         }
@@ -356,6 +362,9 @@ class GameViewModel: ObservableObject {
         // ゲームスタート効果音
         audioManager.playSoundEffect(.gameStart)
 
+        // 階層に応じたBGM再生
+        audioManager.playBGMMusic(.forFloor(currentFloor))
+
         // BPM設定
         var bpm = stageManager.getBPM(for: currentFloor)
         #if DEBUG
@@ -531,8 +540,8 @@ class GameViewModel: ObservableObject {
         if currentFloor % Constants.skillResetInterval == 1 {
             skillUsageCount = 0
             showSkillReset = true
-            // 3秒後に通知を非表示
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(3))
                 self?.showSkillReset = false
             }
         }
@@ -549,6 +558,12 @@ class GameViewModel: ObservableObject {
         if currentFloor > Constants.maxFloors {
             endGame(result: .win)
             return
+        }
+
+        // 階層に応じたBGM切り替え（範囲が変わった場合のみ）
+        let nextBGMType = AudioManager.BGMType.forFloor(currentFloor)
+        if audioManager.currentBGMType != nextBGMType {
+            audioManager.playBGMMusic(nextBGMType)
         }
 
         // BPM設定
@@ -575,11 +590,8 @@ class GameViewModel: ObservableObject {
             return
         }
 
-        let playerPos = availablePositions.randomElement()!
-        var enemyPos = availablePositions.randomElement()!
-        while enemyPos == playerPos {
-            enemyPos = availablePositions.randomElement()!
-        }
+        guard let playerPos = availablePositions.randomElement() else { return }
+        var enemyPos = availablePositions.filter { $0 != playerPos }.randomElement() ?? (playerPos == 1 ? 9 : 1)
         playerPosition = playerPos
         enemyPosition = enemyPos
 
@@ -664,10 +676,14 @@ class GameViewModel: ObservableObject {
     func endGame(result: GameStatus) {
         gameStatus = result
         audioManager.stopBGM()
+        audioManager.stopBGMMusic()
 
-        // ゲームオーバー効果音
-        if result == .lose {
+        // リザルトBGM再生
+        if result == .win {
+            audioManager.playBGMMusic(.clear)
+        } else if result == .lose {
             audioManager.playSoundEffect(.gameOver)
+            audioManager.playBGMMusic(.gameOver)
         }
 
         // スコア送信（ローカル + Game Center）
@@ -697,17 +713,20 @@ class GameViewModel: ObservableObject {
     func pauseGame() {
         gameStatus = .paused
         audioManager.pauseBGM()
+        audioManager.pauseBGMMusic()
     }
 
     func resumeGame() {
         gameStatus = .playing
         audioManager.resumeBGM()
+        audioManager.resumeBGMMusic()
     }
 
     func resetGame() {
         gameStartCountdownTimer?.invalidate()
         gameStartCountdownTimer = nil
         audioManager.stopBGM()
+        audioManager.stopBGMMusic()
         currentFloor = 1
         turnCount = 0
         playerPosition = 1

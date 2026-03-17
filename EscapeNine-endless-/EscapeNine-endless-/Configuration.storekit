@@ -15,8 +15,8 @@
           "locale" : "ja"
         }
       ],
-      "productID" : "com.escapenine.character.mage",
-      "referenceName" : "Character Mage",
+      "productID" : "com.escapenine.endless.character.wizard",
+      "referenceName" : "Character Wizard",
       "type" : "NonConsumable"
     },
     {
@@ -30,7 +30,7 @@
           "locale" : "ja"
         }
       ],
-      "productID" : "com.escapenine.character.elf",
+      "productID" : "com.escapenine.endless.character.elf",
       "referenceName" : "Character Elf",
       "type" : "NonConsumable"
     },
@@ -45,7 +45,7 @@
           "locale" : "ja"
         }
       ],
-      "productID" : "com.escapenine.removeads",
+      "productID" : "com.escapenine.endless.removeads",
       "referenceName" : "Remove Ads",
       "type" : "NonConsumable"
     }

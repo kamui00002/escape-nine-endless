@@ -15,11 +15,15 @@ struct RankingEntry: Codable, Identifiable {
     let characterType: String
     let timestamp: Date
 
-    var formattedDate: String {
+    private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
         formatter.timeStyle = .short
-        return formatter.string(from: timestamp)
+        return formatter
+    }()
+
+    var formattedDate: String {
+        Self.dateFormatter.string(from: timestamp)
     }
 }
 

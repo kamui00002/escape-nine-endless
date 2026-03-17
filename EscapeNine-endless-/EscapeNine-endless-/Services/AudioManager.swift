@@ -10,34 +10,66 @@ import Combine
 
 class AudioManager: ObservableObject {
     static let shared = AudioManager()
-    
+
     // MARK: - Published Properties
     @Published var isBGMEnabled: Bool = true {
         didSet {
-            // BGMのON/OFFは音量だけを変更（ビートエンジンは動かし続ける）
+            // ビートエンジン音量
             if isBGMEnabled {
                 beatEngine.setVolume(bgmVolume)
             } else {
                 beatEngine.setVolume(0.0)
             }
+            // BGMプレイヤー音量
+            bgmPlayer?.volume = isBGMEnabled ? Float(bgmVolume) : 0.0
         }
     }
-    
+
     @Published var isSFXEnabled: Bool = true
     @Published var bgmVolume: Double = 0.7 {
         didSet {
             if isBGMEnabled {
                 beatEngine.setVolume(bgmVolume)
+                bgmPlayer?.volume = Float(bgmVolume)
             }
         }
     }
-    
+
     @Published var sfxVolume: Double = 0.8
-    
+
+    // MARK: - BGM Types
+    enum BGMType: String {
+        case menu = "bgm_menu"
+        case early = "bgm_early"    // Floor 1-30
+        case mid = "bgm_mid"        // Floor 31-60
+        case late = "bgm_late"      // Floor 61-100
+        case clear = "bgm_clear"    // クリアリザルト
+        case gameOver = "bgm_gameover" // ゲームオーバー
+
+        var loops: Bool {
+            switch self {
+            case .menu, .early, .mid, .late: return true
+            case .clear, .gameOver: return false
+            }
+        }
+
+        /// 階層に応じたゲームBGMを返す
+        static func forFloor(_ floor: Int) -> BGMType {
+            switch floor {
+            case 1...30: return .early
+            case 31...60: return .mid
+            default: return .late
+            }
+        }
+    }
+
     // MARK: - Private Properties
     private let beatEngine: BeatEngine
     private var soundEffects: [SoundEffect: AVAudioPlayer] = [:]
     private var cancellables = Set<AnyCancellable>()
+    private var bgmPlayer: AVAudioPlayer?
+    private var fadeTimer: Timer?
+    private(set) var currentBGMType: BGMType?
     
     // MARK: - Sound Effect Types
     enum SoundEffect: String {
@@ -89,8 +121,12 @@ class AudioManager: ObservableObject {
             // 保存された設定を読み込み
             isBGMEnabled = UserDefaults.standard.bool(forKey: "isBGMEnabled")
             isSFXEnabled = UserDefaults.standard.bool(forKey: "isSFXEnabled")
-            bgmVolume = UserDefaults.standard.double(forKey: "bgmVolume")
-            sfxVolume = UserDefaults.standard.double(forKey: "sfxVolume")
+            if UserDefaults.standard.object(forKey: "bgmVolume") != nil {
+                bgmVolume = UserDefaults.standard.double(forKey: "bgmVolume")
+            }
+            if UserDefaults.standard.object(forKey: "sfxVolume") != nil {
+                sfxVolume = UserDefaults.standard.double(forKey: "sfxVolume")
+            }
         }
     }
     
@@ -132,22 +168,93 @@ class AudioManager: ObservableObject {
         return nil
     }
     
-    // MARK: - BGM Control
+    // MARK: - BGM Music Player
+    func playBGMMusic(_ type: BGMType, fadeDuration: TimeInterval = 0.5) {
+        // 同じBGMが再生中なら何もしない
+        if currentBGMType == type, bgmPlayer?.isPlaying == true { return }
+
+        // 現在のBGMをフェードアウトして切り替え
+        fadeOutBGMPlayer(duration: fadeDuration) { [weak self] in
+            self?.startBGMPlayer(type)
+        }
+    }
+
+    func stopBGMMusic(fadeDuration: TimeInterval = 0.3) {
+        fadeOutBGMPlayer(duration: fadeDuration) { [weak self] in
+            self?.currentBGMType = nil
+        }
+    }
+
+    private func startBGMPlayer(_ type: BGMType) {
+        guard let url = Bundle.main.url(forResource: type.rawValue, withExtension: "mp3") else {
+            print("BGM file not found: \(type.rawValue).mp3")
+            currentBGMType = nil
+            return
+        }
+        do {
+            bgmPlayer = try AVAudioPlayer(contentsOf: url)
+            bgmPlayer?.numberOfLoops = type.loops ? -1 : 0
+            bgmPlayer?.volume = isBGMEnabled ? Float(bgmVolume) : 0.0
+            bgmPlayer?.prepareToPlay()
+            bgmPlayer?.play()
+            currentBGMType = type
+        } catch {
+            print("BGM playback failed: \(error)")
+            currentBGMType = nil
+        }
+    }
+
+    private func fadeOutBGMPlayer(duration: TimeInterval, completion: @escaping () -> Void) {
+        fadeTimer?.invalidate()
+        fadeTimer = nil
+
+        guard let player = bgmPlayer, player.isPlaying else {
+            completion()
+            return
+        }
+        let steps = 10
+        let interval = duration / Double(steps)
+        let volumeStep = player.volume / Float(steps)
+        var currentStep = 0
+
+        fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
+            currentStep += 1
+            player.volume -= volumeStep
+            if currentStep >= steps {
+                timer.invalidate()
+                self?.fadeTimer = nil
+                player.stop()
+                player.volume = 0
+                completion()
+            }
+        }
+    }
+
+    func pauseBGMMusic() {
+        bgmPlayer?.pause()
+    }
+
+    func resumeBGMMusic() {
+        bgmPlayer?.volume = isBGMEnabled ? Float(bgmVolume) : 0.0
+        bgmPlayer?.play()
+    }
+
+    // MARK: - Beat Engine Control (メトロノーム + ターンカウントダウン)
     func startBGM(bpm: Double) {
         // BGMが無効でもビートエンジンは動かす（ゲームロジックのため）
         let volume = isBGMEnabled ? bgmVolume : 0.0
         beatEngine.loadMusic(bpm: bpm, volume: volume)
         beatEngine.play()
     }
-    
+
     func stopBGM() {
         beatEngine.stop()
     }
-    
+
     func pauseBGM() {
         beatEngine.pause()
     }
-    
+
     func resumeBGM() {
         // BGMが無効でもビートエンジンは再開（ゲームロジックのため）
         beatEngine.resume()
@@ -158,13 +265,13 @@ class AudioManager: ObservableObject {
             beatEngine.setVolume(0.0)
         }
     }
-    
+
     func changeBPM(_ newBPM: Double) {
         // BGMが無効でもビートエンジンのBPMは変更（ゲームロジックのため）
         let volume = isBGMEnabled ? bgmVolume : 0.0
         beatEngine.changeBPM(newBPM, volume: volume)
     }
-    
+
     func setBGMVolume(_ volume: Double) {
         bgmVolume = volume
         saveUserPreferences()

@@ -125,24 +125,29 @@ class AchievementManager: ObservableObject {
         currentBPM: Double,
         gameWon: Bool
     ) {
-        guard gameWon else { return }
-        
-        // 階層到達実績
+        // 階層到達実績（勝敗問わず到達した階層で判定）
         if floor >= 1 { unlock(.firstWin) }
         if floor >= 10 { unlock(.floor10) }
         if floor >= 25 { unlock(.floor25) }
         if floor >= 50 { unlock(.floor50) }
         if floor >= 75 { unlock(.floor75) }
         if floor >= 100 { unlock(.floor100) }
-        
+
+        guard gameWon else { return }
+
         // スキル未使用実績
         if floor >= 10 && !skillUsed {
             unlock(.noSkillWin)
         }
-        
+
         // 高速BPM実績
         if floor >= 20 && currentBPM >= 180 {
             unlock(.speedRunner)
+        }
+
+        // 生存者実績（階層30以上をクリア = ゲーム勝利）
+        if floor >= 30 {
+            unlock(.survivor)
         }
     }
     
