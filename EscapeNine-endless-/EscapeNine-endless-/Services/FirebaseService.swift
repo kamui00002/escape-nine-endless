@@ -3,16 +3,29 @@
 //  EscapeNine-endless-
 //
 //  Firebase Authentication と Cloud Firestore の連携サービス
+//  Firebase SDK未導入時はモック実装で動作する
 //
 
 import Foundation
 import Combine
 
+#if canImport(FirebaseAuth)
+import FirebaseAuth
+import FirebaseFirestore
+#endif
+
 // MARK: - Firebase認証状態
-enum AuthState {
+enum AuthState: Equatable {
     case signedOut
     case signedIn(userId: String)
-    case error(Error)
+
+    static func == (lhs: AuthState, rhs: AuthState) -> Bool {
+        switch (lhs, rhs) {
+        case (.signedOut, .signedOut): return true
+        case (.signedIn(let a), .signedIn(let b)): return a == b
+        default: return false
+        }
+    }
 }
 
 // MARK: - ランキングエントリ（Firebase用）
@@ -26,163 +39,190 @@ struct FirebaseRankingEntry: Codable, Identifiable {
 }
 
 // MARK: - FirebaseService
+@MainActor
 class FirebaseService: ObservableObject {
     static let shared = FirebaseService()
-    
+
     // MARK: - Published Properties
     @Published var authState: AuthState = .signedOut
     @Published var currentUserId: String?
     @Published var isLoading: Bool = false
-    
+
     // MARK: - Private Properties
-    private var cancellables = Set<AnyCancellable>()
-    
+    #if canImport(FirebaseAuth)
+    private var authStateHandle: AuthStateDidChangeListenerHandle?
+    #endif
+
     private init() {
-        // TODO: Firebase初期化
-        // Firebase.configure()は AppDelegate または App.swift で実行
+        #if canImport(FirebaseAuth)
+        setupAuthStateListener()
+        #endif
     }
-    
+
+    #if canImport(FirebaseAuth)
+    deinit {
+        if let handle = authStateHandle {
+            Auth.auth().removeStateDidChangeListener(handle)
+        }
+    }
+    #endif
+
     // MARK: - Authentication
-    
-    /// 匿名認証でサインイン
+
+    #if canImport(FirebaseAuth)
+
+    // ---- Real Firebase Implementation ----
+
+    private func setupAuthStateListener() {
+        authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            Task { @MainActor in
+                self?.currentUserId = user?.uid
+                self?.authState = user != nil ? .signedIn(userId: user!.uid) : .signedOut
+            }
+        }
+    }
+
     func signInAnonymously() async throws {
         isLoading = true
         defer { isLoading = false }
-        
-        // TODO: Firebase実装
-        // let result = try await Auth.auth().signInAnonymously()
-        // currentUserId = result.user.uid
-        // authState = .signedIn(userId: result.user.uid)
-        
-        // プレースホルダー実装
-        let mockUserId = UUID().uuidString
-        currentUserId = mockUserId
-        authState = .signedIn(userId: mockUserId)
-        print("[FirebaseService] 匿名認証成功 (mock): \(mockUserId)")
+
+        let result = try await Auth.auth().signInAnonymously()
+        currentUserId = result.user.uid
+        authState = .signedIn(userId: result.user.uid)
     }
-    
-    /// Apple Sign In でサインイン
+
     func signInWithApple(idToken: String, nonce: String) async throws {
         isLoading = true
         defer { isLoading = false }
-        
-        // TODO: Firebase実装
-        // let credential = OAuthProvider.credential(
-        //     withProviderID: "apple.com",
-        //     idToken: idToken,
-        //     rawNonce: nonce
-        // )
-        // let result = try await Auth.auth().signIn(with: credential)
-        // currentUserId = result.user.uid
-        // authState = .signedIn(userId: result.user.uid)
-        
-        // プレースホルダー実装
-        let mockUserId = "apple_\(UUID().uuidString.prefix(8))"
-        currentUserId = mockUserId
-        authState = .signedIn(userId: mockUserId)
-        print("[FirebaseService] Apple Sign In成功 (mock): \(mockUserId)")
+
+        let credential = OAuthProvider.credential(
+            providerID: AuthProviderID.apple,
+            idToken: idToken,
+            rawNonce: nonce
+        )
+        let result = try await Auth.auth().signIn(with: credential)
+        currentUserId = result.user.uid
+        authState = .signedIn(userId: result.user.uid)
     }
-    
-    /// サインアウト
+
     func signOut() {
-        // TODO: Firebase実装
-        // try? Auth.auth().signOut()
-        
+        try? Auth.auth().signOut()
         currentUserId = nil
         authState = .signedOut
-        print("[FirebaseService] サインアウト成功")
     }
-    
-    /// 認証状態の監視を開始
-    func startAuthStateListener() {
-        // TODO: Firebase実装
-        // Auth.auth().addStateDidChangeListener { [weak self] _, user in
-        //     if let user = user {
-        //         self?.currentUserId = user.uid
-        //         self?.authState = .signedIn(userId: user.uid)
-        //     } else {
-        //         self?.currentUserId = nil
-        //         self?.authState = .signedOut
-        //     }
-        // }
-        
-        print("[FirebaseService] 認証状態リスナー開始 (mock)")
-    }
-    
+
     // MARK: - Firestore Operations
-    
-    /// ランキングにスコアを送信
+
     func submitScore(floor: Int, displayName: String, characterType: String) async throws {
         guard let userId = currentUserId else {
             throw FirebaseError.notAuthenticated
         }
-        
+
         isLoading = true
         defer { isLoading = false }
-        
-        let entry = FirebaseRankingEntry(
-            id: nil,
-            userId: userId,
-            displayName: displayName,
-            floor: floor,
-            characterType: characterType,
-            timestamp: Date()
-        )
-        
-        // TODO: Firebase実装
-        // let db = Firestore.firestore()
-        // try await db.collection("rankings").document(userId).setData([
-        //     "userId": entry.userId,
-        //     "displayName": entry.displayName,
-        //     "floor": entry.floor,
-        //     "characterType": entry.characterType,
-        //     "timestamp": FieldValue.serverTimestamp()
-        // ], merge: true)
-        
-        print("[FirebaseService] スコア送信 (mock): Floor \(floor), User \(userId)")
+
+        let db = Firestore.firestore()
+        try await db.collection("rankings").document(userId).setData([
+            "userId": userId,
+            "displayName": displayName,
+            "floor": floor,
+            "characterType": characterType,
+            "timestamp": FieldValue.serverTimestamp()
+        ], merge: true)
     }
-    
-    /// ランキングを取得
+
     func getRankings(limit: Int = 100) async throws -> [FirebaseRankingEntry] {
         isLoading = true
         defer { isLoading = false }
-        
-        // TODO: Firebase実装
-        // let db = Firestore.firestore()
-        // let snapshot = try await db.collection("rankings")
-        //     .order(by: "floor", descending: true)
-        //     .limit(to: limit)
-        //     .getDocuments()
-        //
-        // return snapshot.documents.compactMap { doc in
-        //     try? doc.data(as: FirebaseRankingEntry.self)
-        // }
-        
-        // プレースホルダー実装（モックデータ）
+
+        let db = Firestore.firestore()
+        let snapshot = try await db.collection("rankings")
+            .order(by: "floor", descending: true)
+            .limit(to: limit)
+            .getDocuments()
+
+        return snapshot.documents.compactMap { doc in
+            try? doc.data(as: FirebaseRankingEntry.self)
+        }
+    }
+
+    func getUserHighScore() async throws -> Int? {
+        guard let userId = currentUserId else { return nil }
+
+        let db = Firestore.firestore()
+        let doc = try await db.collection("rankings").document(userId).getDocument()
+        return doc.data()?["floor"] as? Int
+    }
+
+    #else
+
+    // ---- Mock Implementation (Firebase SDK未導入時) ----
+
+    /// モック用ユーザーIDのUserDefaultsキー（再起動後も同一IDを維持）
+    private static let mockUserIdKey = "firebase_mock_user_id"
+
+    func signInAnonymously() async throws {
+        isLoading = true
+        defer { isLoading = false }
+
+        // 再起動後も同一のモックIDを使用する
+        let mockUserId: String
+        if let stored = UserDefaults.standard.string(forKey: Self.mockUserIdKey) {
+            mockUserId = stored
+        } else {
+            mockUserId = UUID().uuidString
+            UserDefaults.standard.set(mockUserId, forKey: Self.mockUserIdKey)
+        }
+        currentUserId = mockUserId
+        authState = .signedIn(userId: mockUserId)
+        print("[FirebaseService] 匿名認証成功 (mock): \(mockUserId)")
+    }
+
+    func signInWithApple(idToken: String, nonce: String) async throws {
+        isLoading = true
+        defer { isLoading = false }
+
+        let mockUserId = "apple_\(UUID().uuidString.prefix(8))"
+        UserDefaults.standard.set(mockUserId, forKey: Self.mockUserIdKey)
+        currentUserId = mockUserId
+        authState = .signedIn(userId: mockUserId)
+        print("[FirebaseService] Apple Sign In成功 (mock): \(mockUserId)")
+    }
+
+    func signOut() {
+        currentUserId = nil
+        authState = .signedOut
+        print("[FirebaseService] サインアウト成功")
+    }
+
+    func submitScore(floor: Int, displayName: String, characterType: String) async throws {
+        guard let userId = currentUserId else {
+            throw FirebaseError.notAuthenticated
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        print("[FirebaseService] スコア送信 (mock): Floor \(floor), User \(userId)")
+    }
+
+    func getRankings(limit: Int = 100) async throws -> [FirebaseRankingEntry] {
+        isLoading = true
+        defer { isLoading = false }
+
         return generateMockRankings(count: min(limit, 10))
     }
-    
-    /// ユーザーの最高スコアを取得
+
     func getUserHighScore() async throws -> Int? {
-        guard let userId = currentUserId else {
-            return nil
-        }
-        
-        // TODO: Firebase実装
-        // let db = Firestore.firestore()
-        // let doc = try await db.collection("rankings").document(userId).getDocument()
-        // return doc.data()?["floor"] as? Int
-        
+        guard let userId = currentUserId else { return nil }
         print("[FirebaseService] ユーザースコア取得 (mock): \(userId)")
         return nil
     }
-    
-    // MARK: - Helper Methods
-    
+
     private func generateMockRankings(count: Int) -> [FirebaseRankingEntry] {
         let names = ["勇者アレス", "盗賊シャドウ", "魔導師メルリン", "射手エルフィン", "戦士ガンダルフ"]
-        let characters = ["hero", "thief", "mage", "elf"]
-        
+        let characters = ["hero", "thief", "wizard", "elf"]
+
         return (0..<count).map { index in
             FirebaseRankingEntry(
                 id: "mock_\(index)",
@@ -194,6 +234,8 @@ class FirebaseService: ObservableObject {
             )
         }
     }
+
+    #endif
 }
 
 // MARK: - Firebase Errors
@@ -202,7 +244,7 @@ enum FirebaseError: LocalizedError {
     case networkError
     case invalidData
     case unknown
-    
+
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:
@@ -217,45 +259,40 @@ enum FirebaseError: LocalizedError {
     }
 }
 
-// MARK: - Firebase Configuration Instructions
+// MARK: - Firebase Setup Instructions
 /*
  Firebase連携の設定手順:
- 
+
  1. Firebase Console (https://console.firebase.google.com) でプロジェクトを作成
- 
+
  2. iOSアプリを追加:
-    - Bundle ID: com.yourcompany.escapenine-endless
+    - Bundle ID: com.yoshidometoru.EscapeNine-endless-
     - GoogleService-Info.plist をダウンロード
-    - プロジェクトに追加 (Copy items if needed をチェック)
- 
- 3. SPMで依存関係を追加:
-    File > Add Package Dependencies... で以下を追加:
-    - https://github.com/firebase/firebase-ios-sdk
-    - Products: FirebaseAuth, FirebaseFirestore
- 
- 4. AppDelegate.swift または App.swift で初期化:
-    import FirebaseCore
-    
-    @main
-    struct EscapeNineEndlessApp: App {
-        init() {
-            FirebaseApp.configure()
-        }
-        ...
-    }
- 
- 5. Apple Sign In の設定 (オプション):
+    - プロジェクトルート (EscapeNine-endless-/EscapeNine-endless-/) に配置
+    - Xcode で「Add Files to EscapeNine-endless-」から追加 (Copy items if needed をチェック)
+
+ 3. SPMパッケージ依存関係（設定済み）:
+    - firebase-ios-sdk >= 12.10.0 (FirebaseAuth, FirebaseFirestore, FirebaseCore)
+    - swift-package-manager-google-mobile-ads >= 12.0.0
+    ※ Xcodeで一度ビルドすると自動的にパッケージが解決される
+
+ 4. App.swift の初期化（設定済み）:
+    - #if canImport(FirebaseCore) ガード付きで FirebaseApp.configure() 実装済み
+    - GoogleService-Info.plist を配置するだけで自動的に有効化される
+
+ 5. Firebase Console で必要なサービスを有効化:
+    - Authentication > Sign-in method > 匿名認証 を有効化
+    - Firestore Database を作成 (本番モード or テストモードで開始)
+
+ 6. Firestore Security Rules をデプロイ:
+    プロジェクトルートの firestore.rules を使用
+    firebase deploy --only firestore:rules
+
+ 7. Apple Sign In の設定 (オプション):
     - Signing & Capabilities で "Sign in with Apple" を追加
     - Firebase Console > Authentication > Sign-in method で Apple を有効化
- 
- 6. Firestore Rules (推奨):
-    rules_version = '2';
-    service cloud.firestore {
-      match /databases/{database}/documents {
-        match /rankings/{userId} {
-          allow read: if true;
-          allow write: if request.auth != null && request.auth.uid == userId;
-        }
-      }
-    }
+
+ 8. 動作確認:
+    - GoogleService-Info.plist 配置後にビルドすると #if canImport(FirebaseAuth) が有効になり
+      モック実装から本番実装に自動切替される
 */

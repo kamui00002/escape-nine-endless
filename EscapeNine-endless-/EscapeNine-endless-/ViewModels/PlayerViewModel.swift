@@ -8,6 +8,7 @@
 import SwiftUI
 import Combine
 
+@MainActor
 class PlayerViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var highestFloor: Int = 0
@@ -68,13 +69,15 @@ class PlayerViewModel: ObservableObject {
         }
         
         adRemoved = UserDefaults.standard.bool(forKey: adRemovedKey)
-        bgmVolume = UserDefaults.standard.double(forKey: bgmVolumeKey)
-        if bgmVolume == 0.0 {
-            bgmVolume = Constants.defaultVolume // デフォルト値
+        if UserDefaults.standard.object(forKey: bgmVolumeKey) != nil {
+            bgmVolume = UserDefaults.standard.double(forKey: bgmVolumeKey)
+        } else {
+            bgmVolume = Constants.defaultVolume
         }
-        seVolume = UserDefaults.standard.double(forKey: seVolumeKey)
-        if seVolume == 0.0 {
-            seVolume = Constants.defaultVolume // デフォルト値
+        if UserDefaults.standard.object(forKey: seVolumeKey) != nil {
+            seVolume = UserDefaults.standard.double(forKey: seVolumeKey)
+        } else {
+            seVolume = Constants.defaultVolume
         }
         
         #if DEBUG

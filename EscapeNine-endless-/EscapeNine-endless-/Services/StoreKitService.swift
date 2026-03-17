@@ -8,24 +8,25 @@
 import Foundation
 import StoreKit
 import Combine
+import Security
 
 // MARK: - Product Identifiers
 enum ProductID: String, CaseIterable {
-    case characterMage = "com.escapenine.character.mage"      // 魔法使い ¥240
-    case characterElf = "com.escapenine.character.elf"        // エルフ ¥240
-    case removeAds = "com.escapenine.removeads"               // 広告削除 ¥240
+    case characterWizard = "com.escapenine.endless.character.wizard"  // 魔法使い ¥240
+    case characterElf = "com.escapenine.endless.character.elf"        // エルフ ¥240
+    case removeAds = "com.escapenine.endless.removeads"               // 広告削除 ¥480
     
     var displayName: String {
         switch self {
-        case .characterMage: return "魔法使い"
+        case .characterWizard: return "魔法使い"
         case .characterElf: return "エルフ"
         case .removeAds: return "広告削除"
         }
     }
-    
+
     var description: String {
         switch self {
-        case .characterMage: return "透明化スキルを持つ魔法使いキャラクター"
+        case .characterWizard: return "透明化スキルを持つ魔法使いキャラクター"
         case .characterElf: return "拘束スキルを持つエルフキャラクター"
         case .removeAds: return "すべての広告を非表示にします"
         }
@@ -171,7 +172,7 @@ class StoreKitService: ObservableObject {
     func isCharacterPurchased(_ characterType: CharacterType) -> Bool {
         switch characterType {
         case .wizard:
-            return isPurchased(.characterMage)
+            return isPurchased(.characterWizard)
         case .elf:
             return isPurchased(.characterElf)
         default:
@@ -187,10 +188,11 @@ class StoreKitService: ObservableObject {
     // MARK: - Transaction Listener
     
     private func listenForTransactions() -> Task<Void, Error> {
-        return Task.detached {
+        return Task { [weak self] in
             for await result in Transaction.updates {
+                guard let self else { return }
                 do {
-                    let transaction = try await self.checkVerified(result)
+                    let transaction = try self.checkVerified(result)
                     await self.updatePurchasedProducts(transaction)
                     await transaction.finish()
                 } catch {
@@ -232,14 +234,24 @@ class StoreKitService: ObservableObject {
         }
     }
     
-    // MARK: - Persistence
-    
+    // MARK: - Persistence (Keychain)
+
+    private static let keychainService = "com.escapenine.purchases"
+    private static let keychainAccount = "purchasedProductIDs"
+
     private func loadPurchasedProducts() {
-        if let savedIDs = UserDefaults.standard.array(forKey: "purchasedProductIDs") as? [String] {
-            purchasedProductIDs = Set(savedIDs)
+        // Keychainから読み込み
+        if let data = Self.keychainRead(service: Self.keychainService, account: Self.keychainAccount),
+           let ids = try? JSONDecoder().decode([String].self, from: data) {
+            purchasedProductIDs = Set(ids)
+        } else if let legacyIDs = UserDefaults.standard.array(forKey: "purchasedProductIDs") as? [String] {
+            // UserDefaultsからの移行
+            purchasedProductIDs = Set(legacyIDs)
+            savePurchasedProducts()
+            UserDefaults.standard.removeObject(forKey: "purchasedProductIDs")
         }
-        
-        // 起動時に購入状態を検証
+
+        // 起動時にStoreKitのトランザクションで購入状態を検証
         Task {
             for await result in Transaction.currentEntitlements {
                 if case .verified(let transaction) = result {
@@ -248,9 +260,39 @@ class StoreKitService: ObservableObject {
             }
         }
     }
-    
+
     private func savePurchasedProducts() {
-        UserDefaults.standard.set(Array(purchasedProductIDs), forKey: "purchasedProductIDs")
+        guard let data = try? JSONEncoder().encode(Array(purchasedProductIDs)) else { return }
+        Self.keychainWrite(data: data, service: Self.keychainService, account: Self.keychainAccount)
+    }
+
+    // MARK: - Keychain Helpers
+
+    private static func keychainWrite(data: Data, service: String, account: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(query as CFDictionary)
+
+        var newItem = query
+        newItem[kSecValueData as String] = data
+        SecItemAdd(newItem as CFDictionary, nil)
+    }
+
+    private static func keychainRead(service: String, account: String) -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess else { return nil }
+        return result as? Data
     }
     
     // MARK: - Helper Methods
@@ -260,7 +302,7 @@ class StoreKitService: ObservableObject {
         guard let product = products.first(where: { $0.id == productID.rawValue }) else {
             // フォールバック価格
             switch productID {
-            case .characterMage, .characterElf:
+            case .characterWizard, .characterElf:
                 return "¥240"
             case .removeAds:
                 return "¥480"
@@ -301,16 +343,16 @@ enum StoreKitError: LocalizedError {
     - アプリを登録
     - App 内課金 > 追加 で以下の商品を作成:
       
-      a) 魔法使い (消耗型 or 非消耗型)
-         - 製品ID: com.escapenine.character.mage
+      a) 魔法使い (非消耗型)
+         - 製品ID: com.escapenine.endless.character.wizard
          - 価格: ¥240
-         
-      b) エルフ (消耗型 or 非消耗型)
-         - 製品ID: com.escapenine.character.elf
+
+      b) エルフ (非消耗型)
+         - 製品ID: com.escapenine.endless.character.elf
          - 価格: ¥240
-         
+
       c) 広告削除 (非消耗型)
-         - 製品ID: com.escapenine.removeads
+         - 製品ID: com.escapenine.endless.removeads
          - 価格: ¥480
  
  2. Xcode で StoreKit Configuration File を作成（ローカルテスト用）:

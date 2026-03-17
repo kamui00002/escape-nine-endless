@@ -6,6 +6,12 @@
 //
 
 import SwiftUI
+#if canImport(FirebaseCore)
+import FirebaseCore
+#endif
+#if canImport(GoogleMobileAds)
+import GoogleMobileAds
+#endif
 
 @main
 struct EscapeNine_endless_App: App {
@@ -13,13 +19,21 @@ struct EscapeNine_endless_App: App {
     @StateObject private var gameCenterService = GameCenterService.shared
 
     init() {
-        // TODO: Firebase初期化（Firebase SDKを追加後に有効化）
-        // import FirebaseCore
-        // FirebaseApp.configure()
+        // #if canImport(FirebaseCore) は firebase-ios-sdk SPMパッケージがリンクされると有効になる
+        // FirebaseApp.configure() は GoogleService-Info.plist が存在しないとクラッシュするため
+        // plist を配置した後にビルドすること
+        #if canImport(FirebaseCore)
+        FirebaseApp.configure()
+        print("[App] Firebase初期化完了")
+        #endif
 
-        // TODO: AdMob初期化（Google Mobile Ads SDKを追加後に有効化）
-        // import GoogleMobileAds
-        // GADMobileAds.sharedInstance().start(completionHandler: nil)
+        #if canImport(GoogleMobileAds)
+        MobileAds.shared.start(completionHandler: nil)
+        print("[App] AdMob初期化完了")
+        #endif
+
+        // AdMobService の広告ユニット事前ロード（SDK の有無に関わらず実行）
+        AdMobService.shared.initialize()
 
         print("[App] アプリ起動")
     }
@@ -28,6 +42,8 @@ struct EscapeNine_endless_App: App {
         WindowGroup {
             HomeView()
                 .task {
+                    // Firebase匿名認証（GoogleService-Info.plist未配置時はモック動作）
+                    try? await FirebaseService.shared.signInAnonymously()
                     // PurchaseManagerの初期化
                     await purchaseManager.initialize()
                     // Game Center認証

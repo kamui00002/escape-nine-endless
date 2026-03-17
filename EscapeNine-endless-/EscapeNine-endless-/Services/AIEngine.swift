@@ -54,7 +54,7 @@ class AIEngine {
         }
 
         // 残り65%はランダム移動
-        return availableMoves.randomElement() ?? availableMoves[0]
+        return availableMoves.randomElement() ?? enemyPosition
     }
     
     // MARK: - Normal AI
@@ -71,7 +71,7 @@ class AIEngine {
         }
 
         // フォールバック（通常はここに到達しない）
-        return availableMoves[0]
+        return availableMoves.first ?? enemyPosition
     }
     
     // MARK: - Hard AI
@@ -91,7 +91,7 @@ class AIEngine {
         }
 
         // フォールバック: 現在位置に向かって移動
-        return getMoveTowardsPlayer(from: enemyPosition, target: playerPosition, availableMoves: availableMoves) ?? availableMoves[0]
+        return getMoveTowardsPlayer(from: enemyPosition, target: playerPosition, availableMoves: availableMoves) ?? availableMoves.first ?? enemyPosition
     }
 
     /// プレイヤーの次の移動を予測（鬼から最も遠ざかる方向を選ぶと仮定）

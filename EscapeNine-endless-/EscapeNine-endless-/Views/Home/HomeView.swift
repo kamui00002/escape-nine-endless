@@ -7,19 +7,19 @@
 
 import SwiftUI
 
+enum HomeDestination: Hashable {
+    case game, ranking, settings, characterSelection, shop
+}
+
 struct HomeView: View {
     @StateObject private var playerViewModel = PlayerViewModel()
     @StateObject private var adMobService = AdMobService.shared
-    @State private var showGame = false
-    @State private var showRanking = false
-    @State private var showSettings = false
-    @State private var showCharacterSelection = false
-    @State private var showShop = false
+    @State private var path = NavigationPath()
     @State private var showAchievements = false
     @State private var showTutorial = !UserDefaults.standard.bool(forKey: "tutorialCompleted")
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             GeometryReader { geometry in
                 ZStack {
                     GameBackground(showParticles: true)
@@ -47,20 +47,19 @@ struct HomeView: View {
                     }
                 }
             }
-            .navigationDestination(isPresented: $showGame) {
-                GameView()
-            }
-            .navigationDestination(isPresented: $showRanking) {
-                RankingView()
-            }
-            .navigationDestination(isPresented: $showSettings) {
-                SettingsView()
-            }
-            .navigationDestination(isPresented: $showCharacterSelection) {
-                CharacterSelectionView()
-            }
-            .navigationDestination(isPresented: $showShop) {
-                ShopView()
+            .navigationDestination(for: HomeDestination.self) { destination in
+                switch destination {
+                case .game:
+                    GameView()
+                case .ranking:
+                    RankingView()
+                case .settings:
+                    SettingsView()
+                case .characterSelection:
+                    CharacterSelectionView()
+                case .shop:
+                    ShopView()
+                }
             }
             .sheet(isPresented: $showAchievements) {
                 AchievementListView()
@@ -69,6 +68,15 @@ struct HomeView: View {
         .overlay {
             if showTutorial {
                 TutorialOverlayView(isShowing: $showTutorial)
+            }
+        }
+        .onAppear {
+            AudioManager.shared.playBGMMusic(.menu)
+        }
+        .onChange(of: path) { oldPath, newPath in
+            if oldPath.count > newPath.count {
+                // Popped back — check if we left the game
+                AudioManager.shared.playBGMMusic(.menu)
             }
         }
     }
@@ -109,24 +117,25 @@ struct HomeView: View {
 
         return VStack(spacing: spacing) {
             GameButton(title: "冒険を始める", icon: "play.fill", style: .primary, maxWidth: buttonWidth) {
-                showGame = true
+                AudioManager.shared.stopBGMMusic()
+                path.append(HomeDestination.game)
             }
             .glow(color: Color(hex: GameColors.available), radius: 10, intensity: 0.4)
             .slideIn(from: .leading, delay: 0.6)
             .pulse(minScale: 1.0, maxScale: 1.02, duration: 2.0)
 
             GameButton(title: "キャラクター", icon: "person.2.fill", style: .secondary, maxWidth: buttonWidth) {
-                showCharacterSelection = true
+                path.append(HomeDestination.characterSelection)
             }
             .slideIn(from: .leading, delay: 0.7)
 
             GameButton(title: "ランキング", icon: "trophy.fill", style: .secondary, maxWidth: buttonWidth) {
-                showRanking = true
+                path.append(HomeDestination.ranking)
             }
             .slideIn(from: .leading, delay: 0.8)
 
             GameButton(title: "ショップ", icon: "bag.fill", style: .secondary, maxWidth: buttonWidth) {
-                showShop = true
+                path.append(HomeDestination.shop)
             }
             .slideIn(from: .leading, delay: 0.85)
 
@@ -141,7 +150,7 @@ struct HomeView: View {
             .slideIn(from: .leading, delay: 0.9)
 
             GameButton(title: "設定", icon: "gearshape.fill", style: .secondary, maxWidth: buttonWidth) {
-                showSettings = true
+                path.append(HomeDestination.settings)
             }
             .slideIn(from: .leading, delay: 0.95)
         }

@@ -20,12 +20,13 @@ struct GameView: View {
             GameBackground()
 
             GeometryReader { geometry in
+                let verticalSpacing: CGFloat = ResponsiveLayout.isIPad() ? 12 : 6
+
                 VStack(spacing: 0) {
                     gameHeader
 
-                    Spacer()
-
-                    VStack(spacing: ResponsiveLayout.isIPad() ? 16 : 10) {
+                    // Top info section
+                    VStack(spacing: verticalSpacing) {
                         BPMInfoView(
                             floor: viewModel.currentFloor,
                             bpm: Floor.calculateBPM(for: viewModel.currentFloor)
@@ -34,19 +35,25 @@ struct GameView: View {
                         BeatIndicatorView(turnCountdown: viewModel.turnCountdown, turnCount: viewModel.turnCount)
 
                         turnAndSkillInfo
+                    }
 
-                        gridBoard
-                            .frame(maxHeight: geometry.size.height * 0.38)
+                    Spacer(minLength: verticalSpacing)
 
+                    // Center: grid board
+                    gridBoard
+                        .frame(maxHeight: geometry.size.height * 0.40)
+
+                    Spacer(minLength: verticalSpacing)
+
+                    // Bottom: skill button + special rule (fixed at bottom)
+                    VStack(spacing: verticalSpacing) {
                         skillButton(geometry: geometry)
-                            .padding(.top, 8)
 
                         specialRuleLabel
                     }
-
-                    Spacer()
+                    .padding(.bottom, ResponsiveLayout.isIPad() ? 16 : 8)
                 }
-                .padding(ResponsiveLayout.padding(for: geometry))
+                .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
             }
 
             if viewModel.showFloorClear {
@@ -82,6 +89,8 @@ struct GameView: View {
                 showResult = true
             }
         }
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
         .sheet(isPresented: $showResult) {
             ResultView(
                 floor: viewModel.currentFloor,
@@ -247,7 +256,7 @@ struct GameView: View {
                 )
             }
             .disabled(viewModel.remainingSkillUses <= 0 || viewModel.gameStatus != .playing)
-            .frame(height: ResponsiveLayout.isIPad() ? 60 : 56)
+            .frame(height: ResponsiveLayout.isIPad() ? 56 : 48)
         }
     }
 
@@ -494,7 +503,7 @@ struct GameView: View {
 
             if viewModel.gameStartCountdown > 0 {
                 Text("\(viewModel.gameStartCountdown)")
-                    .font(.system(size: 120, weight: .black, design: .rounded))
+                    .font(.system(size: ResponsiveLayout.isIPad() ? 150 : 120, weight: .black, design: .rounded))
                     .foregroundColor(Color(hex: GameColors.available))
                     .shadow(color: Color(hex: GameColors.available).opacity(0.8), radius: 30)
                     .scaleEffect(1.2)
@@ -502,7 +511,7 @@ struct GameView: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.5), value: viewModel.gameStartCountdown)
             } else {
                 Text("GO!")
-                    .font(.system(size: 100, weight: .black, design: .rounded))
+                    .font(.system(size: ResponsiveLayout.isIPad() ? 130 : 100, weight: .black, design: .rounded))
                     .foregroundColor(Color(hex: GameColors.success))
                     .shadow(color: Color(hex: GameColors.success).opacity(0.8), radius: 30)
                     .scaleEffect(1.5)
@@ -530,14 +539,14 @@ struct GameView: View {
             VStack(spacing: 16) {
                 if viewModel.defeatReason == .caughtByEnemy {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 60))
+                        .font(.system(size: ResponsiveLayout.isIPad() ? 80 : 60))
                         .foregroundColor(Color(hex: GameColors.warning))
                     Text("捕まった！")
                         .font(.fantasyHeading())
                         .foregroundColor(Color(hex: GameColors.warning))
                 } else {
                     Image(systemName: "clock.badge.xmark")
-                        .font(.system(size: 60))
+                        .font(.system(size: ResponsiveLayout.isIPad() ? 80 : 60))
                         .foregroundColor(Color.orange)
                     Text("時間切れ！")
                         .font(.fantasyHeading())
@@ -575,7 +584,7 @@ struct GameView: View {
                             .font(.fantasyBody())
                             .foregroundColor(Color(hex: GameColors.text))
                             .padding()
-                            .frame(width: 180)
+                            .frame(maxWidth: 220)
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
                                     .fill(Color(hex: GameColors.backgroundSecondary))

@@ -78,7 +78,7 @@ class PurchaseManager: ObservableObject {
         
         switch characterType {
         case .wizard:
-            productID = .characterMage
+            productID = .characterWizard
         case .elf:
             productID = .characterElf
         default:
@@ -113,7 +113,7 @@ class PurchaseManager: ObservableObject {
     func characterPrice(_ characterType: CharacterType) -> String {
         switch characterType {
         case .wizard:
-            return storeKitService.priceString(for: .characterMage)
+            return storeKitService.priceString(for: .characterWizard)
         case .elf:
             return storeKitService.priceString(for: .characterElf)
         default:
