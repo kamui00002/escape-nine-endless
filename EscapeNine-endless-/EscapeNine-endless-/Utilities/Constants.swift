@@ -38,7 +38,18 @@ enum Constants {
     static let thiefSkillMaxUsage = 5
     static let wizardSkillMaxUsage = 7
     static let elfSkillMaxUsage = 4
+    static let knightSkillMaxUsage = 2
     static let bindDurationTurns = 2
+
+    // Combo System
+    static let comboMultiplierThreshold1 = 3   // combo >= 3: ×1.5
+    static let comboMultiplierThreshold2 = 5   // combo >= 5: ×2.0
+    static let comboJustTimingRatio = 0.20     // ±20% = ジャスト判定
+    static let comboGoodTimingRatio = 0.35     // ±35% = グッド判定
+
+    // Boss Floor
+    static let bossFloorInterval = 10          // 10の倍数階がボス
+    static let bossAIChaseChance = 0.95        // ボスAI追跡確率
 
     // Turn Countdown Settings（1ターンあたりのカウントダウン）
     static let turnCountdownBeats = 3      // 1ターンあたりのカウントダウンビート数

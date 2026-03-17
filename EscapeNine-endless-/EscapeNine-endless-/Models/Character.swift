@@ -12,27 +12,29 @@ enum CharacterType: String, CaseIterable {
     case thief = "thief"
     case wizard = "wizard"
     case elf = "elf"
-    
+    case knight = "knight"
+
     var name: String {
         switch self {
         case .hero: return "勇者"
         case .thief: return "盗賊"
         case .wizard: return "魔法使い"
         case .elf: return "エルフ"
+        case .knight: return "ナイト"
         }
     }
-    
+
     var isFree: Bool {
         switch self {
         case .hero, .thief: return true
-        case .wizard, .elf: return false
+        case .wizard, .elf, .knight: return false
         }
     }
-    
+
     var price: Int? {
         switch self {
         case .hero, .thief: return nil
-        case .wizard, .elf: return Constants.premiumCharacterPrice
+        case .wizard, .elf, .knight: return Constants.premiumCharacterPrice
         }
     }
 }
@@ -57,8 +59,10 @@ struct Character {
             skill = Skill(type: .invisible, name: "透明化", description: "鬼に当たっても無敵", maxUsage: Constants.wizardSkillMaxUsage)
         case .elf:
             skill = Skill(type: .bind, name: "拘束", description: "鬼を\(Constants.bindDurationTurns)ターン停止させる", maxUsage: Constants.elfSkillMaxUsage)
+        case .knight:
+            skill = Skill(type: .shield, name: "盾ガード", description: "次の衝突を1回無効化する", maxUsage: Constants.knightSkillMaxUsage)
         }
-        
+
         return Character(
             id: type.rawValue,
             type: type,

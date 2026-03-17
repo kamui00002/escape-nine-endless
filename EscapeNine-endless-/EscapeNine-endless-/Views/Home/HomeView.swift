@@ -8,12 +8,13 @@
 import SwiftUI
 
 enum HomeDestination: Hashable {
-    case game, ranking, settings, characterSelection, shop
+    case game, ranking, settings, characterSelection, shop, dailyChallenge
 }
 
 struct HomeView: View {
     @StateObject private var playerViewModel = PlayerViewModel()
     @StateObject private var adMobService = AdMobService.shared
+    @StateObject private var dailyChallengeService = DailyChallengeService.shared
     @State private var path = NavigationPath()
     @State private var showAchievements = false
     @State private var showTutorial = !UserDefaults.standard.bool(forKey: "tutorialCompleted")
@@ -59,6 +60,8 @@ struct HomeView: View {
                     CharacterSelectionView()
                 case .shop:
                     ShopView()
+                case .dailyChallenge:
+                    DailyChallengeView(challenge: dailyChallengeService.todaysChallenge)
                 }
             }
             .sheet(isPresented: $showAchievements) {
@@ -124,6 +127,8 @@ struct HomeView: View {
             .slideIn(from: .leading, delay: 0.6)
             .pulse(minScale: 1.0, maxScale: 1.02, duration: 2.0)
 
+            dailyChallengeButton(buttonWidth: buttonWidth)
+
             GameButton(title: "キャラクター", icon: "person.2.fill", style: .secondary, maxWidth: buttonWidth) {
                 path.append(HomeDestination.characterSelection)
             }
@@ -154,6 +159,61 @@ struct HomeView: View {
             }
             .slideIn(from: .leading, delay: 0.95)
         }
+    }
+
+    // MARK: - Daily Challenge Button
+
+    @ViewBuilder
+    private func dailyChallengeButton(buttonWidth: CGFloat) -> some View {
+        let isCompleted = dailyChallengeService.todaysChallenge.isCompleted
+
+        Button(action: {
+            AudioManager.shared.playSoundEffect(.buttonTap)
+            path.append(HomeDestination.dailyChallenge)
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: isCompleted ? "checkmark.seal.fill" : "calendar.badge.clock")
+                    .font(.body)
+                    .foregroundColor(isCompleted ? Color(hex: GameColors.success) : Color(hex: GameColors.textSecondary))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("デイリーチャレンジ")
+                        .font(.fantasyBody())
+                        .foregroundColor(isCompleted ? Color(hex: GameColors.success) : Color(hex: GameColors.text))
+
+                    Text(isCompleted ? "本日クリア済み" : "毎日新しい挑戦")
+                        .font(.fantasyCaption())
+                        .foregroundColor(Color(hex: GameColors.text).opacity(0.6))
+                }
+
+                Spacer()
+
+                if !isCompleted {
+                    Text("NEW")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.red)
+                        .cornerRadius(4)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .frame(maxWidth: buttonWidth)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(hex: GameColors.backgroundSecondary))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                isCompleted ? Color(hex: GameColors.success).opacity(0.5) : Color(hex: GameColors.textSecondary).opacity(0.5),
+                                lineWidth: 1.5
+                            )
+                    )
+            )
+        }
+        .slideIn(from: .leading, delay: 0.65)
     }
 
     // MARK: - Highest Floor Section

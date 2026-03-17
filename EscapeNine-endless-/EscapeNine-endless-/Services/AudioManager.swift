@@ -334,6 +334,10 @@ class AudioManager: ObservableObject {
     func checkMoveTiming() -> Bool {
         beatEngine.checkMoveTiming()
     }
+
+    func checkMoveTimingGrade() -> TimingGrade {
+        beatEngine.timingGrade()
+    }
     
     /// 次のビートまでの残り時間（0.0〜1.0の割合）
     func timeUntilNextBeat() -> Double {

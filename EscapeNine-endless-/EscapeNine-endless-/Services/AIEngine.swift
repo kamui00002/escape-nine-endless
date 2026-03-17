@@ -25,6 +25,8 @@ class AIEngine {
             return normalAI(enemyPosition: enemyPosition, playerPosition: playerPosition)
         case .hard:
             return hardAI(enemyPosition: enemyPosition, playerPosition: playerPosition)
+        case .boss:
+            return bossAI(enemyPosition: enemyPosition, playerPosition: playerPosition)
         }
     }
     
@@ -74,6 +76,26 @@ class AIEngine {
         return availableMoves.first ?? enemyPosition
     }
     
+    // MARK: - Boss AI（追跡確率95%、最短ルート追跡）
+    private func bossAI(enemyPosition: Int, playerPosition: Int) -> Int {
+        let availableMoves = GameEngine.shared.getAvailableMoves(from: enemyPosition)
+
+        let roll = Double.random(in: 0...1)
+        if roll < Constants.bossAIChaseChance {
+            // 95%の確率で最短ルートを追跡
+            if let moveTowardsPlayer = getMoveTowardsPlayer(
+                from: enemyPosition,
+                target: playerPosition,
+                availableMoves: availableMoves
+            ) {
+                return moveTowardsPlayer
+            }
+        }
+
+        // 残り5%はランダム移動（回り込み戦術を防ぐため）
+        return availableMoves.randomElement() ?? enemyPosition
+    }
+
     // MARK: - Hard AI
     private func hardAI(enemyPosition: Int, playerPosition: Int) -> Int {
         let availableMoves = GameEngine.shared.getAvailableMoves(from: enemyPosition)

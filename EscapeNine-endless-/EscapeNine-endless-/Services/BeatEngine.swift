@@ -9,6 +9,13 @@ import AVFoundation
 import Combine
 import UIKit
 
+// MARK: - Timing Grade（コンボシステム用）
+enum TimingGrade {
+    case just   // ±20%以内：完璧なタイミング
+    case good   // ±35%以内：良いタイミング
+    case miss   // 範囲外：遅い/早すぎ
+}
+
 class BeatEngine: ObservableObject {
     // MARK: - Published Properties
     @Published var currentBeat: Int = 0
@@ -205,13 +212,32 @@ class BeatEngine: ObservableObject {
     }
 
     // MARK: - Timing Check
+
     func checkMoveTiming() -> Bool {
         let now = Date()
         let timeDiff = abs(now.timeIntervalSince(lastBeatTime))
         let dynamicTolerance = Constants.timingTolerance(for: bpm)
         let tolerance = beatInterval * dynamicTolerance
-
         return timeDiff <= tolerance
+    }
+
+    /// コンボシステム用：移動タイミングの精度を3段階で返す
+    func timingGrade() -> TimingGrade {
+        let now = Date()
+        let elapsed = now.timeIntervalSince(lastBeatTime)
+        // ビートからの距離（前後のビートとの近さで判定）
+        let fromPrev = elapsed
+        let toNext = beatInterval - elapsed
+        let timeDiff = min(fromPrev, toNext)
+        let ratio = timeDiff / beatInterval
+
+        if ratio <= Constants.comboJustTimingRatio {
+            return .just
+        } else if ratio <= Constants.comboGoodTimingRatio {
+            return .good
+        } else {
+            return .miss
+        }
     }
 
     /// Progress until next beat (0.0 = just beat, 1.0 = about to beat)

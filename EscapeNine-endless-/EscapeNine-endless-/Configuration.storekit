@@ -35,6 +35,21 @@
       "type" : "NonConsumable"
     },
     {
+      "displayPrice" : "240",
+      "familyShareable" : false,
+      "internalID" : "4",
+      "localizations" : [
+        {
+          "description" : "盾ガードスキルを持つナイトキャラクター",
+          "displayName" : "ナイト",
+          "locale" : "ja"
+        }
+      ],
+      "productID" : "com.escapenine.endless.character.knight",
+      "referenceName" : "Character Knight",
+      "type" : "NonConsumable"
+    },
+    {
       "displayPrice" : "480",
       "familyShareable" : false,
       "internalID" : "3",

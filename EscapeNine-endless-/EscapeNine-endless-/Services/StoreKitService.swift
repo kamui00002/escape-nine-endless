@@ -12,14 +12,16 @@ import Security
 
 // MARK: - Product Identifiers
 enum ProductID: String, CaseIterable {
-    case characterWizard = "com.escapenine.endless.character.wizard"  // 魔法使い ¥240
-    case characterElf = "com.escapenine.endless.character.elf"        // エルフ ¥240
-    case removeAds = "com.escapenine.endless.removeads"               // 広告削除 ¥480
-    
+    case characterWizard = "com.escapenine.endless.character.wizard"   // 魔法使い ¥240
+    case characterElf = "com.escapenine.endless.character.elf"         // エルフ ¥240
+    case characterKnight = "com.escapenine.endless.character.knight"   // ナイト ¥240
+    case removeAds = "com.escapenine.endless.removeads"                // 広告削除 ¥480
+
     var displayName: String {
         switch self {
         case .characterWizard: return "魔法使い"
         case .characterElf: return "エルフ"
+        case .characterKnight: return "ナイト"
         case .removeAds: return "広告削除"
         }
     }
@@ -28,6 +30,7 @@ enum ProductID: String, CaseIterable {
         switch self {
         case .characterWizard: return "透明化スキルを持つ魔法使いキャラクター"
         case .characterElf: return "拘束スキルを持つエルフキャラクター"
+        case .characterKnight: return "盾ガードスキルを持つナイトキャラクター"
         case .removeAds: return "すべての広告を非表示にします"
         }
     }
@@ -175,6 +178,8 @@ class StoreKitService: ObservableObject {
             return isPurchased(.characterWizard)
         case .elf:
             return isPurchased(.characterElf)
+        case .knight:
+            return isPurchased(.characterKnight)
         default:
             return true // hero, thief は無料
         }
@@ -302,7 +307,7 @@ class StoreKitService: ObservableObject {
         guard let product = products.first(where: { $0.id == productID.rawValue }) else {
             // フォールバック価格
             switch productID {
-            case .characterWizard, .characterElf:
+            case .characterWizard, .characterElf, .characterKnight:
                 return "¥240"
             case .removeAds:
                 return "¥480"

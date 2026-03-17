@@ -39,6 +39,20 @@ class GameViewModel: ObservableObject {
     // MARK: - Game Over Overlay
     @Published var showGameOverOverlay: Bool = false
 
+    // MARK: - Shield (Knight skill)
+    @Published var shieldActive: Bool = false
+
+    // MARK: - Boss Floor
+    @Published var showBossWarning: Bool = false
+
+    // MARK: - Combo System
+    @Published var comboCount: Int = 0
+    @Published var lastTimingGrade: TimingGrade? = nil
+
+    // MARK: - Daily Challenge
+    var dailyChallengeMode: Bool = false
+    var dailyChallengeConditions: [ChallengeCondition] = []
+
     // MARK: - Game Settings
     private var selectedAILevel: AILevel = .easy // プレイヤーが選択したAI難易度（全階層で固定、初心者向けにEasyをデフォルト）
 
@@ -69,6 +83,21 @@ class GameViewModel: ObservableObject {
 
     var remainingSkillUses: Int {
         currentSkill.maxUsage - skillUsageCount
+    }
+
+    /// コンボによるスコア倍率
+    var scoreMultiplier: Double {
+        if comboCount >= Constants.comboMultiplierThreshold2 {
+            return 2.0
+        } else if comboCount >= Constants.comboMultiplierThreshold1 {
+            return 1.5
+        }
+        return 1.0
+    }
+
+    /// 現在のフロアがボスフロアか
+    var isBossFloor: Bool {
+        Floor.isBossFloor(currentFloor)
     }
 
     func setPlayerViewModel(_ viewModel: PlayerViewModel) {
@@ -213,6 +242,11 @@ class GameViewModel: ObservableObject {
                 DispatchQueue.main.asyncAfter(deadline: .now() + Constants.invisibilityDuration) { [weak self] in
                     self?.isInvisible = false
                 }
+            } else if currentSkill.type == .shield && shieldActive {
+                // 盾ガード: シールドが有効な間の衝突を1回無効化
+                shieldActive = false
+                skillUsageCount += 1
+                comboCount = 0 // 衝突でコンボリセット
             } else {
                 defeatReason = .caughtByEnemy
                 showGameOverOverlay = true
@@ -343,6 +377,10 @@ class GameViewModel: ObservableObject {
         isSkillActive = false
         defeatReason = nil
         showGameOverOverlay = false
+        shieldActive = false
+        comboCount = 0
+        lastTimingGrade = nil
+        showBossWarning = false
 
         // ターンカウントダウンを初期化
         turnCountdown = Constants.turnCountdownBeats
@@ -358,6 +396,15 @@ class GameViewModel: ObservableObject {
 
         // 初回ターンも移動必須（pendingPlayerMoveはnil）
         pendingPlayerMove = nil
+
+        // デイリーチャレンジ：pending challenge があれば適用
+        if let pending = DailyChallengeService.shared.pendingChallenge {
+            DailyChallengeService.shared.pendingChallenge = nil
+            setupDailyChallenge(pending)
+            applyDailyChallengeConditions()
+        } else if dailyChallengeMode {
+            applyDailyChallengeConditions()
+        }
 
         // ゲームスタート効果音
         audioManager.playSoundEffect(.gameStart)
@@ -380,6 +427,14 @@ class GameViewModel: ObservableObject {
         // 特殊ルール設定
         specialRule = stageManager.getSpecialRule(for: currentFloor)
         updateDisappearedCells()
+
+        // ボスフロア警告
+        if Floor.isBossFloor(currentFloor) {
+            showBossWarning = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.showBossWarning = false
+            }
+        }
 
         // ゲーム開始カウントダウン → 完了後にBeatEngine開始
         startGameStartCountdown { [weak self] in
@@ -410,6 +465,20 @@ class GameViewModel: ObservableObject {
         // 次のターンで移動する位置を設定
         pendingPlayerMove = position
         hasMovedThisTurn = true
+
+        // コンボシステム：タイミング判定
+        let grade = audioManager.checkMoveTimingGrade()
+        lastTimingGrade = grade
+        if grade == .just || grade == .good {
+            comboCount += 1
+        } else {
+            comboCount = 0
+        }
+        // タイミング表示を一定時間後にリセット
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(0.8))
+            self?.lastTimingGrade = nil
+        }
     }
 
     // 移動可能な位置を取得（現在位置を除外 = 必須移動）
@@ -514,6 +583,10 @@ class GameViewModel: ObservableObject {
         case .bind:
             // 拘束: 敵を停止させる（敵をタップした時に発動）
             break
+        case .shield:
+            // 盾ガード: シールドをアクティブにする
+            shieldActive = true
+            comboCount = 0 // スキル使用でコンボリセット
         }
     }
 
@@ -553,6 +626,9 @@ class GameViewModel: ObservableObject {
         isSkillActive = false
         defeatReason = nil
         showGameOverOverlay = false
+        shieldActive = false
+        lastTimingGrade = nil
+        showBossWarning = false
 
         // 100階層でクリア
         if currentFloor > Constants.maxFloors {
@@ -600,6 +676,14 @@ class GameViewModel: ObservableObject {
 
         // BGMを停止（カウントダウン後に再開）
         audioManager.stopBGM()
+
+        // ボスフロア警告を表示してからカウントダウン開始
+        if Floor.isBossFloor(currentFloor) {
+            showBossWarning = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.showBossWarning = false
+            }
+        }
 
         // ゲーム開始カウントダウン → 完了後にBeatEngine開始
         startGameStartCountdown { [weak self] in
@@ -686,6 +770,12 @@ class GameViewModel: ObservableObject {
             audioManager.playBGMMusic(.gameOver)
         }
 
+        // デイリーチャレンジ完了を記録（勝利時のみ）
+        if result == .win && dailyChallengeMode {
+            DailyChallengeService.shared.markCompleted(achievedFloor: currentFloor)
+            dailyChallengeMode = false
+        }
+
         // スコア送信（ローカル + Game Center）
         if result == .win || result == .lose {
             RankingService.shared.submitScore(
@@ -744,8 +834,37 @@ class GameViewModel: ObservableObject {
         isSkillActive = false
         defeatReason = nil
         showGameOverOverlay = false
+        shieldActive = false
+        comboCount = 0
+        lastTimingGrade = nil
+        showBossWarning = false
+        dailyChallengeMode = false
+        dailyChallengeConditions = []
         turnCountdown = Constants.turnCountdownBeats
         gameStartCountdown = 0
         isGameStartCountdownActive = false
+    }
+
+    // MARK: - Daily Challenge
+
+    /// デイリーチャレンジモードでゲームを設定する
+    func setupDailyChallenge(_ challenge: DailyChallenge) {
+        dailyChallengeMode = true
+        dailyChallengeConditions = challenge.conditions
+    }
+
+    private func applyDailyChallengeConditions() {
+        for condition in dailyChallengeConditions {
+            switch condition {
+            case .characterLock:
+                break // キャラクターはGameView側でロック済み
+            case .noSkillAllowed:
+                skillUsageCount = currentSkill.maxUsage // スキルを使い切り状態に
+            case .forcedAI(let level):
+                selectedAILevel = level
+            case .startFloor(let floor):
+                currentFloor = max(1, min(floor, Constants.maxFloors))
+            }
+        }
     }
 }

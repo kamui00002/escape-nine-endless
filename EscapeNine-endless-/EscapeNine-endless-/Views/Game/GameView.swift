@@ -34,6 +34,8 @@ struct GameView: View {
 
                         BeatIndicatorView(turnCountdown: viewModel.turnCountdown, turnCount: viewModel.turnCount)
 
+                        comboDisplay
+
                         turnAndSkillInfo
                     }
 
@@ -78,6 +80,10 @@ struct GameView: View {
 
             if viewModel.showGameOverOverlay {
                 gameOverOverlay
+            }
+
+            if viewModel.showBossWarning {
+                bossWarningOverlay
             }
         }
         .onAppear {
@@ -163,6 +169,72 @@ struct GameView: View {
         .padding(.bottom, ResponsiveLayout.isIPad() ? 12 : 8)
     }
 
+    // MARK: - Combo Display
+
+    @ViewBuilder
+    private var comboDisplay: some View {
+        if viewModel.comboCount >= 2 || viewModel.lastTimingGrade != nil {
+            HStack(spacing: 6) {
+                if let grade = viewModel.lastTimingGrade {
+                    Text(grade == .just ? "JUST!" : grade == .good ? "GOOD" : "MISS")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundColor(grade == .just ? Color(hex: GameColors.success) : grade == .good ? Color(hex: GameColors.available) : Color(hex: GameColors.warning))
+                        .transition(.scale.combined(with: .opacity))
+                }
+
+                if viewModel.comboCount >= 2 {
+                    Image(systemName: "flame.fill")
+                        .foregroundColor(.orange)
+                        .font(.system(size: 12))
+
+                    Text("×\(viewModel.comboCount) コンボ")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(viewModel.scoreMultiplier > 1.0 ? Color(hex: GameColors.textSecondary) : Color(hex: GameColors.text))
+
+                    if viewModel.scoreMultiplier > 1.0 {
+                        Text("×\(String(format: "%.1f", viewModel.scoreMultiplier))")
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundColor(Color(hex: GameColors.success))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(hex: GameColors.success).opacity(0.2))
+                            )
+                    }
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: viewModel.comboCount)
+        }
+    }
+
+    // MARK: - Boss Warning Overlay
+
+    private var bossWarningOverlay: some View {
+        ZStack {
+            Color.red.opacity(0.15)
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.red)
+                    .shadow(color: .red.opacity(0.8), radius: 20)
+
+                Text("ボス出現！")
+                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .foregroundColor(.red)
+                    .shadow(color: .red.opacity(0.8), radius: 10)
+
+                Text("\(viewModel.currentFloor)階層")
+                    .font(.fantasySubheading())
+                    .foregroundColor(Color(hex: GameColors.text))
+            }
+            .transition(.scale.combined(with: .opacity))
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: viewModel.showBossWarning)
+    }
+
     // MARK: - Turn & Skill Info
 
     private var turnAndSkillInfo: some View {
@@ -223,9 +295,11 @@ struct GameView: View {
 
     @ViewBuilder
     private func skillButton(geometry: GeometryProxy) -> some View {
-        if viewModel.currentSkill.type == .dash || viewModel.currentSkill.type == .invisible {
+        if viewModel.currentSkill.type == .dash || viewModel.currentSkill.type == .invisible || viewModel.currentSkill.type == .shield {
             let buttonWidth = ResponsiveLayout.buttonWidth(for: geometry)
-            let isActive = (viewModel.currentSkill.type == .dash && viewModel.isSkillActive) || (viewModel.currentSkill.type == .invisible && viewModel.isInvisible)
+            let isActive = (viewModel.currentSkill.type == .dash && viewModel.isSkillActive)
+                        || (viewModel.currentSkill.type == .invisible && viewModel.isInvisible)
+                        || (viewModel.currentSkill.type == .shield && viewModel.shieldActive)
 
             Button(action: {
                 viewModel.activateSkill()

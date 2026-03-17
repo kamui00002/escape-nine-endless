@@ -13,6 +13,11 @@ struct Floor {
     let specialRule: SpecialRule
     let aiLevel: AILevel
     
+    /// ボスフロアかどうか（10の倍数階）
+    static func isBossFloor(_ floor: Int) -> Bool {
+        floor % Constants.bossFloorInterval == 0
+    }
+
     static func calculateBPM(for floor: Int) -> Double {
         // べき乗曲線: BPM = start + (end - start) * (floor/99)^exponent
         // 序盤は緩やか、終盤に急加速
@@ -49,7 +54,9 @@ struct Floor {
     /// - Easy選択: 自然難易度より1段下
     /// - Normal選択: 自然難易度と一致
     /// - Hard選択: 自然難易度より1段上
+    /// - ボスフロア: 常に .boss（プレイヤー選択を無視）
     static func getEffectiveAILevel(for floor: Int, playerSelection: AILevel) -> AILevel {
+        if isBossFloor(floor) { return .boss }
         let natural = getNaturalDifficulty(for: floor)
 
         switch playerSelection {
@@ -59,6 +66,7 @@ struct Floor {
             case .easy: return .easy
             case .normal: return .easy
             case .hard: return .normal
+            case .boss: return .hard  // ボスは下げない
             }
         case .normal:
             return natural
@@ -68,7 +76,10 @@ struct Floor {
             case .easy: return .normal
             case .normal: return .hard
             case .hard: return .hard
+            case .boss: return .boss
             }
+        case .boss:
+            return .boss
         }
     }
     

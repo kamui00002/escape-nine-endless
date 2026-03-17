@@ -19,6 +19,7 @@ enum AILevel: String, CaseIterable {
     case easy = "Easy"
     case normal = "Normal"
     case hard = "Hard"
+    case boss = "Boss"
 }
 
 enum DefeatReason {
