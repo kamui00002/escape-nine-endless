@@ -67,3 +67,7 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Firebase / Google Services - 機密情報のため除外
+GoogleService-Info.plist
+google-services.json
+
