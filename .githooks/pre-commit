@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# pre-commit hook: 機密ファイル・APIキーのコミットを防止
+
+set -euo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+BLOCKED=0
+
+# ============================================================
+# 1. 機密ファイル名のチェック
+# ============================================================
+FORBIDDEN_PATTERNS=(
+    "GoogleService-Info\.plist"
+    "\.env$"
+    "\.env\.local"
+    "\.env\.production"
+    "secrets\.plist"
+    "Secrets\.swift"
+    ".*\.p12"
+    ".*\.mobileprovision"
+)
+
+for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+    matched=$(git diff --cached --name-only | grep -E "$pattern" || true)
+    if [ -n "$matched" ]; then
+        echo -e "${RED}[BLOCKED] 機密ファイルのコミットを検出:${NC}"
+        echo "$matched"
+        BLOCKED=1
+    fi
+done
+
+# ============================================================
+# 2. APIキーパターンのチェック（ステージされた差分のみ）
+# ============================================================
+PATTERNS=(
+    "AIzaSy[0-9A-Za-z_-]{33}"
+    "BEGIN (RSA |EC )?PRIVATE KEY"
+    "AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}"
+)
+
+for pattern in "${PATTERNS[@]}"; do
+    if git diff --cached | grep -E -- "$pattern" > /dev/null 2>&1; then
+        echo -e "${RED}[BLOCKED] APIキー・秘密鍵のパターンを検出:${NC}"
+        echo -e "${YELLOW}  パターン: ${pattern}${NC}"
+        BLOCKED=1
+    fi
+done
+
+# ============================================================
+# 3. git-secrets によるスキャン
+# ============================================================
+if command -v git-secrets &> /dev/null; then
+    if ! git secrets --pre_commit_hook 2>/dev/null; then
+        BLOCKED=1
+    fi
+fi
+
+# ============================================================
+# 結果
+# ============================================================
+if [ "$BLOCKED" -eq 1 ]; then
+    echo ""
+    echo -e "${RED}============================================${NC}"
+    echo -e "${RED}  コミットをブロックしました。${NC}"
+    echo -e "${RED}  機密情報を取り除いてから再度コミットしてください。${NC}"
+    echo -e "${RED}============================================${NC}"
+    echo ""
+    echo "  強制的にコミットする場合（非推奨）:"
+    echo "    git commit --no-verify"
+    exit 1
+fi
+
+echo -e "${GREEN}[OK] 機密ファイルのチェックをパスしました。${NC}"
+exit 0

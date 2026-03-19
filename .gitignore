@@ -67,3 +67,7 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Firebase / Google (APIキー - 絶対にコミット禁止)
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+*GoogleService*Info*.plist
