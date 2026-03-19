@@ -145,15 +145,19 @@ struct RankingView: View {
                         }
                     }
 
-                    // Local Ranking
-                    Text("プレイ履歴")
-                        .font(.fantasySubheading())
-                        .foregroundColor(Color(hex: GameColors.text))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
-                        .padding(.top, ResponsiveLayout.isIPad() ? 4 : 2)
-                        .padding(.bottom, ResponsiveLayout.isIPad() ? 4 : 2)
-                    
+                    // Tab Selector
+                    Picker("", selection: Binding(
+                        get: { viewModel.selectedTab },
+                        set: { viewModel.selectTab($0) }
+                    )) {
+                        Text("プレイ履歴").tag(RankingTab.local)
+                        Text("クラウド").tag(RankingTab.cloud)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
+                    .padding(.top, 4)
+                    .padding(.bottom, 4)
+
                     // Content Area
                     if viewModel.isLoading {
                         Spacer()
@@ -199,7 +203,7 @@ struct RankingView: View {
                             }
                         }
                         Spacer()
-                    } else if viewModel.rankings.isEmpty {
+                    } else if currentEntries.isEmpty {
                         Spacer()
                         VStack(spacing: 12) {
                             Image(systemName: "chart.bar.fill")
@@ -212,44 +216,8 @@ struct RankingView: View {
                         }
                         Spacer()
                     } else {
-                        List(viewModel.rankings.indices, id: \.self) { index in
-                            let entry = viewModel.rankings[index]
-                            HStack {
-                                Text("#\(index + 1)")
-                                    .font(.fantasyNumber())
-                                    .foregroundColor(
-                                        index == 0 ? Color(hex: GameColors.available) :
-                                        index == 1 ? Color(hex: GameColors.textSecondary) :
-                                        index == 2 ? Color(hex: GameColors.main) :
-                                        Color(hex: GameColors.text).opacity(0.7)
-                                    )
-                                    .frame(width: ResponsiveLayout.isIPad() ? 80 : 60)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        Text(characterEmoji(for: entry.characterType))
-                                        Text("\(entry.floor)階層")
-                                            .font(.fantasyBody())
-                                            .foregroundColor(Color(hex: GameColors.text))
-                                    }
-                                    Text(entry.formattedDate)
-                                        .font(.system(size: 10))
-                                        .foregroundColor(Color(hex: GameColors.text).opacity(0.5))
-                                }
-
-                                Spacer()
-
-                                Text("\(entry.floor)")
-                                    .font(.fantasyNumber())
-                                    .foregroundColor(Color(hex: GameColors.textSecondary))
-                            }
-                            .listRowBackground(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(hex: GameColors.backgroundSecondary))
-                                    .padding(.vertical, ResponsiveLayout.isIPad() ? 6 : 4)
-                            )
-                            .listRowSeparator(.hidden)
-                            .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
+                        List(currentEntries.indices, id: \.self) { index in
+                            rankingRow(entry: currentEntries[index], index: index, geometry: geometry)
                         }
                         .listStyle(PlainListStyle())
                         .scrollContentBackground(.hidden)
@@ -263,6 +231,68 @@ struct RankingView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // タブに応じた統一エントリ（floor, name, characterType, date）
+    private var currentEntries: [(floor: Int, name: String, characterType: String, date: String)] {
+        switch viewModel.selectedTab {
+        case .local:
+            return viewModel.rankings.map {
+                (floor: $0.floor, name: $0.playerName, characterType: $0.characterType, date: $0.formattedDate)
+            }
+        case .cloud:
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .short
+            return viewModel.cloudRankings.map {
+                (floor: $0.floor, name: $0.displayName, characterType: $0.characterType,
+                 date: formatter.string(from: $0.timestamp))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func rankingRow(
+        entry: (floor: Int, name: String, characterType: String, date: String),
+        index: Int,
+        geometry: GeometryProxy
+    ) -> some View {
+        HStack {
+            Text("#\(index + 1)")
+                .font(.fantasyNumber())
+                .foregroundColor(
+                    index == 0 ? Color(hex: GameColors.available) :
+                    index == 1 ? Color(hex: GameColors.textSecondary) :
+                    index == 2 ? Color(hex: GameColors.main) :
+                    Color(hex: GameColors.text).opacity(0.7)
+                )
+                .frame(width: ResponsiveLayout.isIPad() ? 80 : 60)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(characterEmoji(for: entry.characterType))
+                    Text(entry.name)
+                        .font(.fantasyBody())
+                        .foregroundColor(Color(hex: GameColors.text))
+                }
+                Text(entry.date)
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(hex: GameColors.text).opacity(0.5))
+            }
+
+            Spacer()
+
+            Text("\(entry.floor)階")
+                .font(.fantasyNumber())
+                .foregroundColor(Color(hex: GameColors.textSecondary))
+        }
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(hex: GameColors.backgroundSecondary))
+                .padding(.vertical, ResponsiveLayout.isIPad() ? 6 : 4)
+        )
+        .listRowSeparator(.hidden)
+        .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
     }
 
     private func characterEmoji(for type: String) -> String {

@@ -776,14 +776,22 @@ class GameViewModel: ObservableObject {
             dailyChallengeMode = false
         }
 
-        // スコア送信（ローカル + Game Center）
+        // スコア送信（ローカル + Game Center + Firebase）
         if result == .win || result == .lose {
+            let characterType = currentCharacter.type.rawValue
+            let floor = currentFloor
             RankingService.shared.submitScore(
-                floor: currentFloor,
-                characterType: currentCharacter.type.rawValue
+                floor: floor,
+                characterType: characterType
             )
             Task {
-                await GameCenterService.shared.submitScore(floor: currentFloor)
+                await GameCenterService.shared.submitScore(floor: floor)
+                let displayName = GameCenterService.shared.localPlayerName
+                try? await FirebaseService.shared.submitScore(
+                    floor: floor,
+                    displayName: displayName,
+                    characterType: characterType
+                )
             }
         }
 
