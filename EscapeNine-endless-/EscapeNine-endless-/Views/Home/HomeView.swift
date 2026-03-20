@@ -75,6 +75,10 @@ struct HomeView: View {
         }
         .onAppear {
             AudioManager.shared.playBGMMusic(.menu)
+            // GameView は別の PlayerViewModel インスタンスを持つため、
+            // ゲーム後に highestFloor が更新されていても反映されていない。
+            // onAppear で UserDefaults から再読み込みして同期する。
+            playerViewModel.reload()
         }
         .onChange(of: path) { oldPath, newPath in
             if oldPath.count > newPath.count {
@@ -127,7 +131,9 @@ struct HomeView: View {
             .slideIn(from: .leading, delay: 0.6)
             .pulse(minScale: 1.0, maxScale: 1.02, duration: 2.0)
 
-            dailyChallengeButton(buttonWidth: buttonWidth)
+            if playerViewModel.highestFloor >= 10 {
+                dailyChallengeButton(buttonWidth: buttonWidth)
+            }
 
             GameButton(title: "キャラクター", icon: "person.2.fill", style: .secondary, maxWidth: buttonWidth) {
                 path.append(HomeDestination.characterSelection)

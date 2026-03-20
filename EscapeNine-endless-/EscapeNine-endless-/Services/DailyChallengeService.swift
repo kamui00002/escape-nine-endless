@@ -58,8 +58,8 @@ class DailyChallengeService: ObservableObject {
             case 1:
                 conditions.append(.noSkillAllowed)
             case 2:
-                // boss を除いた難易度のみ
-                let levels: [AILevel] = [.easy, .normal, .hard]
+                // Hard は除外し Easy/Normal のみ（デイリーチャレンジの難易度調整）
+                let levels: [AILevel] = [.easy, .normal]
                 let levelIndex = rng.nextInt() % levels.count
                 conditions.append(.forcedAI(levels[levelIndex]))
             case 3:

@@ -81,6 +81,8 @@ class PurchaseManager: ObservableObject {
             productID = .characterWizard
         case .elf:
             productID = .characterElf
+        case .knight:
+            productID = .characterKnight
         default:
             print("[PurchaseManager] このキャラクターは購入対象外です: \(characterType.rawValue)")
             return false
@@ -116,6 +118,8 @@ class PurchaseManager: ObservableObject {
             return storeKitService.priceString(for: .characterWizard)
         case .elf:
             return storeKitService.priceString(for: .characterElf)
+        case .knight:
+            return storeKitService.priceString(for: .characterKnight)
         default:
             return "無料"
         }
@@ -172,7 +176,10 @@ class PurchaseManager: ObservableObject {
         if storeKitService.isCharacterPurchased(.elf) {
             NotificationCenter.default.post(name: .characterPurchased, object: CharacterType.elf)
         }
-        
+        if storeKitService.isCharacterPurchased(.knight) {
+            NotificationCenter.default.post(name: .characterPurchased, object: CharacterType.knight)
+        }
+
         isLoading = false
         
         showAlert(title: "復元完了", message: "購入の復元が完了しました")

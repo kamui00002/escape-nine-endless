@@ -56,6 +56,12 @@ class PlayerViewModel: ObservableObject {
     }
     
     // MARK: - Data Persistence
+
+    /// 他の PlayerViewModel インスタンスが UserDefaults を更新した後に呼ぶ（HomeView の onAppear など）
+    func reload() {
+        loadData()
+    }
+
     private func loadData() {
         highestFloor = UserDefaults.standard.integer(forKey: highestFloorKey)
         

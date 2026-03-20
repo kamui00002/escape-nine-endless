@@ -110,6 +110,23 @@ struct ShopView: View {
                                         }
                                     }
                                 )
+
+                                // Knight
+                                ShopItemCard(
+                                    icon: "🛡️",
+                                    title: "ナイト",
+                                    description: "盾ガードスキル: 次の衝突を1回無効化する（2回）",
+                                    price: purchaseManager.characterPrice(.knight),
+                                    isPurchased: purchaseManager.isCharacterPurchased(.knight),
+                                    action: {
+                                        Task {
+                                            let success = await purchaseManager.purchaseCharacter(.knight)
+                                            if success {
+                                                playerViewModel.unlockCharacter(.knight)
+                                            }
+                                        }
+                                    }
+                                )
                             }
                             .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
 
