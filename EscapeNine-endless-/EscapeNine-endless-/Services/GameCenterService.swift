@@ -21,7 +21,7 @@ class GameCenterService: ObservableObject {
     // MARK: - Constants
     // App Store Connect のリーダーボードIDと完全一致させること
     // Bundle ID: com.yoshidometoru.EscapeNine-endless-
-    static let leaderboardID = "com.yoshidometoru.EscapeNine-endless-.leaderboard.highestfloor"
+    static let leaderboardID = "com.yoshidometoru.EscapeNineEndless.leaderboard.highestfloor"
 
     private init() {}
 

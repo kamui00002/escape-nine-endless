@@ -68,7 +68,8 @@
   "settings" : {
     "_applicationInternalID" : "0",
     "_developerTeamID" : "",
-    "_lastSynchronizedDate" : ""
+    "_lastSynchronizedDate" : "",
+    "_storefront" : "JPN"
   },
   "subscriptionGroups" : [
 

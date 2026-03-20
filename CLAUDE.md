@@ -130,11 +130,20 @@ EscapeNine-endless-/EscapeNine-endless-/
 - [x] 定数一元管理（Constants.swift）
 
 ### 外部設定が必要（コードだけでは完了不可）
-- [ ] Firebase: GoogleService-Info.plist + SPMパッケージ
-- [ ] AdMob: Google Mobile Ads SDK + 本番広告ID
-- [ ] App Store Connect: StoreKit実プロダクトID
-- [ ] Game Center: リーダーボードID登録
-- [ ] BGM音楽ファイル（Suno AI等で生成）
+- [x] Firebase: GoogleService-Info.plist配置済み + Firestore Rules デプロイ済み
+- [x] AdMob: 本番広告ID設定済み（バナー+インタースティシャル）
+- [x] App Store Connect: StoreKit 4商品登録済み（wizard/elf/knight/removeads）
+- [x] Game Center: リーダーボードID登録済み（highestfloor）
+- [x] BGM音楽ファイル（6曲生成済み: menu/early/mid/late/clear/gameover）
+- [x] Sign in with Apple: entitlements + Firebase Auth 有効化済み
+
+### App Store 提出に必要な残作業
+- [ ] アプリアイコン（1024x1024）
+- [ ] スクリーンショット（6.7", 6.5", 5.5"）
+- [ ] App内課金の審査用スクリーンショット（4商品分）
+- [ ] アプリ説明文、キーワード
+- [ ] プライバシーポリシーURL
+- [ ] 年齢レーティング設定
 
 ## ビルド・実行
 

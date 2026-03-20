@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UIKit
 import SwiftUI
 import Combine
 
@@ -25,7 +26,7 @@ struct AdMobConfig {
         #if DEBUG
         return testBannerAdUnitId
         #else
-        return "ca-app-pub-XXXXXXXXXXXXX/YYYYYYYYYY" // TODO: 本番IDに置き換え
+        return "ca-app-pub-5237930968754753/3156438181"
         #endif
     }
 
@@ -33,7 +34,7 @@ struct AdMobConfig {
         #if DEBUG
         return testInterstitialAdUnitId
         #else
-        return "ca-app-pub-XXXXXXXXXXXXX/ZZZZZZZZZZ" // TODO: 本番IDに置き換え
+        return "ca-app-pub-5237930968754753/7861969950"
         #endif
     }
 }
@@ -138,14 +139,24 @@ class AdMobService: ObservableObject {
         }
 
         #if canImport(GoogleMobileAds)
-        guard let ad = interstitialAd,
-              let rootViewController = viewController ?? getRootViewController() else {
+        guard let ad = interstitialAd else {
+            print("[AdMobService] インタースティシャル広告オブジェクトがnil")
+            isInterstitialAdReady = false
+            completion(false)
+            loadInterstitialAd()
+            return
+        }
+
+        guard let rootViewController = viewController ?? getRootViewController() else {
+            print("[AdMobService] rootViewControllerが取得できません")
             completion(false)
             return
         }
 
-        ad.present(from: rootViewController)
+        interstitialAd = nil
         isInterstitialAdReady = false
+
+        ad.present(from: rootViewController)
         completion(true)
 
         // 次の広告を事前読み込み
@@ -178,11 +189,27 @@ class AdMobService: ObservableObject {
     // MARK: - Helpers
 
     func getRootViewController() -> UIViewController? {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = windowScene.windows.first?.rootViewController else {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first else {
+            print("[AdMobService] UIWindowSceneが取得できません")
             return nil
         }
-        return rootVC
+
+        guard let rootVC = windowScene.windows
+            .first(where: { $0.isKeyWindow })?.rootViewController ?? windowScene.windows.first?.rootViewController else {
+            print("[AdMobService] rootViewControllerが取得できません")
+            return nil
+        }
+
+        // 最前面のViewControllerを取得（presented VCがある場合）
+        var topVC = rootVC
+        while let presented = topVC.presentedViewController {
+            topVC = presented
+        }
+        return topVC
     }
 }
 
