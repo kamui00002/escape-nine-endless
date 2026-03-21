@@ -39,7 +39,7 @@ Escape Nine: Endless
 4+ (暴力的/性的コンテンツなし)
 
 ## プライバシーポリシーURL
-https://yoshidometoru.github.io/escape-nine-endless/privacy-policy.html
+https://kamui00002.github.io/escape-nine-endless/privacy-policy.html
 
 ## サポートURL
-https://github.com/yoshidometoru/escape-nine-endless
+https://github.com/kamui00002/escape-nine-endless
