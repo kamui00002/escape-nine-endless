@@ -15,7 +15,13 @@ enum Constants {
 
     // Game Progress
     static let maxFloors = 100
-    static let maxTurns = 10
+    static let baseTurns = 5
+    static let turnsPerFloorStep = 10 // 10階ごとにターン数+1
+
+    /// 階層に応じた最大ターン数を計算（Floor 1-10: 5, 11-20: 6, ..., 91-100: 14）
+    static func getMaxTurns(for floor: Int) -> Int {
+        baseTurns + (floor - 1) / turnsPerFloorStep
+    }
     static let maxSkillUsage = 5  // レガシー（キャラ別定数を優先）
 
     // Timing（BPM連動で動的計算）

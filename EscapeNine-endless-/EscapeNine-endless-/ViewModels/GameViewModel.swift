@@ -63,7 +63,7 @@ class GameViewModel: ObservableObject {
     private let stageManager = StageManager.shared
 
     // MARK: - Constants
-    private let maxTurns = Constants.maxTurns
+    var maxTurns: Int { Constants.getMaxTurns(for: currentFloor) }
     private let maxSkillUsage = Constants.maxSkillUsage
 
     // MARK: - Character & Skill

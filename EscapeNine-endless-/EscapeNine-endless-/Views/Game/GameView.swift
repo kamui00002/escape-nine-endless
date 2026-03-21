@@ -32,7 +32,7 @@ struct GameView: View {
                             bpm: Floor.calculateBPM(for: viewModel.currentFloor)
                         )
 
-                        BeatIndicatorView(turnCountdown: viewModel.turnCountdown, turnCount: viewModel.turnCount)
+                        BeatIndicatorView(turnCountdown: viewModel.turnCountdown, turnCount: viewModel.turnCount, maxTurns: viewModel.maxTurns)
 
                         comboDisplay
 
@@ -43,9 +43,10 @@ struct GameView: View {
 
                     // Center: grid board
                     gridBoard
-                        .frame(maxHeight: geometry.size.height * 0.40)
+                        .frame(maxHeight: geometry.size.height * (ResponsiveLayout.isIPad() ? 0.35 : 0.40))
+                        .frame(maxWidth: ResponsiveLayout.isIPad() ? min(geometry.size.width * 0.55, 500) : .infinity)
 
-                    Spacer(minLength: verticalSpacing)
+                    Spacer(minLength: ResponsiveLayout.isIPad() ? 20 : verticalSpacing)
 
                     // Bottom: skill button + special rule (fixed at bottom)
                     VStack(spacing: verticalSpacing) {
@@ -244,7 +245,7 @@ struct GameView: View {
                     .font(.fantasyCaption())
                     .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
 
-                Text("\(viewModel.turnCount) / \(Constants.maxTurns)")
+                Text("\(viewModel.turnCount) / \(viewModel.maxTurns)")
                     .font(.fantasyNumber())
                     .foregroundColor(Color(hex: GameColors.available))
             }

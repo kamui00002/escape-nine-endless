@@ -10,6 +10,7 @@ import SwiftUI
 struct BeatIndicatorView: View {
     let turnCountdown: Int // 3, 2, 1
     let turnCount: Int
+    var maxTurns: Int = Constants.baseTurns
     @State private var scale: CGFloat = 1.0
     @State private var pulse: Bool = false
     @State private var progress: Double = 1.0
@@ -137,7 +138,7 @@ struct BeatIndicatorView: View {
 
                 // Turn indicator dots
                 HStack(spacing: dotSpacing) {
-                    ForEach(1...Constants.maxTurns, id: \.self) { turn in
+                    ForEach(1...maxTurns, id: \.self) { turn in
                         let isActive = turn <= turnCount
                         Circle()
                             .fill(

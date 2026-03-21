@@ -37,7 +37,6 @@ enum SpecialRule {
 struct GameState {
     var currentFloor: Int = 1
     var turnCount: Int = 0
-    var maxTurns: Int = 10
     var playerPosition: Int = 1
     var enemyPosition: Int = 9
     var gameStatus: GameStatus = .playing
