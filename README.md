@@ -84,7 +84,16 @@ escape-nine-endless/
 - **iOS**: 14.0以上
 - **将来的**: Android対応予定
 
-## 📄 ライセンス
+## サポート
+
+アプリに関するご質問、不具合の報告、ご要望などがございましたら、以下の方法でお問い合わせください。
+
+- **メール**: dome090111220916@gmail.com
+- **GitHub Issues**: [Issues](https://github.com/kamui00002/escape-nine-endless/issues)
+
+通常、お問い合わせには3営業日以内にご返信いたします。
+
+## ライセンス
 
 © 2025 Souatou. All rights reserved.
 
