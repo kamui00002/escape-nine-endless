@@ -63,6 +63,8 @@
 			<string>3qy4746246.skadnetwork</string>
 		</dict>
 	</array>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>広告のパーソナライズと効果測定のためにトラッキングの許可をお願いします。許可しない場合でもゲームは通常どおりご利用いただけます。</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
