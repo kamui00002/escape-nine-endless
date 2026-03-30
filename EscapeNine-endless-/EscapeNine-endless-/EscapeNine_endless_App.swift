@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppTrackingTransparency
 #if canImport(FirebaseCore)
 import FirebaseCore
 #endif
@@ -19,21 +20,10 @@ struct EscapeNine_endless_App: App {
     @StateObject private var gameCenterService = GameCenterService.shared
 
     init() {
-        // #if canImport(FirebaseCore) は firebase-ios-sdk SPMパッケージがリンクされると有効になる
-        // FirebaseApp.configure() は GoogleService-Info.plist が存在しないとクラッシュするため
-        // plist を配置した後にビルドすること
         #if canImport(FirebaseCore)
         FirebaseApp.configure()
         print("[App] Firebase初期化完了")
         #endif
-
-        #if canImport(GoogleMobileAds)
-        MobileAds.shared.start(completionHandler: nil)
-        print("[App] AdMob初期化完了")
-        #endif
-
-        // AdMobService の広告ユニット事前ロード（SDK の有無に関わらず実行）
-        AdMobService.shared.initialize()
 
         print("[App] アプリ起動")
     }
@@ -42,7 +32,9 @@ struct EscapeNine_endless_App: App {
         WindowGroup {
             HomeView()
                 .task {
-                    // Firebase匿名認証（GoogleService-Info.plist未配置時はモック動作）
+                    // ATTダイアログ表示後にAdMobを初期化
+                    await requestTrackingAndInitializeAds()
+                    // Firebase匿名認証
                     try? await FirebaseService.shared.signInAnonymously()
                     // PurchaseManagerの初期化
                     await purchaseManager.initialize()
@@ -50,5 +42,21 @@ struct EscapeNine_endless_App: App {
                     gameCenterService.authenticate()
                 }
         }
+    }
+
+    private func requestTrackingAndInitializeAds() async {
+        // ATTダイアログはアプリがアクティブな状態で表示する必要がある
+        // 少し待ってUIが表示された後にリクエスト
+        try? await Task.sleep(for: .seconds(1))
+
+        let status = await ATTrackingManager.requestTrackingAuthorization()
+        print("[App] ATTステータス: \(status.rawValue)")
+
+        #if canImport(GoogleMobileAds)
+        await MobileAds.shared.start()
+        print("[App] AdMob初期化完了")
+        #endif
+
+        AdMobService.shared.initialize()
     }
 }
