@@ -306,3 +306,17 @@ struct RankingView: View {
     }
 }
 
+// MARK: - Previews
+
+#Preview("iPhone") {
+    NavigationStack {
+        RankingView()
+    }
+}
+
+#Preview("iPad") {
+    NavigationStack {
+        RankingView()
+    }
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

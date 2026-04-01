@@ -71,3 +71,11 @@ yarn-error.*
 GoogleService-Info.plist
 **/GoogleService-Info.plist
 *GoogleService*Info*.plist
+
+# Temp/Log files
+*.swp
+firebase-debug.log
+.playwright-mcp/
+
+# Suno MCP (separate project)
+suno-mcp/

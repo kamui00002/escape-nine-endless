@@ -273,3 +273,18 @@ struct ShopItemCard: View {
         )
     }
 }
+
+// MARK: - Previews
+
+#Preview("iPhone") {
+    NavigationStack {
+        ShopView()
+    }
+}
+
+#Preview("iPad") {
+    NavigationStack {
+        ShopView()
+    }
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

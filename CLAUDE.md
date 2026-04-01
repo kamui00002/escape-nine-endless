@@ -164,6 +164,29 @@ xcodebuild -scheme EscapeNine-endless- \
 - 警告: #ff6347（トマトレッド）
 - 成功: #90ee90（ライトグリーン）
 
+## iPad レイアウトルール
+
+### 原則: 比率ベースレイアウト
+- **固定ptサイズ禁止**: iPad/iPhoneで異なる固定値を使わず、`GeometryProxy` の比率で計算する
+- **`ResponsiveLayout` 経由**: サイズ・スペーシング・パディングは `ResponsiveLayout` のメソッドを使う
+- **新しいレイアウト値の追加時**: `ResponsiveLayout` にメソッドを追加し、View内で直接 `isIPad()` 分岐しない
+
+### 確認必須項目
+- UI変更時は必ず `#Preview("iPad")` で iPad 表示を確認する
+- 主要View（GameView, HomeView, ShopView, RankingView, CharacterSelectionView）には iPhone/iPad 両方の `#Preview` が定義済み
+- グリッドやボタンが画面からはみ出していないか、要素同士が重なっていないかを確認する
+
+### ResponsiveLayout の使い方
+```swift
+// Good: ResponsiveLayout メソッド経由
+.frame(maxHeight: ResponsiveLayout.gridMaxHeight(for: geometry))
+.frame(maxWidth: ResponsiveLayout.gridMaxWidth(for: geometry))
+let spacing = ResponsiveLayout.verticalSpacing(for: geometry)
+
+// Bad: View内で直接分岐
+.frame(maxHeight: geometry.size.height * (ResponsiveLayout.isIPad() ? 0.30 : 0.40))
+```
+
 ## 注意事項
 
 - ビルドターゲット: iOS 26.0

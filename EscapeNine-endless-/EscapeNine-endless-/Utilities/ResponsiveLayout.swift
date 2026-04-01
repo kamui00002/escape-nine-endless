@@ -12,83 +12,82 @@ struct ResponsiveLayout {
     static func isIPad() -> Bool {
         UIDevice.current.userInterfaceIdiom == .pad
     }
-    
-    // 画面サイズに応じたグリッドセルサイズ
+
+    // MARK: - 比率ベースのレイアウト定数
+    // iPad/iPhone共通で画面サイズに対する比率で計算し、はみ出しを防止
+
+    // 画面サイズに応じたグリッドセルサイズ（親ビューの幅に対する比率ベース）
     static func gridCellSize(for geometry: GeometryProxy) -> CGFloat {
-        let minDimension = min(geometry.size.width, geometry.size.height)
-        let padding: CGFloat = 40
-        let spacing: CGFloat = 8 * 2 // 2つのスペース
-        let availableWidth = minDimension - padding - spacing
-        
-        // iPadの場合はより大きく、iPhoneの場合は適度なサイズ
+        let availableWidth = min(geometry.size.width, geometry.size.height)
+        // 幅の25%をセルサイズとし、3列 + スペーシングが収まるように
+        let cellSize = (availableWidth - padding(for: geometry) * 2 - spacing(for: geometry) * 2) / 3
         if isIPad() {
-            // iPad: 最小120pt、最大150pt
-            return min(max(availableWidth / 3, 120), 150)
+            return min(cellSize, 120)
         } else {
-            // iPhone: 最小80pt、最大120pt
-            return min(max(availableWidth / 3, 80), 120)
+            return min(cellSize, 120)
         }
     }
-    
+
     // キャラクターサイズ（プレイヤー/敵の円）
     static func characterSize(for geometry: GeometryProxy) -> CGFloat {
-        let cellSize = gridCellSize(for: geometry)
-        // セルサイズの50-60%をキャラクターサイズにする
-        return cellSize * 0.55
+        return gridCellSize(for: geometry) * 0.55
     }
-    
-    // ボタン幅
+
+    // ボタン幅（画面幅の比率ベース）
     static func buttonWidth(for geometry: GeometryProxy) -> CGFloat {
         if isIPad() {
-            // iPad: 最大400pt
-            return min(geometry.size.width * 0.6, 400)
+            return min(geometry.size.width * 0.45, 360)
         } else {
-            // iPhone: 最大280pt
             return min(geometry.size.width * 0.85, 280)
         }
     }
-    
+
+    // グリッドボードの最大高さ（画面高さの比率ベース）
+    static func gridMaxHeight(for geometry: GeometryProxy) -> CGFloat {
+        if isIPad() {
+            return geometry.size.height * 0.32
+        } else {
+            return geometry.size.height * 0.40
+        }
+    }
+
+    // グリッドボードの最大幅（画面幅の比率ベース）
+    static func gridMaxWidth(for geometry: GeometryProxy) -> CGFloat {
+        if isIPad() {
+            return min(geometry.size.width * 0.45, 420)
+        } else {
+            return .infinity
+        }
+    }
+
     // フォントサイズのスケーリング
     static func scaleFontSize(_ baseSize: CGFloat, for geometry: GeometryProxy) -> CGFloat {
-        if isIPad() {
-            return baseSize * 1.2
-        } else {
-            return baseSize
-        }
+        return isIPad() ? baseSize * 1.2 : baseSize
     }
-    
-    // スペーシング
+
+    // スペーシング（画面高さの比率ベース）
     static func spacing(for geometry: GeometryProxy) -> CGFloat {
-        if isIPad() {
-            return 12
-        } else {
-            return 8
-        }
+        return isIPad() ? 12 : 8
     }
-    
+
+    // 垂直スペーシング（GameView等のセクション間）
+    static func verticalSpacing(for geometry: GeometryProxy) -> CGFloat {
+        return isIPad() ? 12 : 6
+    }
+
     // パディング
     static func padding(for geometry: GeometryProxy) -> CGFloat {
-        if isIPad() {
-            return 40
-        } else {
-            return 20
-        }
+        return isIPad() ? 40 : 20
     }
 
     // ビートインジケーターサイズ（外枠リング）
     static func beatIndicatorSize(for geometry: GeometryProxy) -> CGFloat {
-        let cellSize = gridCellSize(for: geometry)
-        // セルサイズの75%をベースに
-        return cellSize * 0.75
+        return gridCellSize(for: geometry) * 0.75
     }
 
     // BPMInfoView のパディング
     static func bpmInfoPadding(for geometry: GeometryProxy) -> (horizontal: CGFloat, vertical: CGFloat) {
-        if isIPad() {
-            return (horizontal: 36, vertical: 16)
-        } else {
-            return (horizontal: 24, vertical: 12)
-        }
+        return isIPad() ? (horizontal: 36, vertical: 16) : (horizontal: 24, vertical: 12)
     }
 
     // BPMInfoView のディバイダー高さ

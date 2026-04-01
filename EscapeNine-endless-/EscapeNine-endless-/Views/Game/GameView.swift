@@ -20,13 +20,13 @@ struct GameView: View {
             GameBackground()
 
             GeometryReader { geometry in
-                let verticalSpacing: CGFloat = ResponsiveLayout.isIPad() ? 12 : 6
+                let vSpacing = ResponsiveLayout.verticalSpacing(for: geometry)
 
                 VStack(spacing: 0) {
                     gameHeader
 
                     // Top info section
-                    VStack(spacing: verticalSpacing) {
+                    VStack(spacing: vSpacing) {
                         BPMInfoView(
                             floor: viewModel.currentFloor,
                             bpm: Floor.calculateBPM(for: viewModel.currentFloor)
@@ -39,22 +39,22 @@ struct GameView: View {
                         turnAndSkillInfo
                     }
 
-                    Spacer(minLength: verticalSpacing)
+                    Spacer(minLength: vSpacing)
 
-                    // Center: grid board
+                    // Center: grid board（比率ベースで自動フィット）
                     gridBoard
-                        .frame(maxHeight: geometry.size.height * (ResponsiveLayout.isIPad() ? 0.35 : 0.40))
-                        .frame(maxWidth: ResponsiveLayout.isIPad() ? min(geometry.size.width * 0.55, 500) : .infinity)
+                        .frame(maxHeight: ResponsiveLayout.gridMaxHeight(for: geometry))
+                        .frame(maxWidth: ResponsiveLayout.gridMaxWidth(for: geometry))
 
-                    Spacer(minLength: ResponsiveLayout.isIPad() ? 20 : verticalSpacing)
+                    Spacer(minLength: vSpacing)
 
                     // Bottom: skill button + special rule (fixed at bottom)
-                    VStack(spacing: verticalSpacing) {
+                    VStack(spacing: vSpacing) {
                         skillButton(geometry: geometry)
 
                         specialRuleLabel
                     }
-                    .padding(.bottom, ResponsiveLayout.isIPad() ? 16 : 8)
+                    .padding(.bottom, vSpacing)
                 }
                 .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
             }
@@ -673,4 +673,19 @@ struct GameView: View {
             }
         }
     }
+}
+
+// MARK: - Previews
+
+#Preview("iPhone") {
+    NavigationStack {
+        GameView()
+    }
+}
+
+#Preview("iPad") {
+    NavigationStack {
+        GameView()
+    }
+    .previewDevice("iPad Pro 13-inch (M4)")
 }

@@ -249,3 +249,18 @@ struct CharacterCardView: View {
         }
     }
 }
+
+// MARK: - Previews
+
+#Preview("iPhone") {
+    NavigationStack {
+        CharacterSelectionView()
+    }
+}
+
+#Preview("iPad") {
+    NavigationStack {
+        CharacterSelectionView()
+    }
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

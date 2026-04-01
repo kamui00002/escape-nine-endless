@@ -239,3 +239,14 @@ struct HomeView: View {
         .slideIn(from: .bottom, delay: 1.0)
     }
 }
+
+// MARK: - Previews
+
+#Preview("iPhone") {
+    HomeView()
+}
+
+#Preview("iPad") {
+    HomeView()
+        .previewDevice("iPad Pro 13-inch (M4)")
+}
