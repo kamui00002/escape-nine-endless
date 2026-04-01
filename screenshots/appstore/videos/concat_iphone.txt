@@ -1,0 +1,3 @@
+file '/Users/yoshidometoru/Documents/GitHub/escape-nine-endless/screenshots/appstore/videos/clip1_iphone.mp4'
+file '/Users/yoshidometoru/Documents/GitHub/escape-nine-endless/screenshots/appstore/videos/clip2_iphone.mp4'
+file '/Users/yoshidometoru/Documents/GitHub/escape-nine-endless/screenshots/appstore/videos/clip3_iphone.mp4'
