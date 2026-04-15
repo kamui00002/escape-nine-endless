@@ -13,6 +13,9 @@ import FirebaseCore
 #if canImport(GoogleMobileAds)
 import GoogleMobileAds
 #endif
+#if canImport(FacebookCore)
+import FacebookCore
+#endif
 
 @main
 struct EscapeNine_endless_App: App {
@@ -25,6 +28,14 @@ struct EscapeNine_endless_App: App {
         print("[App] Firebase初期化完了")
         #endif
 
+        #if canImport(FacebookCore)
+        ApplicationDelegate.shared.application(
+            UIApplication.shared,
+            didFinishLaunchingWithOptions: nil
+        )
+        print("[App] Facebook SDK初期化完了")
+        #endif
+
         print("[App] アプリ起動")
     }
 
@@ -34,6 +45,8 @@ struct EscapeNine_endless_App: App {
                 .task {
                     // ATTダイアログ表示後にAdMobを初期化
                     await requestTrackingAndInitializeAds()
+                    // Google Ads コンバージョン計測
+                    ConversionService.shared.trackAppOpen()
                     // Firebase匿名認証
                     try? await FirebaseService.shared.signInAnonymously()
                     // PurchaseManagerの初期化

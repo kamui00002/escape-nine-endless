@@ -72,6 +72,10 @@ GoogleService-Info.plist
 **/GoogleService-Info.plist
 *GoogleService*Info*.plist
 
+# Secrets xcconfig (Facebook App Keys等 - 絶対にコミット禁止)
+Secrets.xcconfig
+**/Secrets.xcconfig
+
 # Temp/Log files
 *.swp
 firebase-debug.log
