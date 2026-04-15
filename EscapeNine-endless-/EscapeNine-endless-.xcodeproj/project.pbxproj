@@ -15,6 +15,7 @@
 
 /* Begin PBXFileReference section */
 		E0A3852D2EC62A570058EC96 /* EscapeNine-endless-.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "EscapeNine-endless-.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0FB00102FA10000008AD47D /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -93,6 +94,7 @@
 				E004C4162F5E6BAA008AD47D /* FirebaseFirestore */,
 				E004C4182F5E6BAA008AD47D /* FirebaseCore */,
 				E004C41B2F5E7000008AD47D /* GoogleMobileAds */,
+				E0FB00012FA00000008AD47D /* FacebookCore */,
 			);
 			productName = "EscapeNine-endless-";
 			productReference = E0A3852D2EC62A570058EC96 /* EscapeNine-endless-.app */;
@@ -125,6 +127,7 @@
 			packageReferences = (
 				E004C4132F5E6BAA008AD47D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				E004C41A2F5E7000008AD47D /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+				E0FB00002FA00000008AD47D /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E0A3852E2EC62A570058EC96 /* Products */;
@@ -280,6 +283,7 @@
 		};
 		E0A385392EC62A590058EC96 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E0FB00102FA10000008AD47D /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -316,6 +320,7 @@
 		};
 		E0A3853A2EC62A590058EC96 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E0FB00102FA10000008AD47D /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -390,6 +395,14 @@
 				minimumVersion = 12.0.0;
 			};
 		};
+		E0FB00002FA00000008AD47D /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/facebook-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 17.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -412,6 +425,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E004C41A2F5E7000008AD47D /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
 			productName = GoogleMobileAds;
+		};
+		E0FB00012FA00000008AD47D /* FacebookCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E0FB00002FA00000008AD47D /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
+			productName = FacebookCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
