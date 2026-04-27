@@ -12,7 +12,7 @@
 		E0E5FE6E2F6D9950009A46C9 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = E004C4162F5E6BAA008AD47D /* FirebaseFirestore */; };
 		E0E5FE6F2F6D9950009A46C9 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E004C4182F5E6BAA008AD47D /* FirebaseCore */; };
 		E0E5FE712F6D9950009A46C9 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41C2F5E6BAA008AD47D /* FirebaseAnalytics */; };
-		E0E5FE722F6D9950009A46C9 /* GoogleAppMeasurementIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41D2F5E6BAA008AD47D /* GoogleAppMeasurementIdentitySupport */; };
+		E0E5FE722F6D9950009A46C9 /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41D2F5E6BAA008AD47D /* FirebaseAnalyticsIdentitySupport */; };
 		E0E5FE702F6D9950009A46C9 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41B2F5E7000008AD47D /* GoogleMobileAds */; };
 /* End PBXBuildFile section */
 
@@ -51,7 +51,7 @@
 				E0E5FE702F6D9950009A46C9 /* GoogleMobileAds in Frameworks */,
 				E0E5FE6F2F6D9950009A46C9 /* FirebaseCore in Frameworks */,
 				E0E5FE712F6D9950009A46C9 /* FirebaseAnalytics in Frameworks */,
-				E0E5FE722F6D9950009A46C9 /* GoogleAppMeasurementIdentitySupport in Frameworks */,
+				E0E5FE722F6D9950009A46C9 /* FirebaseAnalyticsIdentitySupport in Frameworks */,
 				E0E5FE6E2F6D9950009A46C9 /* FirebaseFirestore in Frameworks */,
 				E0E5FE6D2F6D9950009A46C9 /* FirebaseAuth in Frameworks */,
 			);
@@ -109,7 +109,7 @@
 				E004C4162F5E6BAA008AD47D /* FirebaseFirestore */,
 				E004C4182F5E6BAA008AD47D /* FirebaseCore */,
 				E004C41C2F5E6BAA008AD47D /* FirebaseAnalytics */,
-				E004C41D2F5E6BAA008AD47D /* GoogleAppMeasurementIdentitySupport */,
+				E004C41D2F5E6BAA008AD47D /* FirebaseAnalyticsIdentitySupport */,
 				E004C41B2F5E7000008AD47D /* GoogleMobileAds */,
 				E0FB00012FA00000008AD47D /* FacebookCore */,
 			);
@@ -323,6 +323,10 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.4.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.yoshidometoru.EscapeNine-endless-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -360,6 +364,10 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.4.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.yoshidometoru.EscapeNine-endless-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -443,10 +451,10 @@
 			package = E004C4132F5E6BAA008AD47D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAnalytics;
 		};
-		E004C41D2F5E6BAA008AD47D /* GoogleAppMeasurementIdentitySupport */ = {
+		E004C41D2F5E6BAA008AD47D /* FirebaseAnalyticsIdentitySupport */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E004C4132F5E6BAA008AD47D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = GoogleAppMeasurementIdentitySupport;
+			productName = FirebaseAnalyticsIdentitySupport;
 		};
 		E004C41B2F5E7000008AD47D /* GoogleMobileAds */ = {
 			isa = XCSwiftPackageProductDependency;
