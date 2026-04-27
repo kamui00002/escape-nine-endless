@@ -7,9 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E06A11DC2F9200EE0009071C /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = E0FB00012FA00000008AD47D /* FacebookCore */; };
 		E0E5FE6D2F6D9950009A46C9 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E004C4142F5E6BAA008AD47D /* FirebaseAuth */; };
 		E0E5FE6E2F6D9950009A46C9 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = E004C4162F5E6BAA008AD47D /* FirebaseFirestore */; };
 		E0E5FE6F2F6D9950009A46C9 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E004C4182F5E6BAA008AD47D /* FirebaseCore */; };
+		E0E5FE712F6D9950009A46C9 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41C2F5E6BAA008AD47D /* FirebaseAnalytics */; };
 		E0E5FE702F6D9950009A46C9 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41B2F5E7000008AD47D /* GoogleMobileAds */; };
 /* End PBXBuildFile section */
 
@@ -44,8 +46,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E06A11DC2F9200EE0009071C /* FacebookCore in Frameworks */,
 				E0E5FE702F6D9950009A46C9 /* GoogleMobileAds in Frameworks */,
 				E0E5FE6F2F6D9950009A46C9 /* FirebaseCore in Frameworks */,
+				E0E5FE712F6D9950009A46C9 /* FirebaseAnalytics in Frameworks */,
 				E0E5FE6E2F6D9950009A46C9 /* FirebaseFirestore in Frameworks */,
 				E0E5FE6D2F6D9950009A46C9 /* FirebaseAuth in Frameworks */,
 			);
@@ -54,11 +58,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		E06A11DD2F9200EE0009071C /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				E0FB00102FA10000008AD47D /* Secrets.xcconfig */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		E0A385242EC62A560058EC96 = {
 			isa = PBXGroup;
 			children = (
 				E0A3852F2EC62A570058EC96 /* EscapeNine-endless- */,
 				E0A3852E2EC62A570058EC96 /* Products */,
+				E06A11DD2F9200EE0009071C /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -93,6 +106,7 @@
 				E004C4142F5E6BAA008AD47D /* FirebaseAuth */,
 				E004C4162F5E6BAA008AD47D /* FirebaseFirestore */,
 				E004C4182F5E6BAA008AD47D /* FirebaseCore */,
+				E004C41C2F5E6BAA008AD47D /* FirebaseAnalytics */,
 				E004C41B2F5E7000008AD47D /* GoogleMobileAds */,
 				E0FB00012FA00000008AD47D /* FacebookCore */,
 			);
@@ -289,7 +303,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "EscapeNine-endless-/EscapeNine-endless-.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = B7F79FDM78;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -305,7 +319,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.yoshidometoru.EscapeNine-endless-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -326,7 +340,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "EscapeNine-endless-/EscapeNine-endless-.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = B7F79FDM78;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -342,7 +356,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.yoshidometoru.EscapeNine-endless-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -420,6 +434,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E004C4132F5E6BAA008AD47D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCore;
+		};
+		E004C41C2F5E6BAA008AD47D /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E004C4132F5E6BAA008AD47D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
 		};
 		E004C41B2F5E7000008AD47D /* GoogleMobileAds */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -10,6 +10,9 @@ import AppTrackingTransparency
 #if canImport(FirebaseCore)
 import FirebaseCore
 #endif
+#if canImport(FirebaseAnalytics)
+import FirebaseAnalytics
+#endif
 #if canImport(GoogleMobileAds)
 import GoogleMobileAds
 #endif
@@ -26,6 +29,17 @@ struct EscapeNine_endless_App: App {
         #if canImport(FirebaseCore)
         FirebaseApp.configure()
         print("[App] Firebase初期化完了")
+        #endif
+
+        #if canImport(FirebaseAnalytics)
+        Analytics.setAnalyticsCollectionEnabled(true)
+        Analytics.setConsent([
+            .analyticsStorage: .granted,
+            .adStorage: .granted,
+            .adUserData: .granted,
+            .adPersonalization: .granted
+        ])
+        print("[App] Firebase Analytics有効化完了")
         #endif
 
         #if canImport(FacebookCore)
