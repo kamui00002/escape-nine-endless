@@ -8,7 +8,9 @@
 import Foundation
 import SwiftUI
 import Combine
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "PurchaseManager")
 // MARK: - PurchaseManager
 @MainActor
 class PurchaseManager: ObservableObject {
@@ -67,7 +69,7 @@ class PurchaseManager: ObservableObject {
             adMobService.setAdRemoved(true)
         }
         
-        print("[PurchaseManager] 初期化完了")
+        logger.info("[PurchaseManager] 初期化完了")
     }
     
     // MARK: - Character Purchase
@@ -84,7 +86,7 @@ class PurchaseManager: ObservableObject {
         case .knight:
             productID = .characterKnight
         default:
-            print("[PurchaseManager] このキャラクターは購入対象外です: \(characterType.rawValue)")
+            logger.warning("[PurchaseManager] このキャラクターは購入対象外です: \(characterType.rawValue)")
             return false
         }
         
@@ -101,7 +103,7 @@ class PurchaseManager: ObservableObject {
             
             return success
         } catch {
-            print("[PurchaseManager] キャラクター購入エラー: \(error.localizedDescription)")
+            logger.error("[PurchaseManager] キャラクター購入エラー: \(error.localizedDescription)")
             return false
         }
     }
@@ -141,7 +143,7 @@ class PurchaseManager: ObservableObject {
             
             return success
         } catch {
-            print("[PurchaseManager] 広告削除購入エラー: \(error.localizedDescription)")
+            logger.error("[PurchaseManager] 広告削除購入エラー: \(error.localizedDescription)")
             return false
         }
     }

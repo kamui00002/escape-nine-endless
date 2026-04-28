@@ -8,7 +8,9 @@
 
 import Foundation
 import Combine
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "FirebaseService")
 #if canImport(FirebaseAuth)
 import FirebaseAuth
 import FirebaseFirestore
@@ -175,7 +177,7 @@ class FirebaseService: ObservableObject {
         }
         currentUserId = mockUserId
         authState = .signedIn(userId: mockUserId)
-        print("[FirebaseService] 匿名認証成功 (mock): \(mockUserId)")
+        logger.info("[FirebaseService] 匿名認証成功 (mock): \(mockUserId.prefix(4))***")
     }
 
     func signInWithApple(idToken: String, nonce: String) async throws {
@@ -186,13 +188,13 @@ class FirebaseService: ObservableObject {
         UserDefaults.standard.set(mockUserId, forKey: Self.mockUserIdKey)
         currentUserId = mockUserId
         authState = .signedIn(userId: mockUserId)
-        print("[FirebaseService] Apple Sign In成功 (mock): \(mockUserId)")
+        logger.info("[FirebaseService] Apple Sign In成功 (mock): \(mockUserId.prefix(8))***")
     }
 
     func signOut() {
         currentUserId = nil
         authState = .signedOut
-        print("[FirebaseService] サインアウト成功")
+        logger.info("[FirebaseService] サインアウト成功")
     }
 
     func submitScore(floor: Int, displayName: String, characterType: String) async throws {
@@ -203,7 +205,7 @@ class FirebaseService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        print("[FirebaseService] スコア送信 (mock): Floor \(floor), User \(userId)")
+        logger.info("[FirebaseService] スコア送信 (mock): Floor \(floor), User \(userId.prefix(4))***")
     }
 
     func getRankings(limit: Int = 100) async throws -> [FirebaseRankingEntry] {
@@ -215,7 +217,7 @@ class FirebaseService: ObservableObject {
 
     func getUserHighScore() async throws -> Int? {
         guard let userId = currentUserId else { return nil }
-        print("[FirebaseService] ユーザースコア取得 (mock): \(userId)")
+        logger.info("[FirebaseService] ユーザースコア取得 (mock): \(userId.prefix(4))***")
         return nil
     }
 

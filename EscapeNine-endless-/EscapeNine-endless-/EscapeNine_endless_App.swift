@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppTrackingTransparency
+import os
 #if canImport(FirebaseCore)
 import FirebaseCore
 #endif
@@ -20,6 +21,7 @@ import GoogleMobileAds
 import FacebookCore
 #endif
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "App")
 @main
 struct EscapeNine_endless_App: App {
     @StateObject private var purchaseManager = PurchaseManager.shared
@@ -28,7 +30,7 @@ struct EscapeNine_endless_App: App {
     init() {
         #if canImport(FirebaseCore)
         FirebaseApp.configure()
-        print("[App] Firebase初期化完了")
+        logger.info("[App] Firebase初期化完了")
         #endif
 
         #if canImport(FirebaseAnalytics)
@@ -39,7 +41,7 @@ struct EscapeNine_endless_App: App {
             .adUserData: .granted,
             .adPersonalization: .granted
         ])
-        print("[App] Firebase Analytics有効化完了")
+        logger.info("[App] Firebase Analytics有効化完了")
         #endif
 
         #if canImport(FacebookCore)
@@ -47,10 +49,10 @@ struct EscapeNine_endless_App: App {
             UIApplication.shared,
             didFinishLaunchingWithOptions: nil
         )
-        print("[App] Facebook SDK初期化完了")
+        logger.info("[App] Facebook SDK初期化完了")
         #endif
 
-        print("[App] アプリ起動")
+        logger.info("[App] アプリ起動")
     }
 
     var body: some Scene {
@@ -77,11 +79,11 @@ struct EscapeNine_endless_App: App {
         try? await Task.sleep(for: .seconds(1))
 
         let status = await ATTrackingManager.requestTrackingAuthorization()
-        print("[App] ATTステータス: \(status.rawValue)")
+        logger.info("[App] ATTステータス: \(status.rawValue)")
 
         #if canImport(GoogleMobileAds)
         await MobileAds.shared.start()
-        print("[App] AdMob初期化完了")
+        logger.info("[App] AdMob初期化完了")
         #endif
 
         AdMobService.shared.initialize()

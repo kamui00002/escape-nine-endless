@@ -10,7 +10,9 @@ import Foundation
 import UIKit
 import SwiftUI
 import Combine
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "AdMobService")
 #if canImport(GoogleMobileAds)
 import GoogleMobileAds
 #endif
@@ -65,16 +67,16 @@ class AdMobService: ObservableObject {
 
     func initialize() {
         guard !isAdRemoved else {
-            print("[AdMobService] 広告削除済み - 初期化スキップ")
+            logger.warning("[AdMobService] 広告削除済み - 初期化スキップ")
             return
         }
 
         #if canImport(GoogleMobileAds)
-        print("[AdMobService] 初期化完了")
+        logger.info("[AdMobService] 初期化完了")
         loadInterstitialAd()
         isBannerAdReady = true
         #else
-        print("[AdMobService] 初期化 (mock)")
+        logger.info("[AdMobService] 初期化 (mock)")
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(1))
             self?.isInterstitialAdReady = true
@@ -94,7 +96,7 @@ class AdMobService: ObservableObject {
     func loadInterstitialAd() {
         guard !isAdRemoved else { return }
         guard interstitialLoadAttempts < maxLoadAttempts else {
-            print("[AdMobService] インタースティシャル広告の読み込み試行回数上限")
+            logger.warning("[AdMobService] インタースティシャル広告の読み込み試行回数上限")
             return
         }
 
@@ -108,7 +110,7 @@ class AdMobService: ObservableObject {
         ) { [weak self] ad, error in
             Task { @MainActor in
                 if let error = error {
-                    print("[AdMobService] インタースティシャル広告読み込みエラー: \(error.localizedDescription)")
+                    logger.error("[AdMobService] インタースティシャル広告読み込みエラー: \(error.localizedDescription)")
                     return
                 }
                 self?.interstitialAd = ad
@@ -117,7 +119,7 @@ class AdMobService: ObservableObject {
             }
         }
         #else
-        print("[AdMobService] インタースティシャル広告を読み込み (mock)")
+        logger.info("[AdMobService] インタースティシャル広告を読み込み (mock)")
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
             self?.isInterstitialAdReady = true
@@ -133,14 +135,14 @@ class AdMobService: ObservableObject {
         }
 
         guard isInterstitialAdReady else {
-            print("[AdMobService] インタースティシャル広告が準備できていません")
+            logger.warning("[AdMobService] インタースティシャル広告が準備できていません")
             completion(false)
             return
         }
 
         #if canImport(GoogleMobileAds)
         guard let ad = interstitialAd else {
-            print("[AdMobService] インタースティシャル広告オブジェクトがnil")
+            logger.warning("[AdMobService] インタースティシャル広告オブジェクトがnil")
             isInterstitialAdReady = false
             completion(false)
             loadInterstitialAd()
@@ -148,7 +150,7 @@ class AdMobService: ObservableObject {
         }
 
         guard let rootViewController = viewController ?? getRootViewController() else {
-            print("[AdMobService] rootViewControllerが取得できません")
+            logger.warning("[AdMobService] rootViewControllerが取得できません")
             completion(false)
             return
         }
@@ -162,7 +164,7 @@ class AdMobService: ObservableObject {
         // 次の広告を事前読み込み
         loadInterstitialAd()
         #else
-        print("[AdMobService] インタースティシャル広告を表示 (mock)")
+        logger.info("[AdMobService] インタースティシャル広告を表示 (mock)")
         isInterstitialAdReady = false
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(1))
@@ -178,7 +180,7 @@ class AdMobService: ObservableObject {
         isAdRemoved = removed
         UserDefaults.standard.set(removed, forKey: "adRemoved")
         if removed {
-            print("[AdMobService] 広告削除が適用されました")
+            logger.info("[AdMobService] 広告削除が適用されました")
         }
     }
 
@@ -194,13 +196,13 @@ class AdMobService: ObservableObject {
             .first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first else {
-            print("[AdMobService] UIWindowSceneが取得できません")
+            logger.warning("[AdMobService] UIWindowSceneが取得できません")
             return nil
         }
 
         guard let rootVC = windowScene.windows
             .first(where: { $0.isKeyWindow })?.rootViewController ?? windowScene.windows.first?.rootViewController else {
-            print("[AdMobService] rootViewControllerが取得できません")
+            logger.warning("[AdMobService] rootViewControllerが取得できません")
             return nil
         }
 

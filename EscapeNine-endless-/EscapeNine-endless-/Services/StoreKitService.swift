@@ -9,7 +9,9 @@ import Foundation
 import StoreKit
 import Combine
 import Security
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "StoreKitService")
 // MARK: - Product Identifiers
 enum ProductID: String, CaseIterable {
     case characterWizard = "com.escapenine.endless.character.wizard"   // 魔法使い ¥240
@@ -84,9 +86,9 @@ class StoreKitService: ObservableObject {
             products.sort { $0.price < $1.price }
             purchaseState = .idle
             
-            print("[StoreKitService] 商品読み込み完了: \(products.count)件")
+            logger.info("[StoreKitService] 商品読み込み完了: \(products.count)件")
         } catch {
-            print("[StoreKitService] 商品読み込みエラー: \(error.localizedDescription)")
+            logger.error("[StoreKitService] 商品読み込みエラー: \(error.localizedDescription)")
             purchaseState = .failed(error)
             errorMessage = "商品情報の取得に失敗しました"
         }
@@ -156,11 +158,11 @@ class StoreKitService: ObservableObject {
             }
             
             purchaseState = .idle
-            print("[StoreKitService] 購入復元完了")
+            logger.info("[StoreKitService] 購入復元完了")
         } catch {
             purchaseState = .failed(error)
             errorMessage = "購入の復元に失敗しました"
-            print("[StoreKitService] 購入復元エラー: \(error.localizedDescription)")
+            logger.error("[StoreKitService] 購入復元エラー: \(error.localizedDescription)")
         }
     }
     
@@ -201,7 +203,7 @@ class StoreKitService: ObservableObject {
                     await self.updatePurchasedProducts(transaction)
                     await transaction.finish()
                 } catch {
-                    print("[StoreKitService] トランザクション検証エラー: \(error)")
+                    logger.error("[StoreKitService] トランザクション検証エラー: \(error)")
                 }
             }
         }
@@ -230,12 +232,12 @@ class StoreKitService: ObservableObject {
                 AdMobService.shared.setAdRemoved(true)
             }
             
-            print("[StoreKitService] 購入完了: \(transaction.productID)")
+            logger.info("[StoreKitService] 購入完了: \(transaction.productID)")
         } else {
             purchasedProductIDs.remove(transaction.productID)
             savePurchasedProducts()
             
-            print("[StoreKitService] 購入取り消し: \(transaction.productID)")
+            logger.info("[StoreKitService] 購入取り消し: \(transaction.productID)")
         }
     }
     

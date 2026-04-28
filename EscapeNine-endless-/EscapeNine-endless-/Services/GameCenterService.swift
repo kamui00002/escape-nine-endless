@@ -8,7 +8,9 @@
 import GameKit
 import SwiftUI
 import Combine
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "GameCenterService")
 @MainActor
 class GameCenterService: ObservableObject {
     static let shared = GameCenterService()
@@ -32,7 +34,7 @@ class GameCenterService: ObservableObject {
         GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, error in
             Task { @MainActor in
                 if let error = error {
-                    print("[GameCenter] Authentication error: \(error.localizedDescription)")
+                    logger.error("[GameCenter] Authentication error: \(error.localizedDescription)")
                     self?.isAuthenticated = false
                     return
                 }
@@ -49,7 +51,7 @@ class GameCenterService: ObservableObject {
                 // Successfully authenticated
                 self?.isAuthenticated = GKLocalPlayer.local.isAuthenticated
                 self?.localPlayerName = GKLocalPlayer.local.displayName
-                print("[GameCenter] Authenticated: \(GKLocalPlayer.local.displayName)")
+                logger.info("[GameCenter] Authenticated: \(GKLocalPlayer.local.displayName)")
             }
         }
     }
@@ -59,7 +61,7 @@ class GameCenterService: ObservableObject {
     /// Submit a score to the leaderboard
     func submitScore(floor: Int) async {
         guard isAuthenticated else {
-            print("[GameCenter] Not authenticated - skipping score submit")
+            logger.warning("[GameCenter] Not authenticated - skipping score submit")
             return
         }
 
@@ -70,9 +72,9 @@ class GameCenterService: ObservableObject {
                 player: GKLocalPlayer.local,
                 leaderboardIDs: [Self.leaderboardID]
             )
-            print("[GameCenter] Score submitted: \(floor)")
+            logger.info("[GameCenter] Score submitted: \(floor)")
         } catch {
-            print("[GameCenter] Score submit error: \(error.localizedDescription)")
+            logger.error("[GameCenter] Score submit error: \(error.localizedDescription)")
         }
     }
 
@@ -96,7 +98,7 @@ class GameCenterService: ObservableObject {
                 (name: entry.player.displayName, score: entry.score)
             }
         } catch {
-            print("[GameCenter] Load scores error: \(error.localizedDescription)")
+            logger.error("[GameCenter] Load scores error: \(error.localizedDescription)")
             return []
         }
     }
@@ -104,7 +106,7 @@ class GameCenterService: ObservableObject {
     /// Show the Game Center leaderboard UI
     func presentLeaderboard() {
         guard isAuthenticated else {
-            print("[GameCenter] Not authenticated - cannot show leaderboard")
+            logger.warning("[GameCenter] Not authenticated - cannot show leaderboard")
             return
         }
 
