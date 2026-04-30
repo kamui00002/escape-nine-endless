@@ -86,7 +86,7 @@ class StoreKitService: ObservableObject {
             products.sort { $0.price < $1.price }
             purchaseState = .idle
             
-            logger.info("[StoreKitService] 商品読み込み完了: \(products.count)件")
+            logger.info("[StoreKitService] 商品読み込み完了: \(self.products.count)件")
         } catch {
             logger.error("[StoreKitService] 商品読み込みエラー: \(error.localizedDescription, privacy: .public)")
             purchaseState = .failed(error)
