@@ -1,149 +1,41 @@
-# Escape Nine: Endless - プロジェクト概要
+# Escape Nine: Endless ⭐️
+
+9マスの盤面で音楽のビートに合わせて逃げ続けるハイスピードエンドレスチャレンジ（iOS）。
 
 ## 基本情報
 
-- **タイトル**: Escape Nine: Endless
-- **ジャンル**: 音ゲー x 戦略型エンドレスチャレンジ
-- **プラットフォーム**: iOS (SwiftUI, iOS 26.0+)
-- **アーキテクチャ**: MVVM + Combine
+| 項目 | 値 |
+|---|---|
+| タイトル | Escape Nine: Endless |
+| ジャンル | 音ゲー × 戦略型エンドレスチャレンジ |
+| プラットフォーム | iOS 26.0+（SwiftUI） |
+| アーキテクチャ | MVVM + Combine |
 
 ## コンセプト
 
-9マスの盤面で音楽のビートに合わせて逃げ続けるハイスピードエンドレスチャレンジ。
 - 3x3グリッドでプレイヤーと鬼が同時移動
 - 10ターン逃げ切りで階層クリア
 - BPMが階層ごとに加速（70→200、べき乗曲線）
 - 100階層到達が目標
 
-## ディレクトリ構造
+## Tech Stack（要点）
 
-```
-EscapeNine-endless-/EscapeNine-endless-/
-├── Models/
-│   ├── Character.swift      # キャラクター定義（勇者/盗賊/魔法使い/エルフ）
-│   ├── Floor.swift          # 階層・BPM曲線・AI階層スケーリング
-│   ├── GameState.swift      # ゲーム状態・AI難易度・敗因・特殊ルール
-│   ├── Skill.swift          # スキル定義
-│   └── Achievement.swift    # 実績システム
-├── Views/
-│   ├── Game/                # ゲーム画面
-│   │   ├── GameView.swift
-│   │   ├── GridBoardView.swift
-│   │   ├── GridCellView.swift
-│   │   ├── BeatIndicatorView.swift
-│   │   └── BPMInfoView.swift
-│   ├── Home/
-│   │   ├── HomeView.swift
-│   │   └── TutorialOverlayView.swift
-│   ├── Character/CharacterSelectionView.swift
-│   ├── Ranking/RankingView.swift
-│   ├── Settings/SettingsView.swift
-│   ├── Result/ResultView.swift
-│   ├── Achievement/AchievementListView.swift
-│   └── Components/          # 共通UIコンポーネント
-├── ViewModels/
-│   ├── GameViewModel.swift   # ゲームロジック・ターン管理
-│   ├── PlayerViewModel.swift # プレイヤーデータ・デバッグ設定
-│   └── RankingViewModel.swift
-├── Services/
-│   ├── AIEngine.swift       # 鬼AI（Easy/Normal/Hard）
-│   ├── BeatEngine.swift     # ビート同期・ターンカウントダウン
-│   ├── GameEngine.swift     # ゲームエンジン
-│   ├── StageManager.swift   # ステージ管理
-│   ├── AudioManager.swift   # BGM/効果音統合管理
-│   ├── GameCenterService.swift # Game Center連携
-│   ├── RankingService.swift # ローカルランキング
-│   ├── FirebaseService.swift # Firebase（モック実装）
-│   ├── AdMobService.swift   # AdMob広告（モック実装）
-│   ├── StoreKitService.swift # StoreKit 2課金
-│   └── PurchaseManager.swift # 課金管理
-└── Utilities/
-    ├── Constants.swift      # 全バランス定数・カラーパレット
-    ├── Fonts.swift
-    ├── AnimationEffects.swift
-    └── ResponsiveLayout.swift
-```
+- Swift 5.9+ / SwiftUI / Combine
+- AVFoundation（音楽同期が最重要）
+- GameKit（Game Center）/ StoreKit 2（課金）
+- Firebase（Auth / Firestore / Analytics）/ Google Mobile Ads
+- 詳細は @docs/DEVELOPMENT_SWIFT.md を参照
 
-## 要件定義書
+## 関連ドキュメント（@記法で展開）
 
-`docs/要件定義書_EscapeNine.md` に詳細仕様あり
-
-## キャラクター仕様
-
-| キャラ | スキル | 回数 | 解放条件 |
-|--------|--------|------|----------|
-| 勇者 | ダッシュ（2マス移動） | 3回 | 初期 |
-| 盗賊 | 斜め移動 | 5回 | 階層10クリア |
-| 魔法使い | 透明化（衝突時に無敵） | 7回 | 有料¥240 |
-| エルフ | 拘束（鬼を2ターン停止） | 4回 | 有料¥240 |
-
-## ゲームバランス
-
-### BPM曲線（べき乗: BPM = 70 + 130 x (floor/99)^1.4）
-| Floor | BPM |
-|-------|-----|
-| 1     | 70  |
-| 25    | ~95 |
-| 50    | ~139|
-| 75    | ~170|
-| 100   | 200 |
-
-### AI階層スケーリング
-- Floor 1-15: 自然Easy
-- Floor 16-35: 自然Normal
-- Floor 36+: 自然Hard
-- プレイヤー選択でさらに1段調整
-
-### 特殊ルール
-- 階層21-40: 霧マップ（視界制限）
-- 階層41-60: マス消失（段階的: 1→2→3→4マス）
-- 階層61-100: 霧+消失
-
-### ターンシステム
-- 1ターン = カウントダウン3→2→1 → 移動実行
-- ゲーム開始時に3秒カウントダウン（3→2→1→GO!）
-- 移動しなかった場合 → 時間切れゲームオーバー
-
-## 現在の開発状況
-
-### 完了（コード実装済み）
-- [x] 基本ゲームロジック（移動・当たり判定・同時移動）
-- [x] 3x3グリッドUI + レスポンシブ対応
-- [x] キャラクター選択画面 + 4キャラスキル
-- [x] AI（Easy/Normal/Hard）+ 階層スケーリング
-- [x] BPMべき乗曲線（70→200）
-- [x] 階層システム + 特殊ルール（霧/消失/複合）
-- [x] ターンカウントダウンシステム（3→2→1 → 移動）
-- [x] ゲーム開始カウントダウン（3→2→1→GO!）
-- [x] 敗因表示（捕まった/時間切れ）
-- [x] メトロノームビートシステム（AVAudioEngine）
-- [x] 効果音8種（.wav）
-- [x] 設定画面（BGM/効果音音量分離）
-- [x] ランキング（ローカル永続化）
-- [x] 実績システム（9種）
-- [x] チュートリアル6ページ（図解付き）
-- [x] ショップ画面
-- [x] StoreKit 2（ローカルテスト設定済み）
-- [x] Game Center連携（コード実装済み）
-- [x] Firebase/AdMob（モック実装・本番切替準備済み）
-- [x] デバッグ管理システム（開始階層/BPM/AI/カウントダウン設定）
-- [x] 定数一元管理（Constants.swift）
-
-### 外部設定が必要（コードだけでは完了不可）
-- [x] Firebase: GoogleService-Info.plist配置済み + Firestore Rules デプロイ済み
-- [x] AdMob: 本番広告ID設定済み（バナー+インタースティシャル）
-- [x] App Store Connect: StoreKit 4商品登録済み（wizard/elf/knight/removeads）
-- [x] Game Center: リーダーボードID登録済み（highestfloor）
-- [x] BGM音楽ファイル（6曲生成済み: menu/early/mid/late/clear/gameover）
-- [x] Sign in with Apple: entitlements + Firebase Auth 有効化済み
-
-### App Store 提出に必要な残作業
-- [ ] アプリアイコン（1024x1024）
-- [ ] スクリーンショット（6.7", 6.5", 5.5"）
-- [ ] App内課金の審査用スクリーンショット（4商品分）
-- [ ] アプリ説明文、キーワード
-- [ ] プライバシーポリシーURL
-- [ ] 年齢レーティング設定
+- 要件定義: @docs/要件定義書_EscapeNine.md
+- 開発仕様: @docs/DEVELOPMENT_SWIFT.md
+- ゲーム仕様詳細（キャラ・BPM・特殊ルール・ディレクトリ・カラーパレット）: @docs/game-spec.md
+- 収益化（Firebase / AdMob / StoreKit / Game Center）: @docs/収益化設定ガイド.md
+- SDK残タスク: @docs/SDK修正_残タスク手順書.md
+- App Store メタデータ: @docs/appstore-metadata.md
+- リリース進捗・残作業チェックリスト: @docs/release-checklist.md
+- プライバシーポリシー: @docs/privacy-policy.html
 
 ## ビルド・実行
 
@@ -154,43 +46,44 @@ xcodebuild -scheme EscapeNine-endless- \
   build
 ```
 
-## カラーパレット（冒険ファンタジー系）
+- ビルドターゲット: iOS 26.0
+- SourceKit の false positive エラーが出ることがある（ビルド自体は成功する）
 
-- メイン: #f4a460（サンディブラウン）
-- アクセント: #daa520（ゴールデンロッド）
-- 背景: #2c1810（ダークブラウン）
-- テキスト: #f5deb3（ベージュ）
-- 金テキスト: #ffd700（ゴールド）
-- 警告: #ff6347（トマトレッド）
-- 成功: #90ee90（ライトグリーン）
-
-## iPad レイアウトルール
+## iPad レイアウトルール（厳守）
 
 ### 原則: 比率ベースレイアウト
-- **固定ptサイズ禁止**: iPad/iPhoneで異なる固定値を使わず、`GeometryProxy` の比率で計算する
-- **`ResponsiveLayout` 経由**: サイズ・スペーシング・パディングは `ResponsiveLayout` のメソッドを使う
-- **新しいレイアウト値の追加時**: `ResponsiveLayout` にメソッドを追加し、View内で直接 `isIPad()` 分岐しない
+
+- **固定ptサイズ禁止** — iPad/iPhone で異なる固定値を使わず、`GeometryProxy` の比率で計算する
+- **`ResponsiveLayout` 経由** — サイズ・スペーシング・パディングは `ResponsiveLayout` のメソッドを使う
+- **新しいレイアウト値の追加時** — `ResponsiveLayout` にメソッドを追加し、View 内で直接 `isIPad()` 分岐しない
 
 ### 確認必須項目
-- UI変更時は必ず `#Preview("iPad")` で iPad 表示を確認する
-- 主要View（GameView, HomeView, ShopView, RankingView, CharacterSelectionView）には iPhone/iPad 両方の `#Preview` が定義済み
+
+- UI 変更時は必ず `#Preview("iPad")` で iPad 表示を確認する
+- 主要 View（GameView, HomeView, ShopView, RankingView, CharacterSelectionView）には iPhone/iPad 両方の `#Preview` が定義済み
 - グリッドやボタンが画面からはみ出していないか、要素同士が重なっていないかを確認する
 
 ### ResponsiveLayout の使い方
+
 ```swift
 // Good: ResponsiveLayout メソッド経由
 .frame(maxHeight: ResponsiveLayout.gridMaxHeight(for: geometry))
 .frame(maxWidth: ResponsiveLayout.gridMaxWidth(for: geometry))
 let spacing = ResponsiveLayout.verticalSpacing(for: geometry)
 
-// Bad: View内で直接分岐
+// Bad: View 内で直接分岐
 .frame(maxHeight: geometry.size.height * (ResponsiveLayout.isIPad() ? 0.30 : 0.40))
 ```
 
-## 注意事項
+## 開発ルール・禁止事項
 
-- ビルドターゲット: iOS 26.0
-- ドット絵: 64x64ピクセル
-- スキル使用回数: キャラ別（勇者3/盗賊5/魔法使い7/エルフ4）
-- 10階層ごとにスキルリセット
-- SourceKitのfalse positiveエラーあり（ビルドは成功する）
+- バランス定数（BPM・スキル回数・階層スケーリング等）は `Utilities/Constants.swift` に一元管理
+- Firestore／AdMob／StoreKit への直接アクセスは `Services/` 配下のサービスクラス経由に限定（View/ViewModel から直接呼ばない）
+- ドット絵は 64x64 ピクセルで統一
+- スキル使用回数は 10 階層ごとにリセット（勇者3/盗賊5/魔法使い7/エルフ4）
+- 新規 View 追加時は `#Preview` を必ず定義（iPhone/iPad 両対応）
+
+## Git 運用
+
+- コンベンショナルコミット（feat:, fix:, docs:, test:, refactor:, chore:）／日本語メッセージ
+- main への直接コミットは避ける

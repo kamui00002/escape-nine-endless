@@ -9,19 +9,19 @@
 
 | タスク | サブタスク | ステータス | 備考 |
 |--------|-----------|-----------|------|
-| Task 2: ParkPedia ATT対応 | 2-1. app.config.js に NSUserTrackingUsageDescription 追加 | [ ] 未着手 | |
-| | 2-2. expo-tracking-transparency 追加 | [ ] 未着手 | |
-| | 2-3. plugins に追加 | [ ] 未着手 | |
-| | 2-4. ATTダイアログ実装 | [ ] 未着手 | |
-| | 2-5. ビルド・テスト | [ ] 未着手 | |
-| Task 3: Facebook SDK導入 | 3-1. Escape Nine: Facebook SDK追加（SPM） | [ ] 未着手 | Info.plistにプレースホルダー設定済み |
+| Task 2: ParkPedia ATT対応 | 2-1. app.config.js に NSUserTrackingUsageDescription 追加 | [x] 完了 | |
+| | 2-2. expo-tracking-transparency 追加 | [x] 完了 | |
+| | 2-3. plugins に追加 | [x] 完了 | |
+| | 2-4. ATTダイアログ実装 | [x] 完了 | |
+| | 2-5. ビルド・テスト | [x] 完了 | |
+| Task 3: Facebook SDK導入 | 3-1. Escape Nine: Facebook SDK追加（SPM） | [x] 完了 | Info.plistにプレースホルダー設定済み |
 | | 3-2. Escape Nine: Info.plist に追加 | [x] 設定済み | `{FB_APP_ID}` / `{FB_CLIENT_TOKEN}` をMeta Business Suiteの値に置換が必要 |
 | | 3-3. Escape Nine: SKAdNetworkItems に Meta用ID追加 | [x] 設定済み | `v9wttpbfk9` / `n38lu8286q` 追加済み |
 | | 3-4. Escape Nine: App初期化コード追加 | [x] 実装済み | `EscapeNine_endless_App.swift` に `#if canImport(FacebookCore)` ブロック追加済み |
-| | 3-5. ParkPedia: react-native-fbsdk-next 追加 | [ ] 未着手 | |
-| | 3-6. ParkPedia: app.config.js に追加 | [ ] 未着手 | |
-| | 3-7. ParkPedia: ビルド | [ ] 未着手 | |
-| Task 5: プロモーション動画作成 | 動画撮影・編集・書き出し | [ ] 未着手 | |
+| | 3-5. ParkPedia: react-native-fbsdk-next 追加 | [x] 完了 | |
+| | 3-6. ParkPedia: app.config.js に追加 | [x] 完了 | |
+| | 3-7. ParkPedia: ビルド | [x] 完了 | |
+| Task 5: プロモーション動画作成 | 動画撮影・編集・書き出し | [x] 完了 | |
 
 ---
 

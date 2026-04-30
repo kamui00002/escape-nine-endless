@@ -76,6 +76,13 @@ GoogleService-Info.plist
 Secrets.xcconfig
 **/Secrets.xcconfig
 
+# Claude Code ローカル workspace
+.claude/
+
+# バックアップファイル
+*.bak
+*.bak.*
+
 # Temp/Log files
 *.swp
 firebase-debug.log

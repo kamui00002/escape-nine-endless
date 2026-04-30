@@ -7,10 +7,12 @@
 //
 
 import Foundation
+import os
 #if canImport(FirebaseAnalytics)
 import FirebaseAnalytics
 #endif
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "ConversionService")
 @MainActor
 final class ConversionService {
     static let shared = ConversionService()
@@ -20,9 +22,9 @@ final class ConversionService {
     func trackAppOpen() {
         #if canImport(FirebaseAnalytics)
         Analytics.logEvent("app_open", parameters: nil)
-        print("[Conversion] app_open event logged")
+        logger.info("[Conversion] app_open event logged")
         #else
-        print("[Conversion] FirebaseAnalytics not available")
+        logger.info("[Conversion] FirebaseAnalytics not available")
         #endif
     }
 

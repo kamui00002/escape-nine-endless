@@ -7,7 +7,9 @@
 
 import AVFoundation
 import Combine
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "AudioManager")
 class AudioManager: ObservableObject {
     static let shared = AudioManager()
 
@@ -98,7 +100,7 @@ class AudioManager: ObservableObject {
             try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try audioSession.setActive(true)
         } catch {
-            print("❌ Audio Session setup failed: \(error)")
+            logger.error("❌ Audio Session setup failed: \(error)")
         }
     }
     
@@ -150,10 +152,10 @@ class AudioManager: ObservableObject {
                     player.volume = Float(sfxVolume)
                     soundEffects[effect] = player
                 } catch {
-                    print("⚠️ Failed to load sound effect \(effect.rawValue): \(error)")
+                    logger.error("⚠️ Failed to load sound effect \(effect.rawValue): \(error)")
                 }
             } else {
-                print("ℹ️ Sound effect file not found: \(effect.rawValue)")
+                logger.warning("ℹ️ Sound effect file not found: \(effect.rawValue)")
             }
         }
     }
@@ -187,7 +189,7 @@ class AudioManager: ObservableObject {
 
     private func startBGMPlayer(_ type: BGMType) {
         guard let url = Bundle.main.url(forResource: type.rawValue, withExtension: "mp3") else {
-            print("BGM file not found: \(type.rawValue).mp3")
+            logger.warning("BGM file not found: \(type.rawValue).mp3")
             currentBGMType = nil
             return
         }
@@ -199,7 +201,7 @@ class AudioManager: ObservableObject {
             bgmPlayer?.play()
             currentBGMType = type
         } catch {
-            print("BGM playback failed: \(error)")
+            logger.error("BGM playback failed: \(error)")
             currentBGMType = nil
         }
     }

@@ -7,7 +7,9 @@
 
 import Foundation
 import Combine
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "RankingService")
 struct RankingEntry: Codable, Identifiable {
     var id: String = UUID().uuidString
     let floor: Int
@@ -79,7 +81,7 @@ class RankingService: ObservableObject {
             rankings = try JSONDecoder().decode([RankingEntry].self, from: data)
             rankings.sort { $0.floor > $1.floor }
         } catch {
-            print("[RankingService] Failed to load rankings: \(error)")
+            logger.error("[RankingService] Failed to load rankings: \(error)")
         }
     }
 
@@ -88,7 +90,7 @@ class RankingService: ObservableObject {
             let data = try JSONEncoder().encode(rankings)
             UserDefaults.standard.set(data, forKey: storageKey)
         } catch {
-            print("[RankingService] Failed to save rankings: \(error)")
+            logger.error("[RankingService] Failed to save rankings: \(error)")
         }
     }
 

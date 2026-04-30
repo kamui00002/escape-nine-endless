@@ -8,7 +8,9 @@
 import AVFoundation
 import Combine
 import UIKit
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "BeatEngine")
 // MARK: - Timing Grade（コンボシステム用）
 enum TimingGrade {
     case just   // ±20%以内：完璧なタイミング
@@ -71,7 +73,7 @@ class BeatEngine: ObservableObject {
         do {
             try engine.start()
         } catch {
-            print("Audio Engine start failed: \(error)")
+            logger.error("Audio Engine start failed: \(error)")
         }
     }
 

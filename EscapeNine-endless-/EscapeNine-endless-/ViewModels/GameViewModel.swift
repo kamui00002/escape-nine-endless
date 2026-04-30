@@ -8,7 +8,9 @@
 import SwiftUI
 import UIKit
 import Combine
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "GameViewModel")
 @MainActor
 class GameViewModel: ObservableObject {
     // MARK: - Published Properties
@@ -71,7 +73,7 @@ class GameViewModel: ObservableObject {
 
     var currentCharacter: Character {
         guard let vm = playerViewModelInstance else {
-            print("Warning: PlayerViewModel is not set yet. Using default hero character.")
+            logger.warning("Warning: PlayerViewModel is not set yet. Using default hero character.")
             return Character.getCharacter(for: .hero) // デフォルト値
         }
         return Character.getCharacter(for: vm.selectedCharacter)
