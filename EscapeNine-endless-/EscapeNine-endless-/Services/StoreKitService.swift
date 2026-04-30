@@ -88,7 +88,7 @@ class StoreKitService: ObservableObject {
             
             logger.info("[StoreKitService] 商品読み込み完了: \(products.count)件")
         } catch {
-            logger.error("[StoreKitService] 商品読み込みエラー: \(error.localizedDescription)")
+            logger.error("[StoreKitService] 商品読み込みエラー: \(error.localizedDescription, privacy: .public)")
             purchaseState = .failed(error)
             errorMessage = "商品情報の取得に失敗しました"
         }
@@ -162,7 +162,7 @@ class StoreKitService: ObservableObject {
         } catch {
             purchaseState = .failed(error)
             errorMessage = "購入の復元に失敗しました"
-            logger.error("[StoreKitService] 購入復元エラー: \(error.localizedDescription)")
+            logger.error("[StoreKitService] 購入復元エラー: \(error.localizedDescription, privacy: .public)")
         }
     }
     
@@ -203,7 +203,7 @@ class StoreKitService: ObservableObject {
                     await self.updatePurchasedProducts(transaction)
                     await transaction.finish()
                 } catch {
-                    logger.error("[StoreKitService] トランザクション検証エラー: \(error)")
+                    logger.error("[StoreKitService] トランザクション検証エラー: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }
