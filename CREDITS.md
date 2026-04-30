@@ -22,4 +22,3 @@ Escape Nine: Endless uses the following open-source libraries and SDKs.
 - StoreKit 2
 - AppTrackingTransparency
 - AVFoundation
-- PhotosUI
