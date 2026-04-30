@@ -73,7 +73,7 @@ class BeatEngine: ObservableObject {
         do {
             try engine.start()
         } catch {
-            logger.error("Audio Engine start failed: \(error)")
+            logger.error("Audio Engine start failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

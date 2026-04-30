@@ -100,7 +100,7 @@ class AudioManager: ObservableObject {
             try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try audioSession.setActive(true)
         } catch {
-            logger.error("❌ Audio Session setup failed: \(error)")
+            logger.error("❌ Audio Session setup failed: \(error.localizedDescription, privacy: .public)")
         }
     }
     
@@ -152,10 +152,10 @@ class AudioManager: ObservableObject {
                     player.volume = Float(sfxVolume)
                     soundEffects[effect] = player
                 } catch {
-                    logger.error("⚠️ Failed to load sound effect \(effect.rawValue): \(error)")
+                    logger.error("⚠️ Failed to load sound effect \(effect.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 }
             } else {
-                logger.warning("ℹ️ Sound effect file not found: \(effect.rawValue)")
+                logger.warning("ℹ️ Sound effect file not found: \(effect.rawValue, privacy: .public)")
             }
         }
     }
@@ -189,7 +189,7 @@ class AudioManager: ObservableObject {
 
     private func startBGMPlayer(_ type: BGMType) {
         guard let url = Bundle.main.url(forResource: type.rawValue, withExtension: "mp3") else {
-            logger.warning("BGM file not found: \(type.rawValue).mp3")
+            logger.warning("BGM file not found: \(type.rawValue, privacy: .public).mp3")
             currentBGMType = nil
             return
         }
@@ -201,7 +201,7 @@ class AudioManager: ObservableObject {
             bgmPlayer?.play()
             currentBGMType = type
         } catch {
-            logger.error("BGM playback failed: \(error)")
+            logger.error("BGM playback failed: \(error.localizedDescription, privacy: .public)")
             currentBGMType = nil
         }
     }

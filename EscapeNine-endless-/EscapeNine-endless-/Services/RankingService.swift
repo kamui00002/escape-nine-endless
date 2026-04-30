@@ -81,7 +81,7 @@ class RankingService: ObservableObject {
             rankings = try JSONDecoder().decode([RankingEntry].self, from: data)
             rankings.sort { $0.floor > $1.floor }
         } catch {
-            logger.error("[RankingService] Failed to load rankings: \(error)")
+            logger.error("[RankingService] Failed to load rankings: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -90,7 +90,7 @@ class RankingService: ObservableObject {
             let data = try JSONEncoder().encode(rankings)
             UserDefaults.standard.set(data, forKey: storageKey)
         } catch {
-            logger.error("[RankingService] Failed to save rankings: \(error)")
+            logger.error("[RankingService] Failed to save rankings: \(error.localizedDescription, privacy: .public)")
         }
     }
 

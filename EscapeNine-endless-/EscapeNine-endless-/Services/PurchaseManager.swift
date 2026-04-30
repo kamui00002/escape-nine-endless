@@ -103,7 +103,7 @@ class PurchaseManager: ObservableObject {
             
             return success
         } catch {
-            logger.error("[PurchaseManager] キャラクター購入エラー: \(error.localizedDescription)")
+            logger.error("[PurchaseManager] キャラクター購入エラー: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
@@ -143,7 +143,7 @@ class PurchaseManager: ObservableObject {
             
             return success
         } catch {
-            logger.error("[PurchaseManager] 広告削除購入エラー: \(error.localizedDescription)")
+            logger.error("[PurchaseManager] 広告削除購入エラー: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
