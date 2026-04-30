@@ -34,7 +34,7 @@ class GameCenterService: ObservableObject {
         GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, error in
             Task { @MainActor in
                 if let error = error {
-                    logger.error("[GameCenter] Authentication error: \(error.localizedDescription)")
+                    logger.error("[GameCenter] Authentication error: \(error.localizedDescription, privacy: .public)")
                     self?.isAuthenticated = false
                     return
                 }
@@ -74,7 +74,7 @@ class GameCenterService: ObservableObject {
             )
             logger.info("[GameCenter] Score submitted: \(floor)")
         } catch {
-            logger.error("[GameCenter] Score submit error: \(error.localizedDescription)")
+            logger.error("[GameCenter] Score submit error: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -98,7 +98,7 @@ class GameCenterService: ObservableObject {
                 (name: entry.player.displayName, score: entry.score)
             }
         } catch {
-            logger.error("[GameCenter] Load scores error: \(error.localizedDescription)")
+            logger.error("[GameCenter] Load scores error: \(error.localizedDescription, privacy: .public)")
             return []
         }
     }

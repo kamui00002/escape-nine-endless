@@ -110,7 +110,7 @@ class AdMobService: ObservableObject {
         ) { [weak self] ad, error in
             Task { @MainActor in
                 if let error = error {
-                    logger.error("[AdMobService] インタースティシャル広告読み込みエラー: \(error.localizedDescription)")
+                    logger.error("[AdMobService] インタースティシャル広告読み込みエラー: \(error.localizedDescription, privacy: .public)")
                     return
                 }
                 self?.interstitialAd = ad
