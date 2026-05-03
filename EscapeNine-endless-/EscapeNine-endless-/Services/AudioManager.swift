@@ -7,6 +7,7 @@
 
 import AVFoundation
 import Combine
+import UIKit
 import os
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "AudioManager")
@@ -91,6 +92,41 @@ class AudioManager: ObservableObject {
         setupAudioSession()
         loadUserPreferences()
         preloadSoundEffects()
+        setupBackgroundObservers()
+    }
+
+    private func setupBackgroundObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+    }
+
+    private var wasEnginePlayingBeforeBackground = false
+    private var wasBGMPlayingBeforeBackground = false
+
+    @objc private func handleDidEnterBackground() {
+        wasEnginePlayingBeforeBackground = beatEngine.isPlaying
+        wasBGMPlayingBeforeBackground = bgmPlayer?.isPlaying == true
+        beatEngine.pause()
+        bgmPlayer?.pause()
+    }
+
+    @objc private func handleWillEnterForeground() {
+        if wasEnginePlayingBeforeBackground {
+            beatEngine.resume()
+        }
+        if wasBGMPlayingBeforeBackground {
+            bgmPlayer?.play()
+        }
     }
     
     // MARK: - Audio Session Setup

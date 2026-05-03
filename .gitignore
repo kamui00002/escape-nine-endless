@@ -62,6 +62,7 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
@@ -90,3 +91,4 @@ firebase-debug.log
 
 # Suno MCP (separate project)
 suno-mcp/
+ads/.env

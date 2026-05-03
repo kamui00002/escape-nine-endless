@@ -1,0 +1,30 @@
+{
+  "generated": "2026-05-01",
+  "model": "gemini-2.5-flash-image",
+  "assets": [
+    {
+      "concept": 1,
+      "path": "ad-assets/meta/concept-1/feed-1080x1080-v1.png",
+      "dimensions": "1024x1024",
+      "target_dimensions": "1080x1080",
+      "platform": "meta",
+      "status": "needs_resize"
+    },
+    {
+      "concept": 2,
+      "path": "ad-assets/meta/concept-2/stories-1080x1920-v1.png",
+      "dimensions": "1024x1024",
+      "target_dimensions": "1080x1920",
+      "platform": "meta",
+      "status": "needs_regenerate"
+    },
+    {
+      "concept": 3,
+      "path": "ad-assets/meta/concept-3/feed-1080x1080-v2.png",
+      "dimensions": "1024x1024",
+      "target_dimensions": "1080x1080",
+      "platform": "meta",
+      "status": "needs_resize"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+# Escape Nine: Endless Meta Ads キャンペーン設定テンプレート
+# dry-run: meta-ads create --config ads/campaign-template.yaml --dry-run
+# 本番:    meta-ads create --config ads/campaign-template.yaml
+
+campaign:
+  name: "EscapeNine - App Install [2026-05]"
+  objective: OUTCOME_TRAFFIC
+  status: PAUSED
+
+ad_set:
+  name: "音ゲーファン 15-35 JP iOS"
+  daily_budget: 1000
+  optimization_goal: LINK_CLICKS
+  targeting:
+    countries: ["JP"]
+    age_min: 15
+    age_max: 35
+    # WARNING: meta-ads-cli は device_platforms を API に渡さない。
+    # 実際にモバイル/iOS に絞るには、Meta Ads Manager で手動設定するか
+    # CLI を --targeting-spec で上書きする必要がある。
+    device_platforms: ["mobile"]
+    user_os: ["iOS"]
+    publisher_platforms: ["facebook", "instagram"]
+
+ads:
+  - name: "EscapeNine - Concept1 やめられない Feed v1"
+    image: "../ad-assets/meta/concept-1/feed-1080x1080-v1.png"
+    headline: "シンプルなのに、やめられない"
+    primary_text: "9マス。ビート。それだけ。なのに気づいたら30分。Escape Nine: Endless を無料でプレイ。"
+    link: "https://apps.apple.com/jp/app/escape-nine-endless/id6760906738"
+    call_to_action: "INSTALL_MOBILE_APP"
+
+  - name: "EscapeNine - Concept2 ビートに挑戦 Stories v1"
+    image: "../ad-assets/meta/concept-2/stories-1080x1920-v1.png"
+    headline: "何階層まで逃げ切れる？"
+    primary_text: "BPMが上がるほど、思考が追いつかなくなる。あなたの限界を試せ。音ゲー好き必見。"
+    link: "https://apps.apple.com/jp/app/escape-nine-endless/id6760906738"
+    call_to_action: "INSTALL_MOBILE_APP"
+
+  - name: "EscapeNine - Concept3 逃げろ Feed v2"
+    image: "../ad-assets/meta/concept-3/feed-1080x1080-v2.png"
+    headline: "音が速くなるほど、頭が真っ白に"
+    primary_text: "BPM200の世界で逃げ続けろ。シンプルな9マスが、最高の地獄になる。無料プレイ。"
+    link: "https://apps.apple.com/jp/app/escape-nine-endless/id6760906738"
+    call_to_action: "INSTALL_MOBILE_APP"
