@@ -103,6 +103,10 @@ struct GameView: View {
                 floor: viewModel.currentFloor,
                 result: viewModel.gameStatus,
                 defeatReason: viewModel.defeatReason,
+                elapsedSeconds: viewModel.elapsedSeconds,
+                nearMissDistance: viewModel.nearMissDistance,
+                playerPosition: viewModel.playerPosition,
+                enemyPosition: viewModel.enemyPosition,
                 onPlayAgain: {
                     viewModel.resetGame()
                     isGameStarted = false
