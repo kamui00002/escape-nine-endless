@@ -37,6 +37,10 @@ struct ResultView: View {
     // MARK: - Sprint 1: シェア用 state
     @State private var showShareSheet = false
 
+    // MARK: - Sprint 1 Issue 02: ワンタップリトライ設定 (@AppStorage で永続化)
+    /// SettingsView と同一キー (`oneTapRetryEnabled`) を共有
+    @AppStorage("oneTapRetryEnabled") private var oneTapRetryEnabled: Bool = true
+
     // MARK: - 派生プロパティ
 
     /// 自己ベストを更新したか (Sprint 1: 「自己ベスト!」演出用)
@@ -57,6 +61,20 @@ struct ResultView: View {
     var body: some View {
         ZStack {
             GameBackground()
+
+            // MARK: - Sprint 1 Issue 02: ワンタップリトライ用透明レイヤー
+            // 敗北時 + 設定 ON のときのみ反応。ZStack の最下層に配置することで、
+            // 上に重なる「もう一回」「シェア」「ホーム」ボタンのタップが優先される
+            // (SwiftUI: overlap 時は最上位の Tappable View が hit)。
+            if oneTapRetryEnabled && result == .lose {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        onPlayAgain()
+                    }
+                    .accessibilityHidden(true)  // VoiceOver は既存の「もう一回」ボタンを使う
+            }
 
             if result == .win {
                 CelebrationEffect()
