@@ -282,6 +282,20 @@ class GameViewModel: ObservableObject {
 
             // フロアクリア効果音
             audioManager.playSoundEffect(.floorClear)
+
+            // Sprint 1: Analytics — 階層クリアイベント送信
+            // クリア所要時間は startGame() からの累計経過秒数を使用
+            // (gameStartTime は private のため既存の計算方法を踏襲)
+            let clearSec: Double = {
+                if let start = gameStartTime {
+                    return Date().timeIntervalSince(start)
+                }
+                return elapsedSeconds
+            }()
+            AnalyticsLogger.logFloorCleared(
+                floor: currentFloor,
+                clearSeconds: clearSec
+            )
         }
     }
 
@@ -470,6 +484,14 @@ class GameViewModel: ObservableObject {
             self.audioManager.resetTurnCountdown()
             self.audioManager.startBGM(bpm: bpm)
         }
+
+        // Sprint 1: Analytics — ゲーム開始イベント送信
+        // (AnalyticsLogger は同 module 内のため import 不要)
+        AnalyticsLogger.logGameStarted(
+            floor: currentFloor,
+            isDailyChallenge: dailyChallengeMode,
+            characterId: currentCharacter.id
+        )
     }
 
     // 移動先を指定（次のターンで移動）
@@ -791,6 +813,27 @@ class GameViewModel: ObservableObject {
             elapsedSeconds = Date().timeIntervalSince(start)
         }
         nearMissDistance = chebyshevDistance(from: playerPosition, to: enemyPosition)
+
+        // Sprint 1: Analytics — Game Over 表示イベント送信 (.lose のみ)
+        // DefeatReason は RawValue を持たない素 enum のため、AnalyticsDefeatReason に手動マッピング。
+        // TODO: Sprint 2+ で trap / fall 等の敗北原因を追加した場合、このマッピングも拡張する。
+        // TODO: ResultView (UI) から、Sprint 1 で以下を計装すること:
+        //   - 「もう一回」ボタン: AnalyticsLogger.logRetryTapped(fromFloor: vm.currentFloor, secondsUntilTap: ...)
+        //   - 「ホームへ」ボタン:   AnalyticsLogger.logHomeTapped(fromFloor: vm.currentFloor)
+        if result == .lose {
+            let reason: AnalyticsDefeatReason
+            switch defeatReason {
+            case .caughtByEnemy: reason = .enemy
+            case .timeOut:       reason = .timeout
+            case .none:          reason = .unknown
+            }
+            AnalyticsLogger.logGameOverShown(
+                floor: currentFloor,
+                defeatReason: reason,
+                nearMissDistance: nearMissDistance,
+                elapsedSeconds: elapsedSeconds
+            )
+        }
 
         gameStatus = result
         audioManager.stopBGM()
