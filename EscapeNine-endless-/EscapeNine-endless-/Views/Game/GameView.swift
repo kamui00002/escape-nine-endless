@@ -111,9 +111,12 @@ struct GameView: View {
                 result: viewModel.gameStatus,
                 defeatReason: viewModel.defeatReason,
                 onPlayAgain: {
-                    viewModel.resetGame()
-                    isGameStarted = false
+                    // Sprint 1: ワンタップリトライ・巨大リトライともに即ゲーム再開する。
+                    // pre-game オーバーレイ (「冒険を始める」) には戻らない。
                     showResult = false
+                    viewModel.resetGame()
+                    viewModel.startGame(aiLevel: selectedAILevel)
+                    isGameStarted = true
                 },
                 onHome: {
                     dismiss()
