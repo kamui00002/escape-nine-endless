@@ -12,6 +12,10 @@ struct SettingsView: View {
     @StateObject private var purchaseManager = PurchaseManager.shared
     @Environment(\.dismiss) var dismiss
 
+    // MARK: - Sprint 1 Issue 02: ワンタップリトライ設定 (@AppStorage で永続化)
+    /// ResultView と同一キー (`oneTapRetryEnabled`) を共有
+    @AppStorage("oneTapRetryEnabled") private var oneTapRetryEnabled: Bool = true
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -23,6 +27,7 @@ struct SettingsView: View {
                     ScrollView {
                         VStack(spacing: 24) {
                             playerInfoSection
+                            gameplaySection
                             soundSection
                             aboutSection
                             purchaseSection
@@ -68,6 +73,34 @@ struct SettingsView: View {
                     Text(playerViewModel.selectedCharacter.name)
                         .font(.fantasyBody())
                         .foregroundColor(Color(hex: GameColors.textSecondary))
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    // MARK: - Sprint 1 Issue 02: ゲームプレイ設定 (ワンタップリトライ)
+
+    private var gameplaySection: some View {
+        GameCard(title: "ゲームプレイ") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("ワンタップリトライ")
+                            .font(.fantasyBody())
+                            .foregroundColor(Color(hex: GameColors.textSecondary))
+
+                        Text("Game Over 後、画面のどこをタップしても即再挑戦します")
+                            .font(.fantasyCaption())
+                            .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+
+                    Toggle("", isOn: $oneTapRetryEnabled)
+                        .labelsHidden()
+                        .tint(Color(hex: GameColors.available))
                 }
             }
         }

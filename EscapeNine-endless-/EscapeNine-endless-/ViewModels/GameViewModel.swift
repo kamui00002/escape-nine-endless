@@ -51,6 +51,20 @@ class GameViewModel: ObservableObject {
     @Published var comboCount: Int = 0
     @Published var lastTimingGrade: TimingGrade? = nil
 
+    // MARK: - Sprint 1 (Game Over 刷新): Near-miss meter
+    /// 敵から何マス離れて死んだか (Chebyshev 距離: 隣接=1)
+    /// `result == .lose && nearMissDistance == 1` の時のみ「あと1マスで生存」を表示
+    @Published var nearMissDistance: Int = 0
+
+    // MARK: - Sprint 1 (Game Over 刷新): Elapsed time
+    /// 1ゲーム (startGame〜endGame) の経過秒数。ResultView で「今回の挑戦時間: 23秒」表示に使用
+    @Published var elapsedSeconds: Double = 0
+    private var gameStartTime: Date? = nil
+
+    /// 現在の階層開始時刻。`eg_floor_cleared.clear_seconds` を per-floor で算出するために使用。
+    /// `gameStartTime` は 1 ラン通算のため、別管理する。
+    private var floorStartTime: Date? = nil
+
     // MARK: - Daily Challenge
     var dailyChallengeMode: Bool = false
     var dailyChallengeConditions: [ChallengeCondition] = []
@@ -272,6 +286,21 @@ class GameViewModel: ObservableObject {
 
             // フロアクリア効果音
             audioManager.playSoundEffect(.floorClear)
+
+            // Sprint 1: Analytics — 階層クリアイベント送信
+            // clear_seconds は当該階層の所要時間 (per-floor)。floorStartTime は
+            // startGame() / nextFloor() で更新されるため、ここでは現在の階層に対する
+            // 純粋な経過時間が得られる。
+            let clearSec: Double = {
+                if let start = floorStartTime {
+                    return Date().timeIntervalSince(start)
+                }
+                return 0
+            }()
+            AnalyticsLogger.logFloorCleared(
+                floor: currentFloor,
+                clearSeconds: clearSec
+            )
         }
     }
 
@@ -310,6 +339,17 @@ class GameViewModel: ObservableObject {
         }
 
         return (isValid, shouldConsumeSkill)
+    }
+
+    // MARK: - Sprint 1: 距離計算ヘルパー
+    /// 3x3 グリッド上の Chebyshev 距離 (king-move 距離)
+    /// 隣接 (上下左右斜め) = 1、対角 = 最大 2
+    private func chebyshevDistance(from a: Int, to b: Int) -> Int {
+        let rowA = Constants.rowFromPosition(a)
+        let colA = Constants.columnFromPosition(a)
+        let rowB = Constants.rowFromPosition(b)
+        let colB = Constants.columnFromPosition(b)
+        return max(abs(rowA - rowB), abs(colA - colB))
     }
 
     // MARK: - Game Start Countdown (独立タイマー、1秒間隔固定)
@@ -384,6 +424,12 @@ class GameViewModel: ObservableObject {
         lastTimingGrade = nil
         showBossWarning = false
 
+        // Sprint 1: 挑戦時間と惜しさメーターを初期化
+        gameStartTime = Date()
+        floorStartTime = gameStartTime
+        elapsedSeconds = 0
+        nearMissDistance = 0
+
         // ターンカウントダウンを初期化
         turnCountdown = Constants.turnCountdownBeats
 
@@ -444,6 +490,14 @@ class GameViewModel: ObservableObject {
             self.audioManager.resetTurnCountdown()
             self.audioManager.startBGM(bpm: bpm)
         }
+
+        // Sprint 1: Analytics — ゲーム開始イベント送信
+        // (AnalyticsLogger は同 module 内のため import 不要)
+        AnalyticsLogger.logGameStarted(
+            floor: currentFloor,
+            isDailyChallenge: dailyChallengeMode,
+            characterId: currentCharacter.id
+        )
     }
 
     // 移動先を指定（次のターンで移動）
@@ -611,6 +665,10 @@ class GameViewModel: ObservableObject {
         currentFloor += 1
         turnCount = 0
 
+        // Sprint 1: per-floor 計測のため、新しい階層の開始時刻を記録
+        // (gameStartTime は 1 ラン通算のためリセットしない)
+        floorStartTime = Date()
+
         // 10階層ごとにスキル使用回数をリセット
         if currentFloor % Constants.skillResetInterval == 1 {
             skillUsageCount = 0
@@ -760,6 +818,31 @@ class GameViewModel: ObservableObject {
     }
 
     func endGame(result: GameStatus) {
+        // Sprint 1: 経過時間と敗北時の敵との距離 (惜しさメーター) を確定
+        if let start = gameStartTime {
+            elapsedSeconds = Date().timeIntervalSince(start)
+        }
+        nearMissDistance = chebyshevDistance(from: playerPosition, to: enemyPosition)
+
+        // Sprint 1: Analytics — Game Over 表示イベント送信 (.lose のみ)
+        // DefeatReason は RawValue を持たない素 enum のため、AnalyticsDefeatReason に手動マッピング。
+        // TODO: Sprint 2+ で trap / fall 等の敗北原因を追加した場合、このマッピングも拡張する。
+        // 「もう一回」「ホームへ」の計装は ResultView 側で完結 (logRetryTapped / logHomeTapped)。
+        if result == .lose {
+            let reason: AnalyticsDefeatReason
+            switch defeatReason {
+            case .caughtByEnemy: reason = .enemy
+            case .timeOut:       reason = .timeout
+            case .none:          reason = .unknown
+            }
+            AnalyticsLogger.logGameOverShown(
+                floor: currentFloor,
+                defeatReason: reason,
+                nearMissDistance: nearMissDistance,
+                elapsedSeconds: elapsedSeconds
+            )
+        }
+
         gameStatus = result
         audioManager.stopBGM()
         audioManager.stopBGMMusic()
@@ -853,6 +936,12 @@ class GameViewModel: ObservableObject {
         turnCountdown = Constants.turnCountdownBeats
         gameStartCountdown = 0
         isGameStartCountdownActive = false
+
+        // Sprint 1: リセット
+        gameStartTime = nil
+        floorStartTime = nil
+        elapsedSeconds = 0
+        nearMissDistance = 0
     }
 
     // MARK: - Daily Challenge

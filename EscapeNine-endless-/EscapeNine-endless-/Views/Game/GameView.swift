@@ -14,6 +14,9 @@ struct GameView: View {
     @State private var showResult = false
     @State private var isGameStarted = false
     @State private var selectedAILevel: AILevel = .easy
+    /// Sprint 1: `highestFloor` を更新する**直前**の値。ResultView 側で自己ベスト判定に使用。
+    /// 永続化後に判定するとベスト値が既に更新済みのため `isPersonalBest` が常に false になる問題を回避。
+    @State private var previousBest: Int = 0
 
     var body: some View {
         ZStack {
@@ -92,6 +95,10 @@ struct GameView: View {
         }
         .onChange(of: viewModel.gameStatus) {
             if viewModel.gameStatus == .win || viewModel.gameStatus == .lose {
+                // Sprint 1: 永続化前のベスト値を保持してから highestFloor を更新する。
+                // ResultView の `previousBest` に渡すことで、新記録演出の判定が
+                // 「更新後の値」と比較されて常に false になる不具合を防ぐ。
+                previousBest = playerViewModel.highestFloor
                 playerViewModel.updateHighestFloor(viewModel.currentFloor)
                 showResult = true
             }
@@ -104,13 +111,21 @@ struct GameView: View {
                 result: viewModel.gameStatus,
                 defeatReason: viewModel.defeatReason,
                 onPlayAgain: {
-                    viewModel.resetGame()
-                    isGameStarted = false
+                    // Sprint 1: ワンタップリトライ・巨大リトライともに即ゲーム再開する。
+                    // pre-game オーバーレイ (「冒険を始める」) には戻らない。
                     showResult = false
+                    viewModel.resetGame()
+                    viewModel.startGame(aiLevel: selectedAILevel)
+                    isGameStarted = true
                 },
                 onHome: {
                     dismiss()
-                }
+                },
+                elapsedSeconds: viewModel.elapsedSeconds,
+                nearMissDistance: viewModel.nearMissDistance,
+                playerPosition: viewModel.playerPosition,
+                enemyPosition: viewModel.enemyPosition,
+                previousBest: previousBest
             )
         }
     }

@@ -4,8 +4,13 @@
 //
 //  Created by 吉留徹 on 2025/11/14.
 //
+//  Sprint 1 (Game Over 刷新): 「離脱口」から「発射台」へ
+//  追加要素: 1) 惜しさメーター 2) 巨大リトライ 3) 挑戦時間 4) 自己ベスト誘発演出 5) シェア
+//  ※ 既存の AchievementPopup / InterstitialAd / DefeatReason / NEW RECORD は壊さない
+//
 
 import SwiftUI
+import UIKit
 
 struct ResultView: View {
     let floor: Int
@@ -14,34 +19,109 @@ struct ResultView: View {
     let onPlayAgain: () -> Void
     let onHome: () -> Void
 
+    // MARK: - Sprint 1: 追加プロパティ (デフォルト値で後方互換性維持)
+    /// ゲーム開始からの経過秒数
+    var elapsedSeconds: Double = 0
+    /// 敵から何マス離れて死亡したか (Chebyshev 距離: 1=隣接=惜しい)
+    var nearMissDistance: Int = 0
+    /// プレイヤー最終位置 (1-9) — シェア用 9 マス絵文字に使用
+    var playerPosition: Int = 0
+    /// 敵最終位置 (1-9) — シェア用 9 マス絵文字に使用
+    var enemyPosition: Int = 0
+    /// 今回の結果を永続化する**直前**の最高記録 (自己ベスト判定用)。
+    /// 永続化後の `PlayerViewModel.highestFloor` を参照すると常に false になるため、
+    /// GameView 側で更新前の値を渡す。未指定時は 0 で「常に新記録」と扱う安全側。
+    var previousBest: Int = 0
+
     @StateObject private var playerViewModel = PlayerViewModel()
     @StateObject private var adMobService = AdMobService.shared
     @StateObject private var achievementManager = AchievementManager.shared
     @State private var adShown = false
 
+    // MARK: - Sprint 1: シェア用 state
+    @State private var showShareSheet = false
+
+    /// Sprint 1: `eg_retry_tapped.seconds_until_tap` 計測用。`.onAppear` で記録。
+    @State private var appearTime: Date? = nil
+
+    // MARK: - Sprint 1 Issue 02: ワンタップリトライ設定 (@AppStorage で永続化)
+    /// SettingsView と同一キー (`oneTapRetryEnabled`) を共有
+    @AppStorage("oneTapRetryEnabled") private var oneTapRetryEnabled: Bool = true
+
+    // MARK: - 派生プロパティ
+
+    /// 自己ベストを更新したか (Sprint 1: 「自己ベスト!」演出用)
+    /// `previousBest` は GameView 側で `highestFloor` を永続化する直前の値が渡されるため、
+    /// この比較は「今回のスコアがそれまでの最高記録を更新したか」を正しく表す。
+    private var isPersonalBest: Bool {
+        floor > previousBest
+    }
+
+    /// 表示用の最高記録 (今回のスコアと既存ベストの大きい方)
+    private var bestFloor: Int {
+        max(floor, previousBest)
+    }
+
+    /// 「あと1マスで生存」を表示すべきか (敗北時 + 隣接死亡時のみ)
+    private var shouldShowNearMiss: Bool {
+        result == .lose && nearMissDistance == 1
+    }
+
+    /// Sprint 1: `eg_retry_tapped.seconds_until_tap` の値を返す。
+    /// `appearTime` 未設定 (`.onAppear` 未実行) のフォールバックは 0。
+    private func secondsUntilTap() -> Double {
+        guard let appearTime else { return 0 }
+        return Date().timeIntervalSince(appearTime)
+    }
+
     var body: some View {
         ZStack {
             GameBackground()
+
+            // MARK: - Sprint 1 Issue 02: ワンタップリトライ用透明レイヤー
+            // 敗北時 + 設定 ON のときのみ反応。ZStack の最下層に配置することで、
+            // 上に重なる「もう一回」「シェア」「ホーム」ボタンのタップが優先される
+            // (SwiftUI: overlap 時は最上位の Tappable View が hit)。
+            if oneTapRetryEnabled && result == .lose {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        AnalyticsLogger.logRetryTapped(
+                            fromFloor: floor,
+                            secondsUntilTap: secondsUntilTap()
+                        )
+                        onPlayAgain()
+                    }
+                    .accessibilityHidden(true)  // VoiceOver は既存の「もう一回」ボタンを使う
+            }
 
             if result == .win {
                 CelebrationEffect()
                     .ignoresSafeArea()
             }
 
-            VStack(spacing: 30) {
-                Spacer()
+            VStack(spacing: 24) {
+                Spacer(minLength: 16)
 
                 resultTitle
 
+                // Sprint 1: 自己ベスト誘発演出 (NEW RECORD と整合: 自己ベスト時は強調、そうでない時はベスト表示)
+                personalBestSection
+
                 statsSection
 
-                Spacer()
+                // Sprint 1: 「あと1マスで生存」(惜しさメーター)
+                if shouldShowNearMiss {
+                    nearMissBanner
+                }
 
+                Spacer(minLength: 8)
+
+                // Sprint 1: 巨大リトライボタン + 補助ボタン群 (シェア / ホーム)
                 buttonSection
-
-                Spacer()
             }
-            .padding()
+            .padding(.horizontal)
 
             if let achievement = achievementManager.newlyUnlockedAchievement {
                 VStack {
@@ -52,12 +132,33 @@ struct ResultView: View {
             }
         }
         .onAppear {
+            // Sprint 1: Game Over 表示時刻を記録 (`eg_retry_tapped.seconds_until_tap` の基準)
+            if appearTime == nil {
+                appearTime = Date()
+            }
+
+            // Sprint 1: Game Over 表示時に Haptic フィードバック (PDF #1 のガイドライン)
+            let style: UIImpactFeedbackGenerator.FeedbackStyle = (result == .win) ? .heavy : .medium
+            UIImpactFeedbackGenerator(style: style).impactOccurred()
+
             if !adShown {
                 adShown = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     InterstitialAdPresenter.show { _ in }
                 }
             }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            // Sprint 1: Wordle 風シェアテキスト
+            ShareSheet(activityItems: [
+                ShareTextBuilder.build(
+                    floor: floor,
+                    elapsedSeconds: elapsedSeconds,
+                    isVictory: result == .win,
+                    playerPosition: playerPosition,
+                    enemyPosition: enemyPosition
+                )
+            ])
         }
     }
 
@@ -107,11 +208,40 @@ struct ResultView: View {
             .bounceIn(delay: 0.1)
     }
 
+    // MARK: - Sprint 1: 自己ベスト誘発演出
+
+    /// 自己ベスト時は「自己ベスト!」を強調表示、そうでない時は「ベスト: X階」を控えめに表示
+    @ViewBuilder
+    private var personalBestSection: some View {
+        if isPersonalBest {
+            Text("自己ベスト!")
+                .font(.fantasySubheading())
+                .foregroundColor(Color(hex: GameColors.available))
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(hex: GameColors.available).opacity(0.18))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color(hex: GameColors.available).opacity(0.6), lineWidth: 2)
+                        )
+                )
+                .shimmer(duration: 2.0)
+                .bounceIn(delay: 0.25)
+        } else if previousBest > 0 {
+            Text("ベスト: \(previousBest)階")
+                .font(.fantasyCaption())
+                .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                .slideIn(from: .top, delay: 0.25)
+        }
+    }
+
     // MARK: - Stats
 
     private var statsSection: some View {
         GameCard {
-            VStack(spacing: 16) {
+            VStack(spacing: 14) {
                 VStack(spacing: 4) {
                     Text("到達階層")
                         .font(.fantasyCaption())
@@ -121,6 +251,17 @@ struct ResultView: View {
                         .font(.fantasyNumber())
                         .foregroundColor(Color(hex: GameColors.available))
                         .glow(color: Color(hex: GameColors.available), radius: 8, intensity: 0.4)
+                }
+
+                // Sprint 1: 挑戦時間表示 (elapsedSeconds が有意な値のときのみ)
+                if elapsedSeconds > 0 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "stopwatch")
+                            .foregroundColor(Color(hex: GameColors.textSecondary))
+                        Text("今回の挑戦時間: \(Int(elapsedSeconds.rounded()))秒")
+                            .font(.fantasyBody())
+                            .foregroundColor(Color(hex: GameColors.textSecondary))
+                    }
                 }
 
                 HStack(spacing: 8) {
@@ -152,7 +293,8 @@ struct ResultView: View {
                     )
                 }
 
-                if floor > playerViewModel.highestFloor {
+                // 既存の NEW RECORD 表示 (Sprint 1: 自己ベストセクションと整合させつつ残す)
+                if isPersonalBest {
                     Text("NEW RECORD!")
                         .font(.fantasySubheading())
                         .foregroundColor(Color(hex: GameColors.available))
@@ -174,7 +316,7 @@ struct ResultView: View {
                     Text("最高記録")
                         .font(.fantasyCaption())
                         .foregroundColor(Color(hex: GameColors.text).opacity(0.5))
-                    Text("\(max(floor, playerViewModel.highestFloor))階層")
+                    Text("\(bestFloor)階層")
                         .font(.fantasyCaption())
                         .foregroundColor(Color(hex: GameColors.textSecondary))
                 }
@@ -184,19 +326,126 @@ struct ResultView: View {
         .slideIn(from: .bottom, delay: 0.4)
     }
 
+    // MARK: - Sprint 1: 惜しさメーター (敗北時 + 隣接死亡時のみ)
+
+    private var nearMissBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "flame.fill")
+                .foregroundColor(Color(hex: GameColors.warning))
+            Text("あと1マスで生存だった!")
+                .font(.fantasySubheading())
+                .foregroundColor(Color(hex: GameColors.warning))
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: GameColors.warning).opacity(0.15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color(hex: GameColors.warning).opacity(0.55), lineWidth: 2)
+                )
+        )
+        .shimmer(duration: 1.6)
+        .bounceIn(delay: 0.5)
+    }
+
     // MARK: - Buttons
 
+    /// Sprint 1: 巨大リトライボタンを中心に配置。視線・指の自然動線を意識。
+    /// 「もう一回」を画面下半分の主役に、シェア / ホームは補助ボタンとして小さく。
     private var buttonSection: some View {
-        VStack(spacing: 16) {
-            GameButton(title: "再挑戦", style: .primary, maxWidth: 280) {
+        VStack(spacing: 14) {
+            // Sprint 1: 巨大リトライボタン (height: 180、font: fantasyTitle())
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                AnalyticsLogger.logRetryTapped(
+                    fromFloor: floor,
+                    secondsUntilTap: secondsUntilTap()
+                )
                 onPlayAgain()
+            }) {
+                VStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise.circle.fill")
+                        .font(.system(size: 44, weight: .bold))
+                    Text("もう一回")
+                        .font(.fantasySubheading())
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 180)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: GameColors.available),
+                            Color(hex: GameColors.success)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 24))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(Color.white.opacity(0.25), lineWidth: 2)
+                )
             }
-            .glow(color: Color(hex: GameColors.available), radius: 15, intensity: 0.6)
+            .buttonStyle(.plain)
+            .glow(color: Color(hex: GameColors.available), radius: 18, intensity: 0.7)
+            .padding(.horizontal, 8)
 
-            GameButton(title: "ホームへ", style: .secondary, maxWidth: 280) {
-                onHome()
+            // Sprint 1: 補助ボタン (シェア + ホーム) を横並びで小さく
+            HStack(spacing: 12) {
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showShareSheet = true
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("シェア")
+                    }
+                    .font(.fantasyBody())
+                    .foregroundColor(Color(hex: GameColors.text))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(hex: GameColors.text).opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(hex: GameColors.text).opacity(0.25), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    AnalyticsLogger.logHomeTapped(fromFloor: floor)
+                    onHome()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "house.fill")
+                        Text("ホーム")
+                    }
+                    .font(.fantasyBody())
+                    .foregroundColor(Color(hex: GameColors.text))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(hex: GameColors.text).opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(hex: GameColors.text).opacity(0.25), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 8)
         }
+        .padding(.bottom, 16)
         .slideIn(from: .bottom, delay: 0.6)
     }
 }

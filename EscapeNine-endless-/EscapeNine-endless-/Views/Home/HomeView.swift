@@ -17,7 +17,8 @@ struct HomeView: View {
     @StateObject private var dailyChallengeService = DailyChallengeService.shared
     @State private var path = NavigationPath()
     @State private var showAchievements = false
-    @State private var showTutorial = !UserDefaults.standard.bool(forKey: "tutorialCompleted")
+    @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
+    @State private var showTutorial = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -68,9 +69,10 @@ struct HomeView: View {
                 AchievementListView()
             }
         }
-        .overlay {
-            if showTutorial {
-                TutorialOverlayView(isShowing: $showTutorial)
+        .fullScreenCover(isPresented: $showTutorial) {
+            TutorialOverlayView {
+                hasSeenTutorial = true
+                showTutorial = false
             }
         }
         .onAppear {
@@ -79,6 +81,18 @@ struct HomeView: View {
             // ゲーム後に highestFloor が更新されていても反映されていない。
             // onAppear で UserDefaults から再読み込みして同期する。
             playerViewModel.reload()
+
+            // Sprint 1: 旧キー (`tutorialCompleted`) からの一回限り migration。
+            // 1.4.2 までのリリースで完了フラグを保存していた既存ユーザーが、
+            // 更新後に skip 不可なフルスクリーンチュートリアルを再度通らないようにする。
+            if !hasSeenTutorial && UserDefaults.standard.bool(forKey: "tutorialCompleted") {
+                hasSeenTutorial = true
+            }
+
+            // 初回起動時のみチュートリアルを表示 (2 回目以降は自動スキップ)。
+            if !hasSeenTutorial {
+                showTutorial = true
+            }
         }
         .onChange(of: path) { oldPath, newPath in
             if oldPath.count > newPath.count {
