@@ -28,6 +28,10 @@ struct ResultView: View {
     var playerPosition: Int = 0
     /// 敵最終位置 (1-9) — シェア用 9 マス絵文字に使用
     var enemyPosition: Int = 0
+    /// 今回の結果を永続化する**直前**の最高記録 (自己ベスト判定用)。
+    /// 永続化後の `PlayerViewModel.highestFloor` を参照すると常に false になるため、
+    /// GameView 側で更新前の値を渡す。未指定時は 0 で「常に新記録」と扱う安全側。
+    var previousBest: Int = 0
 
     @StateObject private var playerViewModel = PlayerViewModel()
     @StateObject private var adMobService = AdMobService.shared
@@ -37,6 +41,9 @@ struct ResultView: View {
     // MARK: - Sprint 1: シェア用 state
     @State private var showShareSheet = false
 
+    /// Sprint 1: `eg_retry_tapped.seconds_until_tap` 計測用。`.onAppear` で記録。
+    @State private var appearTime: Date? = nil
+
     // MARK: - Sprint 1 Issue 02: ワンタップリトライ設定 (@AppStorage で永続化)
     /// SettingsView と同一キー (`oneTapRetryEnabled`) を共有
     @AppStorage("oneTapRetryEnabled") private var oneTapRetryEnabled: Bool = true
@@ -44,18 +51,27 @@ struct ResultView: View {
     // MARK: - 派生プロパティ
 
     /// 自己ベストを更新したか (Sprint 1: 「自己ベスト!」演出用)
+    /// `previousBest` は GameView 側で `highestFloor` を永続化する直前の値が渡されるため、
+    /// この比較は「今回のスコアがそれまでの最高記録を更新したか」を正しく表す。
     private var isPersonalBest: Bool {
-        floor > playerViewModel.highestFloor
+        floor > previousBest
     }
 
     /// 表示用の最高記録 (今回のスコアと既存ベストの大きい方)
     private var bestFloor: Int {
-        max(floor, playerViewModel.highestFloor)
+        max(floor, previousBest)
     }
 
     /// 「あと1マスで生存」を表示すべきか (敗北時 + 隣接死亡時のみ)
     private var shouldShowNearMiss: Bool {
         result == .lose && nearMissDistance == 1
+    }
+
+    /// Sprint 1: `eg_retry_tapped.seconds_until_tap` の値を返す。
+    /// `appearTime` 未設定 (`.onAppear` 未実行) のフォールバックは 0。
+    private func secondsUntilTap() -> Double {
+        guard let appearTime else { return 0 }
+        return Date().timeIntervalSince(appearTime)
     }
 
     var body: some View {
@@ -71,6 +87,10 @@ struct ResultView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        AnalyticsLogger.logRetryTapped(
+                            fromFloor: floor,
+                            secondsUntilTap: secondsUntilTap()
+                        )
                         onPlayAgain()
                     }
                     .accessibilityHidden(true)  // VoiceOver は既存の「もう一回」ボタンを使う
@@ -112,6 +132,11 @@ struct ResultView: View {
             }
         }
         .onAppear {
+            // Sprint 1: Game Over 表示時刻を記録 (`eg_retry_tapped.seconds_until_tap` の基準)
+            if appearTime == nil {
+                appearTime = Date()
+            }
+
             // Sprint 1: Game Over 表示時に Haptic フィードバック (PDF #1 のガイドライン)
             let style: UIImpactFeedbackGenerator.FeedbackStyle = (result == .win) ? .heavy : .medium
             UIImpactFeedbackGenerator(style: style).impactOccurred()
@@ -204,8 +229,8 @@ struct ResultView: View {
                 )
                 .shimmer(duration: 2.0)
                 .bounceIn(delay: 0.25)
-        } else if playerViewModel.highestFloor > 0 {
-            Text("ベスト: \(playerViewModel.highestFloor)階")
+        } else if previousBest > 0 {
+            Text("ベスト: \(previousBest)階")
                 .font(.fantasyCaption())
                 .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
                 .slideIn(from: .top, delay: 0.25)
@@ -334,6 +359,10 @@ struct ResultView: View {
             // Sprint 1: 巨大リトライボタン (height: 180、font: fantasyTitle())
             Button(action: {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                AnalyticsLogger.logRetryTapped(
+                    fromFloor: floor,
+                    secondsUntilTap: secondsUntilTap()
+                )
                 onPlayAgain()
             }) {
                 VStack(spacing: 6) {
@@ -392,6 +421,7 @@ struct ResultView: View {
 
                 Button(action: {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    AnalyticsLogger.logHomeTapped(fromFloor: floor)
                     onHome()
                 }) {
                     HStack(spacing: 6) {

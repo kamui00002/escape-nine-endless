@@ -61,6 +61,10 @@ class GameViewModel: ObservableObject {
     @Published var elapsedSeconds: Double = 0
     private var gameStartTime: Date? = nil
 
+    /// 現在の階層開始時刻。`eg_floor_cleared.clear_seconds` を per-floor で算出するために使用。
+    /// `gameStartTime` は 1 ラン通算のため、別管理する。
+    private var floorStartTime: Date? = nil
+
     // MARK: - Daily Challenge
     var dailyChallengeMode: Bool = false
     var dailyChallengeConditions: [ChallengeCondition] = []
@@ -284,13 +288,14 @@ class GameViewModel: ObservableObject {
             audioManager.playSoundEffect(.floorClear)
 
             // Sprint 1: Analytics — 階層クリアイベント送信
-            // クリア所要時間は startGame() からの累計経過秒数を使用
-            // (gameStartTime は private のため既存の計算方法を踏襲)
+            // clear_seconds は当該階層の所要時間 (per-floor)。floorStartTime は
+            // startGame() / nextFloor() で更新されるため、ここでは現在の階層に対する
+            // 純粋な経過時間が得られる。
             let clearSec: Double = {
-                if let start = gameStartTime {
+                if let start = floorStartTime {
                     return Date().timeIntervalSince(start)
                 }
-                return elapsedSeconds
+                return 0
             }()
             AnalyticsLogger.logFloorCleared(
                 floor: currentFloor,
@@ -421,6 +426,7 @@ class GameViewModel: ObservableObject {
 
         // Sprint 1: 挑戦時間と惜しさメーターを初期化
         gameStartTime = Date()
+        floorStartTime = gameStartTime
         elapsedSeconds = 0
         nearMissDistance = 0
 
@@ -659,6 +665,10 @@ class GameViewModel: ObservableObject {
         currentFloor += 1
         turnCount = 0
 
+        // Sprint 1: per-floor 計測のため、新しい階層の開始時刻を記録
+        // (gameStartTime は 1 ラン通算のためリセットしない)
+        floorStartTime = Date()
+
         // 10階層ごとにスキル使用回数をリセット
         if currentFloor % Constants.skillResetInterval == 1 {
             skillUsageCount = 0
@@ -817,9 +827,7 @@ class GameViewModel: ObservableObject {
         // Sprint 1: Analytics — Game Over 表示イベント送信 (.lose のみ)
         // DefeatReason は RawValue を持たない素 enum のため、AnalyticsDefeatReason に手動マッピング。
         // TODO: Sprint 2+ で trap / fall 等の敗北原因を追加した場合、このマッピングも拡張する。
-        // TODO: ResultView (UI) から、Sprint 1 で以下を計装すること:
-        //   - 「もう一回」ボタン: AnalyticsLogger.logRetryTapped(fromFloor: vm.currentFloor, secondsUntilTap: ...)
-        //   - 「ホームへ」ボタン:   AnalyticsLogger.logHomeTapped(fromFloor: vm.currentFloor)
+        // 「もう一回」「ホームへ」の計装は ResultView 側で完結 (logRetryTapped / logHomeTapped)。
         if result == .lose {
             let reason: AnalyticsDefeatReason
             switch defeatReason {
@@ -931,6 +939,7 @@ class GameViewModel: ObservableObject {
 
         // Sprint 1: リセット
         gameStartTime = nil
+        floorStartTime = nil
         elapsedSeconds = 0
         nearMissDistance = 0
     }
