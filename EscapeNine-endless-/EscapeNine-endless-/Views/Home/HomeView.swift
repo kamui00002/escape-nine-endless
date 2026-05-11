@@ -82,6 +82,13 @@ struct HomeView: View {
             // onAppear で UserDefaults から再読み込みして同期する。
             playerViewModel.reload()
 
+            // Sprint 1: 旧キー (`tutorialCompleted`) からの一回限り migration。
+            // 1.4.2 までのリリースで完了フラグを保存していた既存ユーザーが、
+            // 更新後に skip 不可なフルスクリーンチュートリアルを再度通らないようにする。
+            if !hasSeenTutorial && UserDefaults.standard.bool(forKey: "tutorialCompleted") {
+                hasSeenTutorial = true
+            }
+
             // 初回起動時のみチュートリアルを表示 (2 回目以降は自動スキップ)。
             if !hasSeenTutorial {
                 showTutorial = true
