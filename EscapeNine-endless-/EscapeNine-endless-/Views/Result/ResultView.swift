@@ -184,6 +184,8 @@ struct ResultView: View {
         Text(result == .win ? "VICTORY!" : "DEFEAT")
             .font(.fantasyTitle())
             .foregroundColor(result == .win ? Color(hex: GameColors.success) : Color(hex: GameColors.warning))
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, alignment: .center)
             .overlay(
                 (result == .win ?
                  LinearGradient(
@@ -202,7 +204,12 @@ struct ResultView: View {
                      startPoint: .leading,
                      endPoint: .trailing
                  ))
-                .mask(Text(result == .win ? "VICTORY!" : "DEFEAT").font(.fantasyTitle()))
+                .mask(
+                    Text(result == .win ? "VICTORY!" : "DEFEAT")
+                        .font(.fantasyTitle())
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                )
             )
             .shadow(color: (result == .win ? Color(hex: GameColors.success) : Color(hex: GameColors.warning)).opacity(0.5), radius: 15)
             .bounceIn(delay: 0.1)
@@ -356,7 +363,7 @@ struct ResultView: View {
     /// 「もう一回」を画面下半分の主役に、シェア / ホームは補助ボタンとして小さく。
     private var buttonSection: some View {
         VStack(spacing: 14) {
-            // Sprint 1: 巨大リトライボタン (height: 180、font: fantasyTitle())
+            // Sprint 1: リトライボタン (主役だが画面の主導権は奪わない height)
             Button(action: {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 AnalyticsLogger.logRetryTapped(
@@ -365,15 +372,15 @@ struct ResultView: View {
                 )
                 onPlayAgain()
             }) {
-                VStack(spacing: 6) {
+                HStack(spacing: 10) {
                     Image(systemName: "arrow.clockwise.circle.fill")
-                        .font(.system(size: 44, weight: .bold))
+                        .font(.system(size: 30, weight: .bold))
                     Text("もう一回")
                         .font(.fantasySubheading())
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 180)
+                .frame(height: 96)
                 .background(
                     LinearGradient(
                         colors: [
