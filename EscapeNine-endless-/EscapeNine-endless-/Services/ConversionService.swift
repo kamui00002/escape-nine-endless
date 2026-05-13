@@ -35,14 +35,9 @@ final class ConversionService {
         #endif
     }
 
-    /// 階層クリア（コンバージョン候補）
-    func trackFloorClear(floor: Int) {
-        #if canImport(FirebaseAnalytics)
-        Analytics.logEvent("floor_clear", parameters: [
-            "floor": floor
-        ])
-        #endif
-    }
+    // 階層クリアは AnalyticsLogger.logFloorCleared (= eg_floor_cleared) に一本化済み。
+    // Google Ads コンバージョンも eg_floor_cleared を GA4 → Ads でインポートして使う。
+    // 旧 trackFloorClear("floor_clear") は呼び出し元ゼロの dead code だったため削除 (2026-05-14)。
 
     /// 課金完了（Google Ads の Purchase コンバージョン用）
     func trackPurchase(productId: String, value: Double, currency: String = "JPY") {
