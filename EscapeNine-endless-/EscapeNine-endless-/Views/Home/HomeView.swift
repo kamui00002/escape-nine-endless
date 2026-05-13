@@ -73,6 +73,7 @@ struct HomeView: View {
             TutorialOverlayView {
                 hasSeenTutorial = true
                 showTutorial = false
+                ConversionService.shared.trackTutorialComplete()
             }
         }
         .onAppear {
