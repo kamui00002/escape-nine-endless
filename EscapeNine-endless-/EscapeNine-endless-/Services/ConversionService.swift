@@ -35,9 +35,7 @@ final class ConversionService {
         #endif
     }
 
-    // 階層クリアは AnalyticsLogger.logFloorCleared (= eg_floor_cleared) に一本化済み。
-    // Google Ads コンバージョンも eg_floor_cleared を GA4 → Ads でインポートして使う。
-    // 旧 trackFloorClear("floor_clear") は呼び出し元ゼロの dead code だったため削除 (2026-05-14)。
+    // 階層クリアは AnalyticsLogger.logFloorCleared (eg_floor_cleared) に一本化 (2026-05-14、旧 floor_clear 削除、GA4→Ads import 経路)。
 
     /// 課金完了（Google Ads の Purchase コンバージョン用）
     func trackPurchase(productId: String, value: Double, currency: String = "JPY") {
