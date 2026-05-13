@@ -20,6 +20,9 @@ import GoogleMobileAds
 #if canImport(FacebookCore)
 import FacebookCore
 #endif
+#if canImport(FirebaseCrashlytics)
+import FirebaseCrashlytics
+#endif
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "App")
 @main
@@ -76,7 +79,14 @@ struct EscapeNine_endless_App: App {
                     // Google Ads コンバージョン計測
                     ConversionService.shared.trackAppOpen()
                     // Firebase匿名認証
-                    try? await FirebaseService.shared.signInAnonymously()
+                    do {
+                        try await FirebaseService.shared.signInAnonymously()
+                    } catch {
+                        logger.error("[App] 匿名認証失敗: \(error.localizedDescription, privacy: .public)")
+                        #if canImport(FirebaseCrashlytics)
+                        Crashlytics.crashlytics().record(error: error)
+                        #endif
+                    }
                     // PurchaseManagerの初期化
                     await purchaseManager.initialize()
                     // Game Center認証
