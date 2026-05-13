@@ -181,38 +181,39 @@ struct ResultView: View {
     }
 
     private var resultTitle: some View {
-        Text(result == .win ? "VICTORY!" : "DEFEAT")
-            .font(.fantasyTitle())
-            .foregroundColor(result == .win ? Color(hex: GameColors.success) : Color(hex: GameColors.warning))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .overlay(
-                (result == .win ?
-                 LinearGradient(
-                     colors: [
-                         Color(hex: GameColors.success),
-                         Color(hex: GameColors.available)
-                     ],
-                     startPoint: .leading,
-                     endPoint: .trailing
-                 ) :
-                 LinearGradient(
-                     colors: [
-                         Color(hex: GameColors.warning),
-                         Color(hex: GameColors.enemy)
-                     ],
-                     startPoint: .leading,
-                     endPoint: .trailing
-                 ))
-                .mask(
-                    Text(result == .win ? "VICTORY!" : "DEFEAT")
-                        .font(.fantasyTitle())
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                )
+        let title = result == .win ? "VICTORY!" : "DEFEAT"
+        let gradient: LinearGradient = (result == .win)
+            ? LinearGradient(
+                colors: [
+                    Color(hex: GameColors.success),
+                    Color(hex: GameColors.available)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
             )
-            .shadow(color: (result == .win ? Color(hex: GameColors.success) : Color(hex: GameColors.warning)).opacity(0.5), radius: 15)
-            .bounceIn(delay: 0.1)
+            : LinearGradient(
+                colors: [
+                    Color(hex: GameColors.warning),
+                    Color(hex: GameColors.enemy)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        let shadowColor = result == .win
+            ? Color(hex: GameColors.success)
+            : Color(hex: GameColors.warning)
+
+        return HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            Text(title)
+                .font(.fantasyTitle())
+                .foregroundStyle(gradient)
+                .shadow(color: shadowColor.opacity(0.5), radius: 15)
+                .fixedSize(horizontal: true, vertical: false)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+        .bounceIn(delay: 0.1)
     }
 
     // MARK: - Sprint 1: 自己ベスト誘発演出
