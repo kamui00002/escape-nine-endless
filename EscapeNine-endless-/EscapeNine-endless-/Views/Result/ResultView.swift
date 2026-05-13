@@ -249,6 +249,8 @@ struct ResultView: View {
 
     private var statsSection: some View {
         GameCard {
+            // GameCard 内部は `VStack(alignment: .leading)` + `frame(maxWidth: .infinity, alignment: .leading)` のため、
+            // 子の自然幅でしか展開されず左寄りに見える。ここで明示的に maxWidth を広げて中央寄せ可能にする。
             VStack(spacing: 14) {
                 VStack(spacing: 4) {
                     Text("到達階層")
@@ -329,6 +331,7 @@ struct ResultView: View {
                         .foregroundColor(Color(hex: GameColors.textSecondary))
                 }
             }
+            .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 40)
         .slideIn(from: .bottom, delay: 0.4)
