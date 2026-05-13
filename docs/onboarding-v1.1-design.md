@@ -21,12 +21,22 @@
 
 ### KPI 目標 (会議結論より)
 
-| KPI | 現状 (推定) | 目標 (v1.1 反映後 2 週間) |
-|---|---|---|
-| **1 階離脱率** | 50%+ | **30% 以下** |
-| **Day 1 リテンション** | 不明 (Sprint 1 で計測開始) | +10pp |
-| **チュートリアル完了率** | 不明 | 80%+ |
-| **チュートリアル後 → 1 階クリア率** | - | 90%+ |
+| KPI | 現状 (推定) | 目標 (v1.1 反映後 2 週間) | ベースライン計測式 |
+|---|---|---|---|
+| **1 階離脱率** | 50%+ | **30% 以下** | `1 - count(eg_floor_cleared where floor>=1) / count(eg_game_started)` |
+| **Day 1 リテンション** | 不明 | +10pp | Firebase Analytics 「リテンション」レポートの D1 値 |
+| **チュートリアル完了率** | 不明 | 80%+ | `count(eg_tutorial_complete) / count(eg_tutorial_started)` ※両イベントは v1.1 で新規追加必須 |
+| **チュートリアル後 → 1 階クリア率** | - | 90%+ | `count(eg_floor_cleared where floor==1 AND prev_event==eg_tutorial_complete) / count(eg_tutorial_complete)` |
+
+### ベースライン取得手順 (着手前の §10 条件 2 を満たすため)
+
+1. **計測期間**: Sprint 1 TestFlight 提出 + ATC 公開後の **連続 7 日間**
+2. **サンプル数下限**: `eg_game_started` の合計 **100 セッション以上** (信頼区間 ±5% を担保)
+3. **保存先**: `docs/aso/sprint-1-baseline.md` (現状未作成、本書着手前に雛形作成)
+4. **必要な新規イベント (v1.1 実装と同時に追加)**:
+   - `eg_tutorial_started` (チュートリアル Step 1 開始時)
+   - `eg_tutorial_step_completed` (各 Step 通過時、`step_number` パラメータ付き)
+   - `eg_tutorial_complete` (Step 4 完了時)
 
 ---
 
@@ -177,41 +187,83 @@ Floor 1 (本格スタート):
     - 2 回目以降は完全ランダム
 ```
 
-### 実装変更点
+### 実装変更点 (具体的な enum / 定数 / メソッド)
 
-- `Models/Floor.swift`: `Floor.prologue` (Floor 0) を追加
-- `Services/StageManager.swift`: チュートリアル直後のフロー分岐
-- `ViewModels/GameViewModel.swift`: 初回限定シードバイアスロジック
+| ファイル | 追加するもの | 既存実装との接続 |
+|---|---|---|
+| `Models/Floor.swift` | `static let prologueFloor: Int = 0` | `calculateBPM(for floor: Int)` に `if floor == 0 { return 60 }` 分岐を追加 |
+| `Utilities/Constants.swift` | `static let tutorialClearTurns: Int = 3`, `static let prologueClearTurns: Int = 3`, `static let prologueSafeMinDistance: Int = 3` | `maxTurnsPerFloor` (既存定数) と並列で管理 |
+| `Services/StageManager.swift` | `func startPrologueFloor()` メソッド | 既存 `startFloor(_:)` の前段で 1 回だけ呼ばれる、内部で固定シード `(player: 5, enemy: 1)` を `GameViewModel` に渡す |
+| `ViewModels/GameViewModel.swift` | `private var isFirstFloor1AfterTutorial: Bool` フラグ | Floor 1 初回限定で `randomPosition(excluding:minDistance:)` を呼ぶ分岐を追加 |
+| `Services/AIEngine.swift` | (変更なし) | Floor 0 では「完全ランダム = 既存 `.easy` で `pursueProbability = 0`」を渡すだけ |
 
 ---
 
 ## 5. 心拍音 + 振動 (会議 第 16 回 / Step 3 連動)
 
-### サウンド
+### 前提: BeatEngine と衝突しない設計
 
-```
-ファイル: heartbeat_low.wav (60 BPM、低音ピアノ単音)
-配置: Resources/Sounds/SFX/
-再生: AudioManager.shared.playSFX(.heartbeat, loop: true)
-停止: Step 3 終了時に AudioManager.shared.stopSFX(.heartbeat)
-```
+⚠️ **重要**: 既存の `BeatEngine.swift` は毎ビートで `UIImpactFeedbackGenerator(.light)` を発火している (BeatEngine.swift:205 付近)。さらに Step 3 中はゲーム進行中の BPM (Floor 0 → 60 BPM) と心拍音 (60 BPM) が並走すると **異周波の重ね合わせで音が濁る**。
 
-### 振動
+これを避けるため、**Step 3 中は BeatEngine を一時停止** し、心拍音と心拍振動を**専用パスで再生**する:
 
 ```swift
-// Step 3 開始時に毎ビートで:
-let generator = UIImpactFeedbackGenerator(style: .light)
-generator.prepare()
-// BeatEngine.currentBeat の publisher にサブスクライブして毎ビート発火
-beatEngine.$currentBeat
-    .sink { _ in generator.impactOccurred() }
-    .store(in: &cancellables)
+// Step 3 開始時:
+beatEngine.suspend()  // 新規メソッド: timer.invalidate() + tactileEnabled = false
+audioManager.playLoopingSFX(.heartbeat)  // 新規メソッド (後述)
+
+// Step 3 終了時:
+audioManager.stopLoopingSFX(.heartbeat)
+beatEngine.resume()
 ```
 
-### 注意点
+### サウンド (AudioManager に loop API を新設)
 
-- アクセシビリティ: `UIAccessibility.isReduceMotionEnabled` が true なら振動を無効化 (第 18 回 Lisa の指摘)
-- 設定画面: 「触覚フィードバック ON/OFF」スイッチが既に存在なら尊重、なければ新規追加検討
+現行 `AudioManager` は `playSoundEffect(_:)` 1 ショット再生のみで loop 引数なし。心拍音用に新規 API:
+
+```swift
+// AudioManager.swift に追加 (SoundEffect enum に case heartbeat も追加)
+extension AudioManager {
+    func playLoopingSFX(_ effect: SoundEffect) { /* AVAudioPlayer.numberOfLoops = -1 */ }
+    func stopLoopingSFX(_ effect: SoundEffect) { /* player.stop() */ }
+}
+```
+
+```
+ファイル: heartbeat_low.wav (60 BPM、低音ピアノ単音、約 4 秒で 4 拍)
+配置: EscapeNine-endless-/EscapeNine-endless-/Sounds/SFX/
+SoundEffect enum: `case heartbeat = "heartbeat_low"`
+```
+
+### 振動 (BeatEngine 既存振動と二重発火させない)
+
+Step 3 中は BeatEngine を suspend してあるので、振動も心拍音用に専用ループで発火:
+
+```swift
+// OnboardingTutorialView の Step 3 で:
+private var heartbeatTimer: Timer?
+
+func startStep3Heartbeat() {
+    let generator = UIImpactFeedbackGenerator(style: .light)
+    generator.prepare()
+    heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+        generator.impactOccurred()  // 60 BPM = 1 秒間隔
+    }
+}
+
+func stopStep3Heartbeat() {
+    heartbeatTimer?.invalidate()
+    heartbeatTimer = nil
+}
+```
+
+⚠️ `beatEngine.$currentBeat.sink { ... }` 経由ではなく**独立タイマー**で発火することで、BeatEngine 既存の毎ビート振動と二重発火を回避。
+
+### アクセシビリティ (会議第 18 回 Lisa)
+
+- `UIAccessibility.isReduceMotionEnabled == true` → 振動を発火しない (`heartbeatTimer` 自体を作らない)
+- `audioManager.isMuted` (既存設定) → 心拍音も停止対象
+- 「触覚フィードバック ON/OFF」スイッチ: SettingsView の現状確認後、未存在なら新規追加 (Sprint 1.x 送り検討)
 
 ---
 
@@ -233,11 +285,29 @@ if !hasSeenTutorial && UserDefaults.standard.bool(forKey: "tutorialCompleted") {
 @AppStorage("hasSeenTutorialV1_1") private var hasSeenTutorialV1_1: Bool = false // v1.1 新規
 
 // onAppear 内:
-// 旧 Sprint 1 静的チュートリアルは通ったが、v1.1 プレイアブルはまだの場合 → v1.1 を表示する
+// Sprint 1 既存 migration (tutorialCompleted → hasSeenTutorial) はそのまま継承
+if !hasSeenTutorial && UserDefaults.standard.bool(forKey: "tutorialCompleted") {
+    hasSeenTutorial = true
+}
+
+// v1.1: hasSeenTutorialV1_1 が false なら表示 (hasSeenTutorial の値は無視)
 if !hasSeenTutorialV1_1 {
     showOnboardingTutorial = true
 }
 ```
+
+### キー併存ルール (両キーの真偽値の組み合わせ)
+
+| `hasSeenTutorial` | `hasSeenTutorialV1_1` | 状態 | 挙動 |
+|---|---|---|---|
+| false | false | 完全新規ユーザー | v1.1 を表示 → 完了時 **両方 true にセット** |
+| true | false | Sprint 1 既存ユーザー (v1.1 未通過) | v1.1 を表示 → 完了時 `hasSeenTutorialV1_1` のみ true |
+| - | true | v1.1 を通過済み | 表示しない (`hasSeenTutorial` の値は無視) |
+
+> **完了時の更新ルール**:
+> - 完全新規 (両方 false) → `hasSeenTutorial = true; hasSeenTutorialV1_1 = true` (Sprint 1 静的版を skip した扱いだが旧版へ戻し対応として両方立てる)
+> - Sprint 1 既存 → `hasSeenTutorialV1_1 = true` のみ (Sprint 1 完了履歴は保持)
+> - 「将来 v1.2 動的版が出る場合は `hasSeenTutorialV1_2` を追加し、本書と同じパターンで世代管理する」
 
 ### 既存ユーザーへの配慮
 

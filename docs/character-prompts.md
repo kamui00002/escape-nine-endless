@@ -270,12 +270,15 @@ mv ~/Downloads/hero@3x.png .
 
 ## §H 既存 `ads/generate-images.py` で自動化する場合 (参考)
 
+> ⚠️ 既存 `BRIEFS` は `"concept": 1` (整数連番) を採用。識別用ラベルは別フィールド `"label"` として分離し、整数連番を継続することで `f"Brief {b['concept']}: ..."` 等のログ出力が壊れないようにする。
+
 ```python
-# ads/generate-images.py の BRIEFS 配列に追加
+# ads/generate-images.py の BRIEFS 配列に追加 (concept は整数連番を継続)
 BRIEFS = [
-    # ... 既存の広告画像 ...
+    # ... 既存の広告画像 (concept: 1, 2, 3) ...
     {
-        "concept": "character_hero",
+        "concept": 4,                       # 整数連番を継続
+        "label": "character_hero",          # 識別ラベルは別フィールド
         "filename": "hero.png",
         "out_dir": "generated_imgs/characters",
         "aspect": "1:1",
@@ -289,11 +292,28 @@ BRIEFS = [
             "limited 16-color palette, no anti-aliasing, sharp pixel edges, alpha channel transparent."
         ),
     },
-    # ... 他 8 体も同様 ...
+    # ... 他 8 体は concept: 5..12, label: "character_thief" .. "character_dragon" ...
 ]
 ```
 
-実行: `python3 ads/generate-images.py` で 9 枚一括生成。
+### 並列化 (9 枚を sequential → 並列で 3-5x 短縮)
+
+現状 `ads/generate-images.py` は `for b in BRIEFS: generate(b)` で sequential 実行。Gemini Image API は rate limit 内で並列リクエスト可能のため、`ThreadPoolExecutor` で並列化できる:
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+# 既存ループ:
+# for b in BRIEFS: generate(b)
+
+# 並列版 (max_workers は API rate limit に合わせて 3-5 が目安):
+with ThreadPoolExecutor(max_workers=3) as executor:
+    list(executor.map(generate, BRIEFS))
+```
+
+> ⚠️ Gemini 2.5 Flash Image の RPM 制限と一時的なクォータ超過に注意。HTTP 429 発生時のリトライは現行スクリプトに無いので、並列化と合わせて `urllib.error.HTTPError` の `code == 429` でバックオフリトライを追加すると安全。
+
+実行: `python3 ads/generate-images.py` で 9 枚生成 (sequential なら API レスポンス × 9、並列なら ~3 倍速)。
 生成後は §D の sips ダウンサンプルと §E の Assets 配置を実施。
 
 ---
