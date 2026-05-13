@@ -20,6 +20,9 @@ import GoogleMobileAds
 #if canImport(FacebookCore)
 import FacebookCore
 #endif
+#if canImport(FirebaseCrashlytics)
+import FirebaseCrashlytics
+#endif
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "App")
 @main
@@ -53,6 +56,18 @@ struct EscapeNine_endless_App: App {
         #endif
 
         logger.info("[App] アプリ起動")
+
+        #if canImport(FirebaseAnalytics)
+        // 起動 sentinel event。Firebase Analytics が無音故障した場合 (5/13 まで Conv 0 だった事案) の
+        // 再発検知用に、起動毎に必ず 1 件 logEvent + appInstanceID 確認を行う。
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        Analytics.logEvent("eg_app_init_ok", parameters: ["version": appVersion])
+        if Analytics.appInstanceID() == nil {
+            logger.fault("[App] Firebase Analytics not initialized (appInstanceID is nil)")
+        } else {
+            logger.info("[App] Firebase Analytics appInstanceID verified")
+        }
+        #endif
     }
 
     var body: some Scene {
@@ -64,7 +79,14 @@ struct EscapeNine_endless_App: App {
                     // Google Ads コンバージョン計測
                     ConversionService.shared.trackAppOpen()
                     // Firebase匿名認証
-                    try? await FirebaseService.shared.signInAnonymously()
+                    do {
+                        try await FirebaseService.shared.signInAnonymously()
+                    } catch {
+                        logger.error("[App] 匿名認証失敗: \(error.localizedDescription, privacy: .public)")
+                        #if canImport(FirebaseCrashlytics)
+                        Crashlytics.crashlytics().record(error: error)
+                        #endif
+                    }
                     // PurchaseManagerの初期化
                     await purchaseManager.initialize()
                     // Game Center認証

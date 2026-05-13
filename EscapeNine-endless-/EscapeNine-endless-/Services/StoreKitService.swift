@@ -224,6 +224,9 @@ class StoreKitService: ObservableObject {
     
     private func updatePurchasedProducts(_ transaction: Transaction) async {
         if transaction.revocationDate == nil {
+            // currentEntitlements は起動毎・復元毎に列挙されるため、
+            // 既に保有している productID は重複送信しないようガード。
+            let isNewPurchase = !purchasedProductIDs.contains(transaction.productID)
             purchasedProductIDs.insert(transaction.productID)
             savePurchasedProducts()
             
@@ -231,7 +234,19 @@ class StoreKitService: ObservableObject {
             if transaction.productID == ProductID.removeAds.rawValue {
                 AdMobService.shared.setAdRemoved(true)
             }
-            
+
+            // Google Ads コンバージョン計測 (Firebase Analytics 経由)
+            if isNewPurchase {
+                let priceDecimal: Decimal = transaction.price ?? 0
+                let value = NSDecimalNumber(decimal: priceDecimal).doubleValue
+                let currency = transaction.currencyCode ?? "JPY"
+                ConversionService.shared.trackPurchase(
+                    productId: transaction.productID,
+                    value: value,
+                    currency: currency
+                )
+            }
+
             logger.info("[StoreKitService] 購入完了: \(transaction.productID)")
         } else {
             purchasedProductIDs.remove(transaction.productID)

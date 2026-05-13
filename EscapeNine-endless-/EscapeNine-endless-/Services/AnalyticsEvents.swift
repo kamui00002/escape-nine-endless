@@ -110,7 +110,7 @@ struct AnalyticsLogger {
         #if canImport(FirebaseAnalytics)
         Analytics.logEvent(event.rawValue, parameters: parameters.isEmpty ? nil : parameters)
         #endif
-        analyticsLogger.debug("Analytics event: \(event.rawValue, privacy: .public) params=\(String(describing: parameters), privacy: .public)")
+        analyticsLogger.info("Analytics event: \(event.rawValue, privacy: .public) params=\(String(describing: parameters), privacy: .public)")
     }
 
     // MARK: - Sprint 1 便利メソッド
