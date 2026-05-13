@@ -1,9 +1,12 @@
 # オンボーディング v1.1 動的チュートリアル — 設計書 ⭐️
 
 作成日: 2026-05-14
+最終更新: 2026-05-14 (multi-agent-reviewer HIGH 指摘反映)
 ステータス: **設計フェーズ (実装未着手)**
-対象リリース: v1.1 (Sprint 2 後半 or Sprint 3)
+対象リリース: **v1.1 = Sprint 3 単独 PR** (旧案「Sprint 2 後半」は工数競合のため取り下げ)
 依存元: Sprint 1 で実装済の `TutorialOverlayView.swift` (静的 3 ページ版)
+
+> ⚠️ **Sprint 2 計画書との関係**: Sprint 2 (5/13-5/26) は Feature 1 (デイリーチャレンジ 6-7 日) + Feature 2 (抜かれ通知 8-9 日) + Feature 3 (シェア拡張 6 日) で既に飽和。onboarding v1.1 は工数 7-8 日のため Sprint 3 へ送る。Obsidian 側の Sprint 2 計画書にも同期する必要あり (PR 範囲外、ユーザー手動)。
 
 > **背景**: 2026-05-09 戦略会議で「**1 階を壁から招待状に変える**」「**動的チュートリアル必須化 (v1.1)**」が決定。Sprint 1 では時間制約で静的 3 ページ版のみ先行リリース。本書は会議決定通り「完全プレイアブル 4 ステップ + ヒヤリ演出 + 心拍音 + 振動」の本格版を設計する。
 
@@ -128,17 +131,24 @@ Step 4: 階層クリアの喜び (達成感)
 盤面: プレイヤー (位置 5) + 敵 (位置 4) ← 隣接配置で開始
 目的: 「あと 1 マスで死ぬ」を脳に焼きつける
 手順:
+  0. ⚠️ Step 開始前に「次の Step は強い演出 (心拍音・振動・赤フラッシュ) が含まれます。スキップする場合は右上のボタンを押してください」予告 (1.5 秒、Reduce Motion ON or Reduced Audio 設定時は自動スキップ)
   1. 上部に文字: 「あと 1 マスで影に飲まれる」
   2. 心拍音 (60 BPM) を AudioManager で開始
   3. 軽い振動 (UIImpactFeedbackGenerator.light) を毎ビート
   4. プレイヤーを 1 回動かす → 敵から離れる
   5. 「ヒヤリとした。これがこのゲームだ。」 → Step 4 へ
 
+スキップ動線 (必須、multi-agent-reviewer HIGH-2 反映):
+- 右上に常時表示のスキップボタン (3 タップ or 長押し 1 秒で発火、誤タップ防止)
+- スキップ時は `eg_tutorial_step_completed(step_number: 3, skipped: true)` を発火させて KPI と分離
+- スキップ後も Step 4 へ進む (チュートリアル全体は完走扱い)
+
 実装ポイント:
 - 心拍音: 低音ピアノ単音 (松本さん指摘の 16 回オーディオ「沈黙より一歩先」階層 1-3 と整合)
 - 振動: `UIImpactFeedbackGenerator(style: .light).impactOccurred()` を毎ビートで
 - 「ヒヤリ」演出: 画面を一瞬赤くフラッシュ (0.2 秒) + 危険圏を強調
 - このステップは "脳に焼きつく瞬間" なので 5-10 回テストプレイで体験の強さを調整
+- アクセシビリティ詳細は §5 を参照 (Reduce Motion / Reduced Audio / 色覚多様性への完全 opt-out)
 ```
 
 ### Step 4: 階層クリアの喜び (約 5-10 秒)
@@ -189,13 +199,15 @@ Floor 1 (本格スタート):
 
 ### 実装変更点 (具体的な enum / 定数 / メソッド)
 
+> ⚠️ **multi-agent-reviewer 指摘反映 (2026-05-14)**: 当初案の `StageManager.startPrologueFloor()` 追加は、**現行 `StageManager` がインスタンスメソッドゼロ・getter のみ** (getBPM / getSpecialRule / getDifficulty / getFloorDescription) なので構造を破壊する。Floor 開始の責務は `GameViewModel.startGame()` 側にあるため、prologue 専用 path も `GameViewModel` に追加する。加えて `Floor.calculateBPM(for:)` は `let clampedFloor = max(1, min(floor, ...))` で **floor=0 を 1 に丸める**ため、clamp の下限を 0 に変更する必要がある。
+
 | ファイル | 追加するもの | 既存実装との接続 |
 |---|---|---|
-| `Models/Floor.swift` | `static let prologueFloor: Int = 0` | `calculateBPM(for floor: Int)` に `if floor == 0 { return 60 }` 分岐を追加 |
-| `Utilities/Constants.swift` | `static let tutorialClearTurns: Int = 3`, `static let prologueClearTurns: Int = 3`, `static let prologueSafeMinDistance: Int = 3` | `maxTurnsPerFloor` (既存定数) と並列で管理 |
-| `Services/StageManager.swift` | `func startPrologueFloor()` メソッド | 既存 `startFloor(_:)` の前段で 1 回だけ呼ばれる、内部で固定シード `(player: 5, enemy: 1)` を `GameViewModel` に渡す |
-| `ViewModels/GameViewModel.swift` | `private var isFirstFloor1AfterTutorial: Bool` フラグ | Floor 1 初回限定で `randomPosition(excluding:minDistance:)` を呼ぶ分岐を追加 |
-| `Services/AIEngine.swift` | (変更なし) | Floor 0 では「完全ランダム = 既存 `.easy` で `pursueProbability = 0`」を渡すだけ |
+| `Models/Floor.swift` | `static let prologueFloor: Int = 0` + `calculateBPM` の clamp 下限を 1 → 0 に変更 + `if floor == 0 { return 60 }` 分岐 | 現行 `let clampedFloor = max(1, min(floor, Constants.maxFloors))` を `max(0, ...)` に変更。0 以外は既存ロジック維持 |
+| `Utilities/Constants.swift` | `static let tutorialClearTurns: Int = 3`, `static let prologueClearTurns: Int = 3`, `static let prologueSafeMinDistance: Int = 3` | 既存は `getMaxTurns(for floor: Int)` 関数で動的計算しているため、本定数は **`getMaxTurns` をバイパスする特殊ケース** であることをコメントで明記 (または `getMaxTurns(for:)` 内で `floor == 0 → prologueClearTurns` 分岐に統合する選択肢もあり) |
+| `ViewModels/GameViewModel.swift` | `func startPrologueFloor()` メソッド + `private var isFirstFloor1AfterTutorial: Bool` フラグ | 既存 `startGame()` をチュートリアル後に呼ぶ前段で `startPrologueFloor()` を 1 回挟む。内部で固定シード `(player: 5, enemy: 1)` を直接プロパティセット。`StageManager` には触らない |
+| `Services/StageManager.swift` | (**変更なし**) | 既存 4 getter は floor 引数を受け取って値を返すだけなので、`getBPM(for: 0)` 等は `Floor.calculateBPM(for: 0)` が 60 を返せば自然に動く。インスタンスメソッド追加は不要 |
+| `Services/AIEngine.swift` | (**呼び出し側変更**) | Floor 0 では `.easy` を渡し、AIEngine 内部の追跡確率はそのまま (`pursueProbability` は AILevel ベース)。AIEngine 自体のコード変更は不要、`GameViewModel.startPrologueFloor` が呼び出し時に `.easy` を選ぶだけ |
 
 ---
 
@@ -259,11 +271,38 @@ func stopStep3Heartbeat() {
 
 ⚠️ `beatEngine.$currentBeat.sink { ... }` 経由ではなく**独立タイマー**で発火することで、BeatEngine 既存の毎ビート振動と二重発火を回避。
 
-### アクセシビリティ (会議第 18 回 Lisa)
+### アクセシビリティ (会議第 18 回 Lisa + multi-agent-reviewer HIGH-1 反映)
 
-- `UIAccessibility.isReduceMotionEnabled == true` → 振動を発火しない (`heartbeatTimer` 自体を作らない)
-- `audioManager.isMuted` (既存設定) → 心拍音も停止対象
-- 「触覚フィードバック ON/OFF」スイッチ: SettingsView の現状確認後、未存在なら新規追加 (Sprint 1.x 送り検討)
+Step 3 の三層演出 (心拍音 + 振動 + 赤フラッシュ 0.2 秒) に対して、**すべての層で独立に opt-out 可能**にする (WCAG 2.3.1 / Apple HIG Accessibility / 光感受性てんかん・PTSD ユーザー配慮)。
+
+| 演出層 | opt-out 条件 | 動作 |
+|---|---|---|
+| **振動** | `UIAccessibility.isReduceMotionEnabled == true` | `heartbeatTimer` を作らない (毎ビート振動なし) |
+| **赤フラッシュ (0.2 秒)** | `UIAccessibility.isReduceMotionEnabled == true` | フラッシュ層自体を skip し、危険圏オーバーレイの色強調のみで代替 |
+| **心拍音** | `audioManager.isMuted == true` OR 効果音音量 = 0 OR `prefersCrossFadeTransitions == true` | `playLoopingSoundEffect(.heartbeat)` 自体を呼ばない |
+| **Step 3 全体** | ユーザーのスキップタップ (3 タップ or 長押し 1 秒) | Step 3 を skip し Step 4 へ。`eg_tutorial_step_completed(step_number: 3, skipped: true)` 送信 |
+
+**事前予告**: Step 3 開始の 1.5 秒前に「次の Step は強い演出が含まれます」と予告 (上記 §3 Step 3 の手順 0 参照)。Reduce Motion ON or 効果音音量 0 のユーザーは予告ステップ自体を skip して直接 Step 4 のキー要素 (移動 → クリア) を体験させる。
+
+### 触覚フィードバック ON/OFF スイッチ (Acceptance Criteria 格上げ)
+
+`SettingsView.swift` の現状確認:
+
+```bash
+grep -rn "触覚\|haptic\|Haptic" EscapeNine-endless-/EscapeNine-endless-/Views/Settings/
+```
+
+- ✅ 既存 → スイッチを尊重し、ON のみ Step 3 振動を発火
+- ❌ 未存在 → **v1.1 と同 Sprint で必ず新規追加** (`@AppStorage("hapticsEnabled")` + SettingsView 行追加、推定 0.3 日)。Sprint 1.x 送りは禁止 (v1.1 で振動が新規増加するため同時投入が必須)。
+
+### VoiceOver / Dynamic Type / 色覚多様性 (Lisa 第 18 回 必須対応 8 項目)
+
+- **Dynamic Type**: チュートリアル全テキストは `.font(.body)` / `.font(.title)` 等のセマンティックフォント使用、固定 pt 禁止
+- **VoiceOver**: 各 Step の状態を `accessibilityValue` でナレーション (例: "Step 2 / 4: 影を避けてください")
+- **アイコンボタン**: `.accessibilityLabel("スキップ")` を必ず付与
+- **色覚多様性**: 危険圏オーバーレイは「赤い色」だけでなく **パターン (斜線) + アイコン (⚠️)** を併用
+- **Bold Text**: システム設定 ON で `.fontWeight(.bold)` 反映、太字対応フォント使用
+- **Reduce Transparency**: 赤フラッシュは半透明使わず単色背景に切替
 
 ---
 
@@ -385,10 +424,20 @@ if !hasSeenTutorialV1_1 {
 
 ## 10. 着手判断
 
-実装着手は以下の 3 条件を満たしてから:
+**実装着手は Sprint 3 開始時点**、以下の 4 条件を全て満たしてから (HIGH-3 反映で Sprint 2 後半案は取り下げ):
 
 - [ ] Sprint 1 が TestFlight に提出済 (Phase 6 完了)
-- [ ] Sprint 1 KPI ベースライン取得済 (`docs/aso/sprint-1-baseline.md`)
-- [ ] Sprint 2 機能 (デイリー / 抜かれ通知 / シェア拡張) の優先度判断完了
+- [ ] Sprint 1 KPI ベースライン取得済 (`docs/aso/sprint-1-baseline.md` が main にマージ済み、§1 のベースライン取得手順 4 項目を実施)
+- [ ] **Sprint 2 (デイリー / 抜かれ通知 / シェア拡張) 完了済 + Sprint 2 振り返り終了**
+- [ ] Obsidian 「Sprint 2 計画書 draft」を「Sprint 2 完了報告」に昇格させ、本書を「Sprint 3 計画書」と同期 (ユーザー手動)
 
-3 条件が揃ったら `feature/onboarding-v1.1` ブランチで実装着手。
+4 条件が揃ったら `feature/onboarding-v1.1` ブランチで実装着手。
+
+### multi-agent-reviewer HIGH 指摘反映ステータス (2026-05-14)
+
+| ID | 指摘 | 反映先 | ステータス |
+|---|---|---|---|
+| HIGH-1 | 心拍音 + 振動 + 赤フラッシュの opt-out が振動のみ | §3 Step 3 手順 0、§5 アクセシビリティ表 | ✅ 反映 |
+| HIGH-2 | Step 3 スキップ動線なし (強制通過のメンタル負荷) | §3 Step 3 スキップ動線 + Analytics 分離 | ✅ 反映 |
+| HIGH-3 | Sprint 2 計画書との工数競合 | 冒頭メタ + 本 §10 (Sprint 3 単独 PR へ) | ✅ 反映 |
+| HIGH-4 | StageManager 構造誤認 + Floor.calculateBPM の clamp(1, ...) | §4 「実装変更点」表を全面書き換え | ✅ 反映 |
