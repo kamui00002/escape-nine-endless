@@ -181,31 +181,39 @@ struct ResultView: View {
     }
 
     private var resultTitle: some View {
-        Text(result == .win ? "VICTORY!" : "DEFEAT")
-            .font(.fantasyTitle())
-            .foregroundColor(result == .win ? Color(hex: GameColors.success) : Color(hex: GameColors.warning))
-            .overlay(
-                (result == .win ?
-                 LinearGradient(
-                     colors: [
-                         Color(hex: GameColors.success),
-                         Color(hex: GameColors.available)
-                     ],
-                     startPoint: .leading,
-                     endPoint: .trailing
-                 ) :
-                 LinearGradient(
-                     colors: [
-                         Color(hex: GameColors.warning),
-                         Color(hex: GameColors.enemy)
-                     ],
-                     startPoint: .leading,
-                     endPoint: .trailing
-                 ))
-                .mask(Text(result == .win ? "VICTORY!" : "DEFEAT").font(.fantasyTitle()))
+        let title = result == .win ? "VICTORY!" : "DEFEAT"
+        let gradient: LinearGradient = (result == .win)
+            ? LinearGradient(
+                colors: [
+                    Color(hex: GameColors.success),
+                    Color(hex: GameColors.available)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
             )
-            .shadow(color: (result == .win ? Color(hex: GameColors.success) : Color(hex: GameColors.warning)).opacity(0.5), radius: 15)
-            .bounceIn(delay: 0.1)
+            : LinearGradient(
+                colors: [
+                    Color(hex: GameColors.warning),
+                    Color(hex: GameColors.enemy)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        let shadowColor = result == .win
+            ? Color(hex: GameColors.success)
+            : Color(hex: GameColors.warning)
+
+        return HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            Text(title)
+                .font(.fantasyTitle())
+                .foregroundStyle(gradient)
+                .shadow(color: shadowColor.opacity(0.5), radius: 15)
+                .fixedSize(horizontal: true, vertical: false)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+        .bounceIn(delay: 0.1)
     }
 
     // MARK: - Sprint 1: 自己ベスト誘発演出
@@ -241,6 +249,8 @@ struct ResultView: View {
 
     private var statsSection: some View {
         GameCard {
+            // GameCard 内部は `VStack(alignment: .leading)` + `frame(maxWidth: .infinity, alignment: .leading)` のため、
+            // 子の自然幅でしか展開されず左寄りに見える。ここで明示的に maxWidth を広げて中央寄せ可能にする。
             VStack(spacing: 14) {
                 VStack(spacing: 4) {
                     Text("到達階層")
@@ -321,6 +331,7 @@ struct ResultView: View {
                         .foregroundColor(Color(hex: GameColors.textSecondary))
                 }
             }
+            .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 40)
         .slideIn(from: .bottom, delay: 0.4)
@@ -356,7 +367,7 @@ struct ResultView: View {
     /// 「もう一回」を画面下半分の主役に、シェア / ホームは補助ボタンとして小さく。
     private var buttonSection: some View {
         VStack(spacing: 14) {
-            // Sprint 1: 巨大リトライボタン (height: 180、font: fantasyTitle())
+            // Sprint 1: リトライボタン (主役だが画面の主導権は奪わない height)
             Button(action: {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 AnalyticsLogger.logRetryTapped(
@@ -365,15 +376,15 @@ struct ResultView: View {
                 )
                 onPlayAgain()
             }) {
-                VStack(spacing: 6) {
+                HStack(spacing: 10) {
                     Image(systemName: "arrow.clockwise.circle.fill")
-                        .font(.system(size: 44, weight: .bold))
+                        .font(.system(size: 30, weight: .bold))
                     Text("もう一回")
                         .font(.fantasySubheading())
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 180)
+                .frame(height: 96)
                 .background(
                     LinearGradient(
                         colors: [
