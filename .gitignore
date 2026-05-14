@@ -83,6 +83,13 @@ Secrets.xcconfig
 # バックアップファイル
 *.bak
 *.bak.*
+*.bak[0-9]*
+
+# Ad campaign 生成画像 (再現可能、リポジトリに含めない)
+# - ad-assets/meta/: Meta 広告キャンペーン用画像 (ads/generate-images.py で再生成)
+# - generated_imgs/: 試作画像置き場
+ad-assets/meta/concept-*/
+generated_imgs/
 
 # Temp/Log files
 *.swp
