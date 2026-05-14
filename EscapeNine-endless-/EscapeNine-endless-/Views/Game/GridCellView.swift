@@ -78,7 +78,26 @@ struct GridCellView: View {
                         // ベースのグリッドセル
                         RoundedRectangle(cornerRadius: 12)
                             .fill(
-                                isSelected
+                                // Into the Breach 風: マス背景色で陣営識別
+                                isPlayer
+                                ? LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.player).opacity(0.45),
+                                        Color(hex: GameColors.player).opacity(0.15)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                : isEnemy
+                                ? LinearGradient(
+                                    colors: [
+                                        Color(hex: GameColors.enemy).opacity(0.45),
+                                        Color(hex: GameColors.enemy).opacity(0.15)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                : isSelected
                                 ? LinearGradient(
                                     colors: [
                                         Color(hex: GameColors.available).opacity(0.35),
@@ -99,7 +118,25 @@ struct GridCellView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(
-                                        isAvailable
+                                        isPlayer
+                                        ? LinearGradient(
+                                            colors: [
+                                                Color(hex: GameColors.player),
+                                                Color(hex: GameColors.player).opacity(0.6)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                        : isEnemy
+                                        ? LinearGradient(
+                                            colors: [
+                                                Color(hex: GameColors.enemy),
+                                                Color(hex: GameColors.enemy).opacity(0.6)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                        : isAvailable
                                         ? LinearGradient(
                                             colors: [
                                                 Color(hex: GameColors.available),
@@ -116,7 +153,7 @@ struct GridCellView: View {
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
                                         ),
-                                        lineWidth: isAvailable ? 3 : 1.5
+                                        lineWidth: (isPlayer || isEnemy) ? 2.5 : (isAvailable ? 3 : 1.5)
                                     )
                             )
                             .frame(width: cellSize, height: cellSize)
@@ -157,33 +194,18 @@ struct GridCellView: View {
                     .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isPressed)
                 }
                 
-                // プレイヤー（見える場合のみ）
+                // プレイヤー（見える場合のみ） — Into the Breach 風: シャープなピクセル + 円ハロー無し
                 if isPlayer && isVisible {
                     if let sprite = playerSprite {
                         Image(sprite)
                             .resizable()
+                            .interpolation(.none)  // Nearest-Neighbor 補間でピクセル感を維持
                             .scaledToFit()
-                            .frame(width: characterSize * 0.9, height: characterSize * 0.9)
-                            .clipShape(Circle())  // 円形にクリップして背景を隠す
-                            .background(
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(hex: GameColors.player).opacity(0.3),
-                                                Color(hex: GameColors.player).opacity(0.1)
-                                            ],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
-                                    )
-                                    .frame(width: characterSize, height: characterSize)
-                            )
-                            .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
-                            // プレイヤーにグローエフェクト
-                            .glow(color: Color(hex: GameColors.player), radius: 15, intensity: 0.9)
-                            // プレイヤーに軽いパルス
-                            .pulse(minScale: 1.0, maxScale: 1.05, duration: 1.2)
+                            .frame(width: characterSize, height: characterSize)
+                            // 地面に落ちる薄い影だけ (オーラ系は廃止、マス背景色で陣営識別)
+                            .shadow(color: Color.black.opacity(0.45), radius: 2, x: 0, y: 2)
+                            // 軽いパルスは生存サインとして残す (キャラ自体のスケール変化)
+                            .pulse(minScale: 1.0, maxScale: 1.03, duration: 1.4)
                     } else {
                         // フォールバック: 元のCircle表示
                         Circle()
@@ -207,33 +229,18 @@ struct GridCellView: View {
                     }
                 }
                 
-                // 敵（見える場合のみ）
+                // 敵（見える場合のみ） — Into the Breach 風: シャープなピクセル + 円ハロー無し
                 if isEnemy && isVisible {
                     if let sprite = enemySprite {
                         Image(sprite)
                             .resizable()
+                            .interpolation(.none)  // Nearest-Neighbor 補間でピクセル感を維持
                             .scaledToFit()
-                            .frame(width: characterSize * 0.9, height: characterSize * 0.9)
-                            .clipShape(Circle())  // 円形にクリップして背景を隠す
-                            .background(
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(hex: GameColors.enemy).opacity(0.3),
-                                                Color(hex: GameColors.enemy).opacity(0.1)
-                                            ],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
-                                    )
-                                    .frame(width: characterSize, height: characterSize)
-                            )
-                            .shadow(color: Color(hex: GameColors.enemy).opacity(0.4), radius: 5, x: 0, y: 2)
-                            // 敵にグローエフェクト（脅威を強調）
-                            .glow(color: Color(hex: GameColors.enemy), radius: 18, intensity: 1.0)
-                            // 敵にパルス（プレイヤーより速く）
-                            .pulse(minScale: 1.0, maxScale: 1.08, duration: 0.9)
+                            .frame(width: characterSize, height: characterSize)
+                            // 敵は赤みのある影で「脅威」サイン (オーラ系は廃止、マス背景色で陣営識別)
+                            .shadow(color: Color(hex: GameColors.enemy).opacity(0.55), radius: 3, x: 0, y: 2)
+                            // 敵は少し速めのパルス (プレイヤー 1.4s に対し 1.0s)
+                            .pulse(minScale: 1.0, maxScale: 1.05, duration: 1.0)
                     } else {
                         // フォールバック: 元のCircle表示
                         Circle()
