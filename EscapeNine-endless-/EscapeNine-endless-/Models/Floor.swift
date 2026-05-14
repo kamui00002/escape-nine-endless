@@ -19,6 +19,12 @@ struct Floor {
     }
 
     static func calculateBPM(for floor: Int) -> Double {
+        // v1.1 オンボーディング: Floor 0 はプロローグ専用で常に bpmCurveStart (60 BPM)。
+        // 既存の clampedFloor - 1 ロジックは floor=0 で負値になり pow() で破綻するため、
+        // 明示的に早期 return する (docs/onboarding-v1.1-design.md §4 反映)。
+        if floor == TutorialConstants.prologueFloor {
+            return Constants.bpmCurveStart
+        }
         // べき乗曲線: BPM = start + (end - start) * (floor/99)^exponent
         // 序盤は緩やか、終盤に急加速
         let clampedFloor = max(1, min(floor, Constants.maxFloors))

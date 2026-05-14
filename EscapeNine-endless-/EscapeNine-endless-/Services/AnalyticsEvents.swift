@@ -50,6 +50,10 @@ enum AnalyticsEvent: String {
     case floorCleared = "eg_floor_cleared"
     // Sprint 2 Feature 2: 抜かれ通知
     case overtakenNotificationShown = "eg_overtaken_notification_shown"
+    // Sprint 3 v1.1 動的オンボーディング (docs/onboarding-v1.1-design.md §1)
+    case tutorialStarted = "eg_tutorial_started"
+    case tutorialStepCompleted = "eg_tutorial_step_completed"
+    case tutorialComplete = "eg_tutorial_complete"
 }
 
 // MARK: - Parameter Keys
@@ -81,6 +85,10 @@ enum AnalyticsParam {
 
     // 抜かれ通知時 (Sprint 2 F2)
     static let newRank = "new_rank"
+
+    // v1.1 オンボーディング (Sprint 3)
+    static let stepNumber = "step_number"
+    static let skipped = "skipped"
 }
 
 // MARK: - Defeat Reason Values
@@ -214,6 +222,35 @@ struct AnalyticsLogger {
     static func logOvertakenNotificationShown(newRank: Int) {
         log(.overtakenNotificationShown, parameters: [
             AnalyticsParam.newRank: newRank
+        ])
+    }
+
+    // MARK: - Sprint 3 v1.1 動的オンボーディング便利メソッド
+
+    /// `eg_tutorial_started` を送信する。
+    /// チュートリアル Step 1 開始時に呼び出す (オープニング遷移後)。
+    static func logTutorialStarted() {
+        log(.tutorialStarted)
+    }
+
+    /// `eg_tutorial_step_completed` を送信する。
+    /// 各 Step (1-4) 完了時に呼び出す。
+    /// - Parameters:
+    ///   - stepNumber: 完了した Step 番号 (1〜4)
+    ///   - skipped: ユーザーが Step をスキップした場合 true (Step 3 のヒヤリ演出スキップ等)
+    static func logTutorialStepCompleted(stepNumber: Int, skipped: Bool) {
+        log(.tutorialStepCompleted, parameters: [
+            AnalyticsParam.stepNumber: stepNumber,
+            AnalyticsParam.skipped: skipped
+        ])
+    }
+
+    /// `eg_tutorial_complete` を送信する。
+    /// Step 4 完了時 (チュートリアル全体終了) に呼び出す。
+    /// - Parameter elapsedSeconds: チュートリアル全体の所要時間 (秒)
+    static func logTutorialComplete(elapsedSeconds: Double) {
+        log(.tutorialComplete, parameters: [
+            AnalyticsParam.elapsedSeconds: elapsedSeconds
         ])
     }
 }

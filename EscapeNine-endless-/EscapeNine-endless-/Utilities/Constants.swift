@@ -117,6 +117,23 @@ enum Constants {
     }
 }
 
+/// v1.1 動的オンボーディング (Sprint 3) で使用する定数。
+/// 設計典拠: docs/onboarding-v1.1-design.md §3-§4
+enum TutorialConstants {
+    /// チュートリアル Step 4 で短縮した必要ターン数 (通常は 10 ターン)。
+    static let tutorialClearTurns: Int = 3
+
+    /// Floor 0 プロローグの必要ターン数。
+    static let prologueClearTurns: Int = 3
+
+    /// Floor 1 初回限定の安全シードに使用する最小プレイヤー敵距離。
+    /// `hasSeenTutorialV1_1 == true` の初回 1 回のみ適用。
+    static let prologueSafeMinDistance: Int = 3
+
+    /// プロローグフロア番号。`Floor.calculateBPM(for:)` で 0 を特別扱いする。
+    static let prologueFloor: Int = 0
+}
+
 enum GameColors {
     // 明るい冒険ファンタジー系カラーパレット
     static let main = "#f4a460"        // サンディブラウン（明るい冒険の色）
