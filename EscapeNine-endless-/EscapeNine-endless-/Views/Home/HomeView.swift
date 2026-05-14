@@ -94,6 +94,11 @@ struct HomeView: View {
             if !hasSeenTutorial {
                 showTutorial = true
             }
+
+            // Sprint 2 F2: 抜かれ検出 (GameCenter 認証済み + レート制限内なら no-op)。
+            Task {
+                await LeaderboardWatcher.shared.checkAndNotify()
+            }
         }
         .onChange(of: path) { oldPath, newPath in
             if oldPath.count > newPath.count {

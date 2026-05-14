@@ -91,6 +91,8 @@ struct EscapeNine_endless_App: App {
                     await purchaseManager.initialize()
                     // Game Center認証
                     gameCenterService.authenticate()
+                    // Sprint 2 F2: ローカル通知許可リクエスト (抜かれ通知用)
+                    await NotificationService.shared.requestPermission()
                 }
         }
     }
