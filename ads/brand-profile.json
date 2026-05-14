@@ -1,0 +1,27 @@
+{
+  "brand": {
+    "name": "Escape Nine: Endless",
+    "tagline": "ビートに乗れ。逃げ切れ。",
+    "description": "9マスの盤面で音楽のビートに合わせて逃げ続ける、ハイスピードなエンドレスチャレンジゲーム。シンプルなのに、やめられない。",
+    "app_store_category": "ゲーム / アーケード",
+    "platforms": ["iOS"]
+  },
+  "audience": {
+    "primary": "音ゲー・リズムゲーム好き（15-35歳）",
+    "secondary": "ハイスコア・やり込み系ゲーマー",
+    "pain_points": ["複雑すぎるゲームに疲れた", "隙間時間に遊べるゲームが欲しい"],
+    "desires": ["シンプルで熱くなれるゲーム", "友達と競い合えるスコアアタック"]
+  },
+  "brand_voice": {
+    "tone": "スピード感・興奮・シンプル・中毒性",
+    "keywords": ["ビート", "逃げろ", "階層", "BPM", "記録更新", "エンドレス"],
+    "avoid": ["複雑・重い・説明的"]
+  },
+  "colors": {
+    "primary": "#1A1A2E",
+    "secondary": "#E94560",
+    "accent": "#0F3460",
+    "highlight": "#FAFAFA"
+  },
+  "cta_options": ["無料でプレイ", "今すぐ逃げろ", "記録に挑戦"]
+}
