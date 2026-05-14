@@ -48,6 +48,8 @@ enum AnalyticsEvent: String {
     case retryTapped = "eg_retry_tapped"
     case homeTapped = "eg_home_tapped"
     case floorCleared = "eg_floor_cleared"
+    // Sprint 2 Feature 2: 抜かれ通知
+    case overtakenNotificationShown = "eg_overtaken_notification_shown"
 }
 
 // MARK: - Parameter Keys
@@ -76,6 +78,9 @@ enum AnalyticsParam {
 
     // 階層クリア時
     static let clearSeconds = "clear_seconds"
+
+    // 抜かれ通知時 (Sprint 2 F2)
+    static let newRank = "new_rank"
 }
 
 // MARK: - Defeat Reason Values
@@ -200,6 +205,15 @@ struct AnalyticsLogger {
         log(.floorCleared, parameters: [
             AnalyticsParam.floor: floor,
             AnalyticsParam.clearSeconds: clearSeconds
+        ])
+    }
+
+    /// `eg_overtaken_notification_shown` を送信する。
+    /// Sprint 2 Feature 2: 抜かれ通知が発火した時に呼び出す。
+    /// - Parameter newRank: 抜かれた後の新しい順位 (1-indexed)
+    static func logOvertakenNotificationShown(newRank: Int) {
+        log(.overtakenNotificationShown, parameters: [
+            AnalyticsParam.newRank: newRank
         ])
     }
 }
