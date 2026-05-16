@@ -73,6 +73,9 @@ class AudioManager: ObservableObject {
     private var bgmPlayer: AVAudioPlayer?
     private var fadeTimer: Timer?
     private(set) var currentBGMType: BGMType?
+    /// Sprint 3 v1.1 オンボーディング Step 3 で使用する心拍音ループ用プレイヤー。
+    /// 既存 BGM/SFX とは独立した経路 (BGM はメトロノーム + 楽曲、SFX は単発再生のため)。
+    private var heartbeatPlayer: AVAudioPlayer?
     
     // MARK: - Sound Effect Types
     enum SoundEffect: String {
@@ -386,8 +389,46 @@ class AudioManager: ObservableObject {
     var beatPublisher: AnyPublisher<Int, Never> {
         beatEngine.$currentBeat.eraseToAnyPublisher()
     }
-    
+
     var playingPublisher: AnyPublisher<Bool, Never> {
         beatEngine.$isPlaying.eraseToAnyPublisher()
+    }
+
+    // MARK: - Heartbeat Loop (Sprint 3 v1.1 オンボーディング Step 3 用)
+
+    /// 心拍音をループ再生する (v1.1 動的オンボーディング Step 3 の BPM 60 体験用)。
+    /// - 音源ファイル `heartbeat.{wav,mp3,m4a}` が Bundle に無い場合は警告ログのみで no-op
+    ///   (音源は Sprint 3 後半で追加予定)。
+    /// - 既存 BGM/SFX とは独立した AVAudioPlayer を使用する (チュートリアル中も Game BGM と
+    ///   共存可能、SFX の単発再生にも干渉しないため)。
+    /// - SFX 無効 (`isSFXEnabled == false`) の場合は再生しない (Reduce Motion / 効果音 0
+    ///   opt-out との整合)。
+    func startHeartbeatLoop() {
+        guard isSFXEnabled else { return }
+
+        // 既に再生中なら何もしない (連打安全)
+        if heartbeatPlayer?.isPlaying == true { return }
+
+        guard let url = findSoundFile(named: "heartbeat") else {
+            logger.info("Heartbeat sound file not found (skeleton stage, no-op)")
+            return
+        }
+
+        do {
+            heartbeatPlayer = try AVAudioPlayer(contentsOf: url)
+            heartbeatPlayer?.numberOfLoops = -1  // 無限ループ
+            heartbeatPlayer?.volume = Float(sfxVolume)
+            heartbeatPlayer?.prepareToPlay()
+            heartbeatPlayer?.play()
+        } catch {
+            logger.error("Heartbeat playback failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// 心拍音ループを停止し、プレイヤーを破棄する。
+    /// チュートリアル Step 3 を抜けるとき、またはチュートリアル全体を中断するときに呼ぶ。
+    func stopHeartbeatLoop() {
+        heartbeatPlayer?.stop()
+        heartbeatPlayer = nil
     }
 }
