@@ -152,6 +152,15 @@ class BeatEngine: ObservableObject {
         startBeatDetection()
     }
 
+    /// Sprint 3 v1.1 オンボーディング Step 3 等、外部要因で BeatEngine を一時停止する。
+    /// 意味的には `pause()` と同じだが、呼び出し意図 (チュートリアル中の心拍音と
+    /// ビート音の二重再生回避) を明示するための API。再開は既存の `resume()` を使う。
+    /// 既に停止中なら no-op (二重呼び出し安全)。
+    func suspend() {
+        guard isPlaying else { return }
+        pause()
+    }
+
     // MARK: - Turn Countdown Configuration
     func setTurnCountdownBeats(_ count: Int) {
         turnCountdownBeats = max(1, min(count, 10))
