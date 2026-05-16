@@ -79,7 +79,15 @@ class GameViewModel: ObservableObject {
     private let stageManager = StageManager.shared
 
     // MARK: - Constants
-    var maxTurns: Int { Constants.getMaxTurns(for: currentFloor) }
+    /// 現在の階層で必要なターン数。
+    /// Floor 0 (プロローグ) は TutorialConstants.prologueClearTurns (短縮) を返し、
+    /// 通常階層は Constants.getMaxTurns(for:) の動的計算を使う。
+    var maxTurns: Int {
+        if currentFloor == TutorialConstants.prologueFloor {
+            return TutorialConstants.prologueClearTurns
+        }
+        return Constants.getMaxTurns(for: currentFloor)
+    }
     private let maxSkillUsage = Constants.maxSkillUsage
 
     // MARK: - Character & Skill
@@ -498,6 +506,70 @@ class GameViewModel: ObservableObject {
             isDailyChallenge: dailyChallengeMode,
             characterId: currentCharacter.id
         )
+    }
+
+    /// Sprint 3 v1.1 動的オンボーディング Step 4 / プロローグ用エントリポイント。
+    ///
+    /// 通常 `startGame(aiLevel:)` との違い:
+    /// - `currentFloor = TutorialConstants.prologueFloor` (0)
+    /// - 配置はシード固定 (P=5 中央, E=1 左上)。距離 (Chebyshev) = 2 を確保
+    /// - `maxTurns` は `TutorialConstants.prologueClearTurns` (3) で短縮 (`maxTurns` プロパティ側で分岐)
+    /// - BPM 60 (`Floor.calculateBPM(for: 0)` 経由)
+    /// - 特殊ルールなし、デイリーチャレンジ無効
+    /// - AI 難易度は Easy 固定
+    /// - BGM 切り替えは行わない (呼び出し側のチュートリアル View が制御する想定)
+    ///
+    /// 設計典拠: `docs/onboarding-v1.1-design.md` §4 (Floor 0 プロローグ化)
+    func startPrologueFloor() {
+        currentFloor = TutorialConstants.prologueFloor
+        selectedAILevel = .easy
+
+        // 状態初期化 (startGame と同等)
+        turnCount = 0
+        gameStatus = .playing
+        skillUsageCount = 0
+        hasMovedThisTurn = false
+        isInvisible = false
+        enemyStoppedTurns = 0
+        isSkillActive = false
+        defeatReason = nil
+        showGameOverOverlay = false
+        shieldActive = false
+        comboCount = 0
+        lastTimingGrade = nil
+        showBossWarning = false
+
+        gameStartTime = Date()
+        floorStartTime = gameStartTime
+        elapsedSeconds = 0
+        nearMissDistance = 0
+
+        turnCountdown = Constants.turnCountdownBeats
+
+        // シード固定配置 (P=5 中央 / E=1 左上、Chebyshev 距離 2)
+        playerPosition = 5
+        enemyPosition = 1
+        pendingPlayerMove = nil
+
+        // 特殊ルール: なし
+        specialRule = .none
+        disappearedCells = []
+
+        // デイリーチャレンジ: プロローグでは無効
+        dailyChallengeMode = false
+        dailyChallengeConditions = []
+
+        // BPM 60 (Floor.calculateBPM(for: 0) = TutorialConstants.prologueBPM)
+        let bpm = stageManager.getBPM(for: TutorialConstants.prologueFloor)
+
+        // ゲーム開始カウントダウン → 完了後に BeatEngine 開始
+        // BGM は呼び出し側 (OnboardingTutorialView 等) で制御する想定のため、
+        // ここでは startBGM (BeatEngine のみ) を呼ぶ。playBGMMusic は呼ばない。
+        startGameStartCountdown { [weak self] in
+            guard let self = self else { return }
+            self.audioManager.resetTurnCountdown()
+            self.audioManager.startBGM(bpm: bpm)
+        }
     }
 
     // 移動先を指定（次のターンで移動）
