@@ -101,11 +101,17 @@ struct HomeView: View {
             // 既存ユーザー (hasSeenTutorial==true / hasSeenTutorialV1_1==false) も
             // v1.1 リリース後に 1 回だけ動的版を通る。
             //
-            // 本実装で有効化する判定 (現在はコメントアウト):
-            //     if !hasSeenTutorialV1_1 {
-            //         showOnboardingTutorialV1_1 = true
-            //         return
-            //     }
+            // 本実装で有効化する手順:
+            //   1. 下の `_ = hasSeenTutorialV1_1` 行を削除
+            //   2. 下の `if !hasSeenTutorial { showTutorial = true }` を以下の二段判定に置換:
+            //          if !hasSeenTutorialV1_1 {
+            //              showOnboardingTutorialV1_1 = true
+            //          } else if !hasSeenTutorial {
+            //              showTutorial = true
+            //          }
+            // 注意: `return` を使って早期脱出しないこと。
+            //   Sprint 2 F2 の `LeaderboardWatcher.shared.checkAndNotify()` (line 下方) を
+            //   オンボーディング表示ユーザーで silent skip させてしまう (抜かれ通知の regression)。
             _ = hasSeenTutorialV1_1 // フラグの未使用警告抑制 (v1.1 本実装で削除)
 
             // 初回起動時のみチュートリアルを表示 (2 回目以降は自動スキップ)。
