@@ -86,7 +86,7 @@ struct ResultView: View {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        HapticsHelper.impact(.light)
                         AnalyticsLogger.logRetryTapped(
                             fromFloor: floor,
                             secondsUntilTap: secondsUntilTap()
@@ -138,8 +138,7 @@ struct ResultView: View {
             }
 
             // Sprint 1: Game Over 表示時に Haptic フィードバック (PDF #1 のガイドライン)
-            let style: UIImpactFeedbackGenerator.FeedbackStyle = (result == .win) ? .heavy : .medium
-            UIImpactFeedbackGenerator(style: style).impactOccurred()
+            HapticsHelper.impact((result == .win) ? .heavy : .medium)
 
             if !adShown {
                 adShown = true
@@ -369,7 +368,7 @@ struct ResultView: View {
         VStack(spacing: 14) {
             // Sprint 1: リトライボタン (主役だが画面の主導権は奪わない height)
             Button(action: {
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                HapticsHelper.impact(.heavy)
                 AnalyticsLogger.logRetryTapped(
                     fromFloor: floor,
                     secondsUntilTap: secondsUntilTap()
@@ -408,7 +407,7 @@ struct ResultView: View {
             // Sprint 1: 補助ボタン (シェア + ホーム) を横並びで小さく
             HStack(spacing: 12) {
                 Button(action: {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    HapticsHelper.impact(.light)
                     showShareSheet = true
                 }) {
                     HStack(spacing: 6) {
@@ -431,7 +430,7 @@ struct ResultView: View {
                 .buttonStyle(.plain)
 
                 Button(action: {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    HapticsHelper.impact(.light)
                     AnalyticsLogger.logHomeTapped(fromFloor: floor)
                     onHome()
                 }) {

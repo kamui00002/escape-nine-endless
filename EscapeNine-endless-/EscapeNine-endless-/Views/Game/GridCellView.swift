@@ -27,8 +27,7 @@ struct GridCellView: View {
 
     var body: some View {
         Button(action: {
-            let impact = UIImpactFeedbackGenerator(style: isAvailable ? .medium : .light)
-            impact.impactOccurred()
+            HapticsHelper.impact(isAvailable ? .medium : .light)
             onTap()
         }) {
             ZStack {
