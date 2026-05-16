@@ -20,11 +20,14 @@ private let logger = Logger(
 /// 子 View (`TutorialHighlightView` / `DangerZoneView`) を盤面に重ねて
 /// チュートリアル意図を視覚化する。
 ///
-/// **本 PR スコープ**: 静的盤面プレビュー (タップ移動なし、AI 追跡なし)。
+/// **本 PR スコープ**: 静的盤面プレビュー + Step 3 アクセシビリティ動線
+/// (Reduce Motion 完全 opt-out + 強演出予告 + Step 3 専用スキップ)。
 ///
 /// **本 PR スコープ外 (別 PR で追加予定)**:
 /// - CLEAR バースト演出 (Step 4)
 /// - 心拍音 .wav 音源 (Step 3、現状 no-op)
+/// - 赤フラッシュ演出 (まだ未実装)
+/// - 触覚スイッチ `@AppStorage("hapticsEnabled")` の SettingsView 追加
 /// - GameViewModel.startPrologueFloor() 経由のプレイアブル化
 struct OnboardingTutorialView: View {
     @Binding var isPresented: Bool
@@ -32,11 +35,19 @@ struct OnboardingTutorialView: View {
     @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
     @AppStorage("hasSeenTutorialV1_1") private var hasSeenTutorialV1_1: Bool = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @State private var currentStep: Int = 1
     @State private var startTime: Date = Date()
+    @State private var showingStep3Warning: Bool = false
+    @State private var step3WarningTask: DispatchWorkItem?
 
     private let audioManager = AudioManager.shared
     private let totalSteps = 4
+
+    private static let step3WarningDuration: TimeInterval = 1.5
+    private static let step3SkipLongPressDuration: TimeInterval = 1.0
+    private static let step3SkipTapCount: Int = 3
 
     var body: some View {
         ZStack {
@@ -48,6 +59,9 @@ struct OnboardingTutorialView: View {
                 instructionForCurrentStep
                 boardForCurrentStep
                 Spacer(minLength: 0)
+                if currentStep == 3 {
+                    step3SkipControl
+                }
                 nextButton
             }
             .padding(.horizontal, 24)
@@ -63,13 +77,21 @@ struct OnboardingTutorialView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
+
+            if showingStep3Warning {
+                step3WarningOverlay
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: showingStep3Warning)
         .onAppear {
             startTime = Date()
             AnalyticsLogger.logTutorialStarted()
             logger.info("Onboarding tutorial started")
         }
         .onDisappear {
+            step3WarningTask?.cancel()
+            step3WarningTask = nil
             audioManager.stopHeartbeatLoop()
             audioManager.resumeBeatEngine()
         }
@@ -136,6 +158,65 @@ struct OnboardingTutorialView: View {
                 .foregroundColor(Color(hex: GameColors.text).opacity(0.6))
         }
         .accessibilityLabel("チュートリアルをスキップ")
+    }
+
+    /// Step 3 中のみ表示される「Step 3 だけ」をスキップする操作領域。
+    /// 3 タップまたは 1 秒長押しで発火 (誤タップ防止 / 設計書 §3 Step 3 手順 0)。
+    private var step3SkipControl: some View {
+        Text("長押し / 3 タップで Step 3 をスキップ")
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundColor(Color(hex: GameColors.warning))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(hex: GameColors.warning).opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color(hex: GameColors.warning), lineWidth: 1.2)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Step 3 をスキップ")
+            .accessibilityHint("3 回タップまたは 1 秒長押しで発火します")
+            .accessibilityAddTraits(.isButton)
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: Self.step3SkipLongPressDuration)
+                    .onEnded { _ in skipStep3() }
+            )
+            .simultaneousGesture(
+                TapGesture(count: Self.step3SkipTapCount)
+                    .onEnded { skipStep3() }
+            )
+    }
+
+    /// Step 3 開始前に 1.5 秒だけ表示する強演出予告オーバーレイ。
+    /// Reduce Motion ON のユーザーには表示せず Step 3 自体を skip する (設計書 §5)。
+    private var step3WarningOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.88)
+                .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 56, weight: .bold))
+                    .foregroundColor(Color(hex: GameColors.warning))
+                Text("次のステップは強い演出を含みます")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                Text("心拍音と振動が再生されます")
+                    .font(.body)
+                    .foregroundColor(.white.opacity(0.85))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 32)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("注意。次のステップは心拍音と振動を含む強い演出が再生されます")
     }
 
     // MARK: - Step content tables
@@ -222,26 +303,80 @@ struct OnboardingTutorialView: View {
 
     /// 「次へ」ボタンタップ時の処理。
     /// - Step ごとの完了 Analytics 発火
-    /// - Step 3 開始/終了時に AudioManager の心拍音 + BeatEngine 制御
+    /// - Step 2 → 3 遷移は Reduce Motion 判定で 3 通りに分岐:
+    ///   (a) reduceMotion ON → Step 3 をまるごと skip (Analytics: step 3 skipped)
+    ///   (b) reduceMotion OFF → 1.5 秒予告オーバーレイ → Step 3 開始 + 心拍音
+    /// - Step 3 → 4 遷移: 心拍音停止 + メトロノーム再開
     /// - Step 4 完了時に hasSeenTutorial / hasSeenTutorialV1_1 をセットして dismiss
     private func advance() {
         AnalyticsLogger.logTutorialStepCompleted(stepNumber: currentStep, skipped: false)
 
-        let nextStep = currentStep + 1
-        handleAudioTransition(from: currentStep, to: nextStep)
-
         if currentStep == totalSteps {
             complete()
-        } else {
-            currentStep = nextStep
+            return
         }
+
+        let nextStep = currentStep + 1
+
+        // Step 2 → 3 遷移: Reduce Motion ユーザーは Step 3 自体を skip
+        if currentStep == 2 && nextStep == 3 && reduceMotion {
+            AnalyticsLogger.logTutorialStepCompleted(stepNumber: 3, skipped: true)
+            logger.info("Step 3 skipped automatically (Reduce Motion enabled)")
+            currentStep = 4
+            return
+        }
+
+        // Step 2 → 3 遷移: 1.5 秒予告 → Step 3 開始 + 心拍音
+        if currentStep == 2 && nextStep == 3 {
+            presentStep3Warning()
+            return
+        }
+
+        // Step 3 → 4 遷移: 心拍音停止 + メトロノーム再開
+        if currentStep == 3 && nextStep == 4 {
+            audioManager.stopHeartbeatLoop()
+            audioManager.resumeBeatEngine()
+        }
+
+        currentStep = nextStep
     }
 
+    /// 全体スキップ (右上 ×)。現在の Step を skipped=true で記録して dismiss。
     private func skip() {
         AnalyticsLogger.logTutorialStepCompleted(stepNumber: currentStep, skipped: true)
+        step3WarningTask?.cancel()
+        step3WarningTask = nil
+        showingStep3Warning = false
         audioManager.stopHeartbeatLoop()
         audioManager.resumeBeatEngine()
         complete()
+    }
+
+    /// Step 3 だけをスキップして Step 4 へ進める (チュートリアル全体は完走扱い)。
+    /// 右上 × の `skip()` とは別物 (Analytics 発火経路もスコープも異なる)。
+    private func skipStep3() {
+        guard currentStep == 3 else { return }
+        AnalyticsLogger.logTutorialStepCompleted(stepNumber: 3, skipped: true)
+        logger.info("Step 3 skipped by user gesture")
+        audioManager.stopHeartbeatLoop()
+        audioManager.resumeBeatEngine()
+        currentStep = 4
+    }
+
+    /// 1.5 秒の強演出予告オーバーレイを表示してから Step 3 へ自動遷移。
+    private func presentStep3Warning() {
+        step3WarningTask?.cancel()
+        showingStep3Warning = true
+
+        let task = DispatchWorkItem { [self] in
+            showingStep3Warning = false
+            step3WarningTask = nil
+            currentStep = 3
+            audioManager.suspendBeatEngine()
+            audioManager.startHeartbeatLoop()
+        }
+        step3WarningTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.step3WarningDuration, execute: task)
     }
 
     private func complete() {
@@ -253,19 +388,6 @@ struct OnboardingTutorialView: View {
         hasSeenTutorialV1_1 = true
 
         isPresented = false
-    }
-
-    /// Step 遷移時の音響制御。
-    /// - Step 3 開始 (2 → 3): メトロノーム停止 + 心拍音開始
-    /// - Step 3 終了 (3 → 4): 心拍音停止 + メトロノーム再開
-    private func handleAudioTransition(from: Int, to: Int) {
-        if from == 2 && to == 3 {
-            audioManager.suspendBeatEngine()
-            audioManager.startHeartbeatLoop()
-        } else if from == 3 && to == 4 {
-            audioManager.stopHeartbeatLoop()
-            audioManager.resumeBeatEngine()
-        }
     }
 }
 
