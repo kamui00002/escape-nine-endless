@@ -537,19 +537,29 @@ private struct TutorialStep4Game: View {
     let totalTurns: Int
     let onClear: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @State private var playerPos: Int = 1
     @State private var enemyPos: Int = 9
     @State private var turnsCompleted: Int = 0
     @State private var hasCleared: Bool = false
+    @State private var showingClearBurst: Bool = false
 
     /// 敵スクリプト (1-indexed ターン)。3 ターン分用意し、最終ターンは固定位置に留める。
     private let enemyScript: [Int] = [6, 3, 3]
     private let cellSpacing: CGFloat = 6
+    private static let clearBurstDuration: TimeInterval = 1.8
 
     var body: some View {
         VStack(spacing: 10) {
             turnCounter
             boardView
+        }
+        .overlay {
+            if showingClearBurst {
+                clearBurstOverlay
+                    .allowsHitTesting(false)
+            }
         }
     }
 
@@ -661,11 +671,54 @@ private struct TutorialStep4Game: View {
         turnsCompleted = nextTurn
         enemyPos = scriptedEnemyPosition(after: nextTurn)
 
-        // 3. クリア検知
+        // 3. クリア検知 + バースト演出トリガー
         if turnsCompleted >= totalTurns && !hasCleared {
             hasCleared = true
+            showingClearBurst = true
             onClear()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.clearBurstDuration) {
+                withAnimation(.easeOut(duration: 0.35)) {
+                    showingClearBurst = false
+                }
+            }
         }
+    }
+
+    /// 数字スケールアップ + パーティクル風の星を放射状に配置するクリア演出。
+    /// Reduce Motion ON のときはアニメーションを止めて静的表示にフォールバック (HIG Accessibility)。
+    @ViewBuilder
+    private var clearBurstOverlay: some View {
+        ZStack {
+            if !reduceMotion {
+                ForEach(0..<8, id: \.self) { index in
+                    let angle = Double(index) * .pi / 4
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(Color(hex: GameColors.textSecondary))
+                        .glow(color: Color(hex: GameColors.accent), radius: 10, intensity: 0.9)
+                        .offset(x: cos(angle) * 95, y: sin(angle) * 95)
+                        .bounceIn(delay: Double(index) * 0.04)
+                }
+            }
+
+            Group {
+                if reduceMotion {
+                    clearTextLabel
+                } else {
+                    clearTextLabel
+                        .bounceIn()
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var clearTextLabel: some View {
+        Text("CLEAR!")
+            .font(.system(size: 56, weight: .heavy, design: .rounded))
+            .foregroundColor(Color(hex: GameColors.success))
+            .glow(color: Color(hex: GameColors.success), radius: 14, intensity: 0.9)
     }
 
     private var accessibilityDescription: String {
