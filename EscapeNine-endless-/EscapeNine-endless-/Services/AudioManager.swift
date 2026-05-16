@@ -431,4 +431,19 @@ class AudioManager: ObservableObject {
         heartbeatPlayer?.stop()
         heartbeatPlayer = nil
     }
+
+    // MARK: - BeatEngine Suspend (Sprint 3 v1.1 オンボーディング Step 3 用)
+
+    /// チュートリアル等で BeatEngine (メトロノーム) を一時停止する。
+    /// 心拍音ループと既存のビート音が二重再生されるのを避けるため、Step 3 開始前に呼ぶ。
+    /// 再開は `resumeBeatEngine()`。
+    func suspendBeatEngine() {
+        beatEngine.suspend()
+    }
+
+    /// `suspendBeatEngine()` で停止した BeatEngine を再開する。
+    /// チュートリアル Step 3 から抜けるとき、または通常ゲームに戻るときに呼ぶ。
+    func resumeBeatEngine() {
+        beatEngine.resume()
+    }
 }
