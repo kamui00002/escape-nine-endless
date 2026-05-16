@@ -41,6 +41,7 @@ struct OnboardingTutorialView: View {
     @State private var startTime: Date = Date()
     @State private var showingStep3Warning: Bool = false
     @State private var step3WarningTask: DispatchWorkItem?
+    @State private var step4Cleared: Bool = false
 
     private let audioManager = AudioManager.shared
     private let totalSteps = 4
@@ -123,17 +124,30 @@ struct OnboardingTutorialView: View {
 
     @ViewBuilder
     private var boardForCurrentStep: some View {
-        let config = Self.boardConfig(for: currentStep)
-        TutorialBoardPreview(
-            playerPos: config.playerPos,
-            enemyPos: config.enemyPos,
-            highlightedPositions: config.highlightedPositions,
-            dangerPositions: config.dangerPositions,
-            stepNumber: currentStep,
-            totalSteps: totalSteps,
-            instructionTitle: Self.instructionCopy(for: currentStep).title
-        )
-        .frame(maxWidth: 320)
+        if currentStep == totalSteps {
+            TutorialStep4Game(
+                totalTurns: 3,
+                onClear: { step4Cleared = true }
+            )
+            .frame(maxWidth: 320)
+        } else {
+            let config = Self.boardConfig(for: currentStep)
+            TutorialBoardPreview(
+                playerPos: config.playerPos,
+                enemyPos: config.enemyPos,
+                highlightedPositions: config.highlightedPositions,
+                dangerPositions: config.dangerPositions,
+                stepNumber: currentStep,
+                totalSteps: totalSteps,
+                instructionTitle: Self.instructionCopy(for: currentStep).title
+            )
+            .frame(maxWidth: 320)
+        }
+    }
+
+    /// Step 4 の「はじめる」ボタンは 3 ターン耐えるまで disable する (達成感の演出)。
+    private var isNextButtonDisabled: Bool {
+        currentStep == totalSteps && !step4Cleared
     }
 
     private var nextButton: some View {
@@ -144,10 +158,12 @@ struct OnboardingTutorialView: View {
                 .foregroundColor(Color(hex: GameColors.background))
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
-                .background(Color(hex: GameColors.accent))
+                .background(Color(hex: GameColors.accent).opacity(isNextButtonDisabled ? 0.35 : 1.0))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .disabled(isNextButtonDisabled)
         .accessibilityLabel(currentStep == totalSteps ? "チュートリアルを終えてゲームを始める" : "次のステップへ進む")
+        .accessibilityHint(isNextButtonDisabled ? "盤面で 3 ターン耐えると有効になります" : "")
     }
 
     private var skipButton: some View {
@@ -253,7 +269,7 @@ struct OnboardingTutorialView: View {
         case 4:
             return InstructionCopy(
                 title: "階層クリア",
-                subtitle: "10 ターン耐えきれば次の階層へ。本当の旅が始まる"
+                subtitle: "周囲のマスをタップして 3 ターン逃げ切ろう。本当の旅が始まる"
             )
         default:
             return InstructionCopy(title: "", subtitle: "")
@@ -501,6 +517,163 @@ private struct TutorialBoardPreview: View {
             parts.append("危険圏 \(dangerPositions.count) 箇所")
         }
         return parts.joined(separator: "、")
+    }
+}
+
+/// Step 4 専用のミニプレイアブル盤面 (タップで移動 + スクリプト敵 + 3 ターン)。
+///
+/// インタラクション最小化方針:
+/// - タップで隣接 8 方向のマスに移動 (TutorialBoardGeometry.adjacent8 を流用)
+/// - 敵は固定スクリプトで移動 (AI 不使用、BeatEngine 不使用)
+/// - スクリプトとタップ可能セルの組み合わせで **算数的に衝突不可** な配置を保証:
+///   - 開始: player=1, enemy=9 (最大距離 = 4)
+///   - 敵スクリプト: ターン 1 後 → 6, ターン 2 後 → 3, ターン 3 後 → 3 (固定)
+///   - プレイヤーが選べるマスから敵の現在位置と次ターン位置を除外 (二重ガード)
+/// - 3 ターン耐えたら `onClear()` を発火 (親側で「はじめる」ボタンが活性化)
+///
+/// **このスコープ外** (#11 以降で追加予定):
+/// - AIEngine 接続、BeatEngine 連動、敗北リトライ、衝突演出、CLEAR バースト演出
+private struct TutorialStep4Game: View {
+    let totalTurns: Int
+    let onClear: () -> Void
+
+    @State private var playerPos: Int = 1
+    @State private var enemyPos: Int = 9
+    @State private var turnsCompleted: Int = 0
+    @State private var hasCleared: Bool = false
+
+    /// 敵スクリプト (1-indexed ターン)。3 ターン分用意し、最終ターンは固定位置に留める。
+    private let enemyScript: [Int] = [6, 3, 3]
+    private let cellSpacing: CGFloat = 6
+
+    var body: some View {
+        VStack(spacing: 10) {
+            turnCounter
+            boardView
+        }
+    }
+
+    private var turnCounter: some View {
+        HStack(spacing: 8) {
+            Text("ターン")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(Color(hex: GameColors.text).opacity(0.75))
+            Text("\(min(turnsCompleted, totalTurns)) / \(totalTurns)")
+                .font(.title3)
+                .fontWeight(.bold)
+                .foregroundColor(Color(hex: GameColors.accent))
+                .monospacedDigit()
+            if hasCleared {
+                Text("クリア!")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color(hex: GameColors.success))
+                    .padding(.leading, 8)
+            }
+        }
+    }
+
+    private var boardView: some View {
+        GeometryReader { geometry in
+            let cellSize = computeCellSize(for: geometry)
+            VStack(spacing: cellSpacing) {
+                ForEach(0..<3, id: \.self) { row in
+                    HStack(spacing: cellSpacing) {
+                        ForEach(0..<3, id: \.self) { col in
+                            let position = row * 3 + col + 1
+                            cell(at: position, cellSize: cellSize)
+                                .contentShape(Rectangle())
+                                .onTapGesture { handleTap(on: position) }
+                        }
+                    }
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step 4 プレイ盤面")
+        .accessibilityValue(accessibilityDescription)
+    }
+
+    @ViewBuilder
+    private func cell(at position: Int, cellSize: CGFloat) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(hex: GameColors.backgroundSecondary))
+                .frame(width: cellSize, height: cellSize)
+
+            if position == enemyPos {
+                Image("red_oni")
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFit()
+                    .frame(width: cellSize * 0.78, height: cellSize * 0.78)
+            } else if position == playerPos {
+                Image("hero")
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFit()
+                    .frame(width: cellSize * 0.78, height: cellSize * 0.78)
+            }
+
+            if isTappable(position) {
+                TutorialHighlightView(cellSize: cellSize)
+            }
+        }
+        .frame(width: cellSize, height: cellSize)
+    }
+
+    private func computeCellSize(for geometry: GeometryProxy) -> CGFloat {
+        let side = min(geometry.size.width, geometry.size.height)
+        let totalSpacing = cellSpacing * 2
+        return max(40, (side - totalSpacing) / 3)
+    }
+
+    /// 現在タップ可能なマスか判定。
+    /// - プレイヤー隣接 8 マス
+    /// - 敵の現在位置と「次ターン位置」を除外 (二重衝突ガード)
+    /// - クリア後はタップ不可
+    private func isTappable(_ position: Int) -> Bool {
+        guard !hasCleared else { return false }
+        guard position != playerPos else { return false }
+        guard position != enemyPos else { return false }
+        let nextEnemyPos = scriptedEnemyPosition(after: turnsCompleted + 1)
+        guard position != nextEnemyPos else { return false }
+        return TutorialBoardGeometry.adjacent8(of: playerPos).contains(position)
+    }
+
+    /// 1-indexed ターン後の敵スクリプト位置 (範囲外なら現在位置を維持)。
+    private func scriptedEnemyPosition(after turn: Int) -> Int {
+        guard turn >= 1, turn <= enemyScript.count else { return enemyPos }
+        return enemyScript[turn - 1]
+    }
+
+    private func handleTap(on position: Int) {
+        guard isTappable(position) else { return }
+
+        // 1. プレイヤー移動
+        playerPos = position
+
+        // 2. ターン進行 + 敵スクリプト適用
+        let nextTurn = turnsCompleted + 1
+        turnsCompleted = nextTurn
+        enemyPos = scriptedEnemyPosition(after: nextTurn)
+
+        // 3. クリア検知
+        if turnsCompleted >= totalTurns && !hasCleared {
+            hasCleared = true
+            onClear()
+        }
+    }
+
+    private var accessibilityDescription: String {
+        if hasCleared {
+            return "Step 4 クリア。プレイヤー位置 \(playerPos)、鬼位置 \(enemyPos)"
+        }
+        let remaining = totalTurns - turnsCompleted
+        return "プレイヤー位置 \(playerPos)、鬼位置 \(enemyPos)、残り \(remaining) ターン。光るマスをタップして移動"
     }
 }
 
