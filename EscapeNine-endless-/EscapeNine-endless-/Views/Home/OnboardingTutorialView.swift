@@ -14,22 +14,18 @@ private let logger = Logger(
     category: "OnboardingTutorialView"
 )
 
-/// v1.1 動的オンボーディングの 4 ステップを順に提示する View (スケルトン版)。
+/// v1.1 動的オンボーディングの 4 ステップを順に提示する View。
 ///
-/// 本 PR は **動く最小スケルトン** のみ:
-/// - 4 ステップの容器 + 「次へ」ボタン + 右上 × スキップ
-/// - Step 3 開始時に AudioManager.startHeartbeatLoop() + suspendBeatEngine()、
-///   Step 3 → 4 遷移時に stopHeartbeatLoop() + resumeBeatEngine()
-/// - 完了/スキップ時に hasSeenTutorial と hasSeenTutorialV1_1 を両方 true にセット
-/// - Analytics: started / stepCompleted / complete
+/// 各 Step は **静的ミニ盤面** + **TutorialStepInstructionView** で構成され、
+/// 子 View (`TutorialHighlightView` / `DangerZoneView`) を盤面に重ねて
+/// チュートリアル意図を視覚化する。
 ///
-/// **未実装 (本 PR スコープ外、別 PR で追加予定)**:
-/// - TutorialHighlightView (中央プレイヤー + 隣接マス点滅)
-/// - 危険圏オーバーレイ (斜線パターン + 警告アイコン)
-/// - CLEAR バースト演出
-/// - 心拍音 .wav 音源 (現状 no-op)
-/// - Reduce Motion / VoiceOver 完全対応
-/// - GameViewModel.startPrologueFloor() 経由の Step 4 プレイアブル化
+/// **本 PR スコープ**: 静的盤面プレビュー (タップ移動なし、AI 追跡なし)。
+///
+/// **本 PR スコープ外 (別 PR で追加予定)**:
+/// - CLEAR バースト演出 (Step 4)
+/// - 心拍音 .wav 音源 (Step 3、現状 no-op)
+/// - GameViewModel.startPrologueFloor() 経由のプレイアブル化
 struct OnboardingTutorialView: View {
     @Binding var isPresented: Bool
 
@@ -40,24 +36,24 @@ struct OnboardingTutorialView: View {
     @State private var startTime: Date = Date()
 
     private let audioManager = AudioManager.shared
+    private let totalSteps = 4
 
     var body: some View {
         ZStack {
-            // 背景
             Color(hex: GameColors.background)
                 .ignoresSafeArea()
 
-            VStack(spacing: 32) {
+            VStack(spacing: 18) {
                 stepIndicator
-                Spacer()
-                stepContent
-                Spacer()
+                instructionForCurrentStep
+                boardForCurrentStep
+                Spacer(minLength: 0)
                 nextButton
             }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 48)
+            .padding(.horizontal, 24)
+            .padding(.top, 56)
+            .padding(.bottom, 28)
 
-            // 右上 スキップボタン
             VStack {
                 HStack {
                     Spacer()
@@ -74,7 +70,6 @@ struct OnboardingTutorialView: View {
             logger.info("Onboarding tutorial started")
         }
         .onDisappear {
-            // 念のための cleanup (途中 dismiss 時に心拍音/BeatEngine が残らないように)
             audioManager.stopHeartbeatLoop()
             audioManager.resumeBeatEngine()
         }
@@ -84,67 +79,44 @@ struct OnboardingTutorialView: View {
 
     private var stepIndicator: some View {
         HStack(spacing: 8) {
-            ForEach(1...4, id: \.self) { step in
+            ForEach(1...totalSteps, id: \.self) { step in
                 Capsule()
                     .fill(step <= currentStep ? Color(hex: GameColors.accent) : Color.gray.opacity(0.3))
                     .frame(width: step == currentStep ? 32 : 16, height: 6)
             }
         }
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder
-    private var stepContent: some View {
-        switch currentStep {
-        case 1:
-            stepPlaceholder(
-                title: "Step 1: 移動を覚える",
-                subtitle: "中央のプレイヤーから隣のマスへ移動できます",
-                systemImage: "arrow.up.right.and.arrow.down.left.rectangle"
-            )
-        case 2:
-            stepPlaceholder(
-                title: "Step 2: 鬼との距離",
-                subtitle: "鬼の隣のマス (危険圏) には入らないように",
-                systemImage: "exclamationmark.triangle"
-            )
-        case 3:
-            stepPlaceholder(
-                title: "Step 3: ビートに乗る",
-                subtitle: "心拍音 BPM 60。リズムに合わせて移動してみよう",
-                systemImage: "heart.fill"
-            )
-        case 4:
-            stepPlaceholder(
-                title: "Step 4: 3 ターン耐える",
-                subtitle: "実戦練習。3 ターン逃げ切ればクリア",
-                systemImage: "flag.checkered"
-            )
-        default:
-            EmptyView()
-        }
+    private var instructionForCurrentStep: some View {
+        let copy = Self.instructionCopy(for: currentStep)
+        TutorialStepInstructionView(
+            stepNumber: currentStep,
+            totalSteps: totalSteps,
+            title: copy.title,
+            subtitle: copy.subtitle
+        )
     }
 
-    private func stepPlaceholder(title: String, subtitle: String, systemImage: String) -> some View {
-        VStack(spacing: 24) {
-            Image(systemName: systemImage)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 80, height: 80)
-                .foregroundColor(Color(hex: GameColors.accent))
-            Text(title)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(Color(hex: GameColors.text))
-            Text(subtitle)
-                .font(.body)
-                .foregroundColor(Color(hex: GameColors.text).opacity(0.85))
-                .multilineTextAlignment(.center)
-        }
+    @ViewBuilder
+    private var boardForCurrentStep: some View {
+        let config = Self.boardConfig(for: currentStep)
+        TutorialBoardPreview(
+            playerPos: config.playerPos,
+            enemyPos: config.enemyPos,
+            highlightedPositions: config.highlightedPositions,
+            dangerPositions: config.dangerPositions,
+            stepNumber: currentStep,
+            totalSteps: totalSteps,
+            instructionTitle: Self.instructionCopy(for: currentStep).title
+        )
+        .frame(maxWidth: 320)
     }
 
     private var nextButton: some View {
         Button(action: advance) {
-            Text(currentStep == 4 ? "はじめる" : "次へ")
+            Text(currentStep == totalSteps ? "はじめる" : "次へ")
                 .font(.headline)
                 .fontWeight(.bold)
                 .foregroundColor(Color(hex: GameColors.background))
@@ -153,6 +125,7 @@ struct OnboardingTutorialView: View {
                 .background(Color(hex: GameColors.accent))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .accessibilityLabel(currentStep == totalSteps ? "チュートリアルを終えてゲームを始める" : "次のステップへ進む")
     }
 
     private var skipButton: some View {
@@ -165,6 +138,86 @@ struct OnboardingTutorialView: View {
         .accessibilityLabel("チュートリアルをスキップ")
     }
 
+    // MARK: - Step content tables
+
+    private struct InstructionCopy {
+        let title: String
+        let subtitle: String
+    }
+
+    private struct BoardConfig {
+        let playerPos: Int
+        let enemyPos: Int?
+        let highlightedPositions: Set<Int>
+        let dangerPositions: Set<Int>
+    }
+
+    private static func instructionCopy(for step: Int) -> InstructionCopy {
+        switch step {
+        case 1:
+            return InstructionCopy(
+                title: "動きを覚える",
+                subtitle: "タップで周囲 8 マスのどこへでも移動できる"
+            )
+        case 2:
+            return InstructionCopy(
+                title: "影を避ける",
+                subtitle: "鬼の隣接マスは危険圏。毎ターン 1 マスずつ近づいてくる"
+            )
+        case 3:
+            return InstructionCopy(
+                title: "ヒヤリ体験",
+                subtitle: "あと 1 マスで影に飲まれる。冷静に逃げ道を読み切ろう"
+            )
+        case 4:
+            return InstructionCopy(
+                title: "階層クリア",
+                subtitle: "10 ターン耐えきれば次の階層へ。本当の旅が始まる"
+            )
+        default:
+            return InstructionCopy(title: "", subtitle: "")
+        }
+    }
+
+    private static func boardConfig(for step: Int) -> BoardConfig {
+        switch step {
+        case 1:
+            // 中央プレイヤー + 周囲 8 マスをハイライト
+            return BoardConfig(
+                playerPos: 5,
+                enemyPos: nil,
+                highlightedPositions: TutorialBoardGeometry.adjacent8(of: 5),
+                dangerPositions: []
+            )
+        case 2:
+            // プレイヤー対角配置 + 鬼の隣接 8 マスを危険圏
+            return BoardConfig(
+                playerPos: 1,
+                enemyPos: 9,
+                highlightedPositions: [],
+                dangerPositions: TutorialBoardGeometry.adjacent8(of: 9)
+            )
+        case 3:
+            // 中央プレイヤー + 鬼が隣接 (位置 4) でヒヤリ状態
+            return BoardConfig(
+                playerPos: 5,
+                enemyPos: 4,
+                highlightedPositions: [],
+                dangerPositions: TutorialBoardGeometry.adjacent8(of: 4)
+            )
+        case 4:
+            // 距離最大の安全配置 (Step 4 は枠のみ、演出は別 PR)
+            return BoardConfig(
+                playerPos: 1,
+                enemyPos: 9,
+                highlightedPositions: [],
+                dangerPositions: []
+            )
+        default:
+            return BoardConfig(playerPos: 5, enemyPos: nil, highlightedPositions: [], dangerPositions: [])
+        }
+    }
+
     // MARK: - Actions
 
     /// 「次へ」ボタンタップ時の処理。
@@ -174,11 +227,10 @@ struct OnboardingTutorialView: View {
     private func advance() {
         AnalyticsLogger.logTutorialStepCompleted(stepNumber: currentStep, skipped: false)
 
-        // Step 遷移に伴う音響制御
         let nextStep = currentStep + 1
         handleAudioTransition(from: currentStep, to: nextStep)
 
-        if currentStep == 4 {
+        if currentStep == totalSteps {
             complete()
         } else {
             currentStep = nextStep
@@ -187,7 +239,6 @@ struct OnboardingTutorialView: View {
 
     private func skip() {
         AnalyticsLogger.logTutorialStepCompleted(stepNumber: currentStep, skipped: true)
-        // スキップ時も音響 cleanup を確実に
         audioManager.stopHeartbeatLoop()
         audioManager.resumeBeatEngine()
         complete()
@@ -198,7 +249,6 @@ struct OnboardingTutorialView: View {
         AnalyticsLogger.logTutorialComplete(elapsedSeconds: elapsed)
         logger.info("Onboarding tutorial completed in \(elapsed, privacy: .public) seconds")
 
-        // 両フラグセット (PR #30 scaffold の併存ルールに従う)
         hasSeenTutorial = true
         hasSeenTutorialV1_1 = true
 
@@ -219,6 +269,130 @@ struct OnboardingTutorialView: View {
     }
 }
 
-#Preview("Onboarding Step 1") {
+// MARK: - Private board preview
+
+/// 1〜9 のマス座標を扱うヘルパー (本 View 専用のため private)。
+private enum TutorialBoardGeometry {
+    /// 8 方向隣接マス (要件定義書「縦横斜め 8 方向」)。位置外は除外。
+    static func adjacent8(of position: Int) -> Set<Int> {
+        guard (1...9).contains(position) else { return [] }
+        let row = (position - 1) / 3
+        let col = (position - 1) % 3
+        var result: Set<Int> = []
+        for dr in -1...1 {
+            for dc in -1...1 {
+                guard dr != 0 || dc != 0 else { continue }
+                let nr = row + dr
+                let nc = col + dc
+                guard (0...2).contains(nr), (0...2).contains(nc) else { continue }
+                result.insert(nr * 3 + nc + 1)
+            }
+        }
+        return result
+    }
+}
+
+/// チュートリアル専用の静的 3x3 盤面プレビュー。
+///
+/// インタラクションなし (タップ移動・AI 追跡・カウントダウンは別 PR)。
+/// 親 OnboardingTutorialView が `BoardConfig` を Step ごとに切り替える。
+private struct TutorialBoardPreview: View {
+    let playerPos: Int
+    let enemyPos: Int?
+    let highlightedPositions: Set<Int>
+    let dangerPositions: Set<Int>
+    let stepNumber: Int
+    let totalSteps: Int
+    let instructionTitle: String
+
+    private let cellSpacing: CGFloat = 6
+
+    var body: some View {
+        GeometryReader { geometry in
+            let cellSize = computeCellSize(for: geometry)
+            VStack(spacing: cellSpacing) {
+                ForEach(0..<3, id: \.self) { row in
+                    HStack(spacing: cellSpacing) {
+                        ForEach(0..<3, id: \.self) { col in
+                            let position = row * 3 + col + 1
+                            cell(at: position, cellSize: cellSize)
+                        }
+                    }
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(stepNumber) / \(totalSteps): \(instructionTitle)")
+        .accessibilityValue(accessibilityDescription)
+    }
+
+    private func computeCellSize(for geometry: GeometryProxy) -> CGFloat {
+        let side = min(geometry.size.width, geometry.size.height)
+        let totalSpacing = cellSpacing * 2
+        return max(40, (side - totalSpacing) / 3)
+    }
+
+    @ViewBuilder
+    private func cell(at position: Int, cellSize: CGFloat) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(hex: GameColors.backgroundSecondary))
+                .frame(width: cellSize, height: cellSize)
+
+            if dangerPositions.contains(position) {
+                DangerZoneView(cellSize: cellSize)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            if let enemyPos, enemyPos == position {
+                Image("red_oni")
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFit()
+                    .frame(width: cellSize * 0.78, height: cellSize * 0.78)
+            } else if position == playerPos {
+                Image("hero")
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFit()
+                    .frame(width: cellSize * 0.78, height: cellSize * 0.78)
+            }
+
+            if highlightedPositions.contains(position) {
+                TutorialHighlightView(cellSize: cellSize)
+            }
+        }
+        .frame(width: cellSize, height: cellSize)
+    }
+
+    private var accessibilityDescription: String {
+        var parts: [String] = ["プレイヤー位置 \(playerPos)"]
+        if let enemyPos {
+            parts.append("鬼位置 \(enemyPos)")
+        }
+        if !highlightedPositions.isEmpty {
+            parts.append("移動可能マス \(highlightedPositions.count) 箇所")
+        }
+        if !dangerPositions.isEmpty {
+            parts.append("危険圏 \(dangerPositions.count) 箇所")
+        }
+        return parts.joined(separator: "、")
+    }
+}
+
+// MARK: - Previews
+
+#Preview("iPhone — Step 1 (default)") {
     OnboardingTutorialView(isPresented: .constant(true))
+}
+
+#Preview("iPhone SE 縦長検証", traits: .fixedLayout(width: 375, height: 667)) {
+    OnboardingTutorialView(isPresented: .constant(true))
+}
+
+#Preview("iPad 横向き — landscape") {
+    OnboardingTutorialView(isPresented: .constant(true))
+        .frame(width: 1024, height: 768)
 }
