@@ -383,9 +383,8 @@ class GameViewModel: ObservableObject {
             }
             DispatchQueue.main.async {
                 self.gameStartCountdown -= 1
-                // Haptic feedback
-                let generator = UIImpactFeedbackGenerator(style: .heavy)
-                generator.impactOccurred()
+                // Haptic feedback (Sprint 3 #12)
+                HapticsHelper.impact(.heavy)
 
                 if self.gameStartCountdown <= 0 {
                     timer.invalidate()

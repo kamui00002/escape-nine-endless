@@ -210,9 +210,8 @@ class BeatEngine: ObservableObject {
             let isAccent = (self.turnCountdown == 0)
             self.playTick(accent: isAccent)
 
-            // Haptic feedback
-            let generator = UIImpactFeedbackGenerator(style: self.turnCountdown == 0 ? .heavy : .light)
-            generator.impactOccurred()
+            // Haptic feedback (Sprint 3 #12 で HapticsHelper 経由に統一)
+            HapticsHelper.impact(self.turnCountdown == 0 ? .heavy : .light)
 
             // カウントダウンが0に達したらターン処理を発火
             if self.turnCountdown <= 0 {

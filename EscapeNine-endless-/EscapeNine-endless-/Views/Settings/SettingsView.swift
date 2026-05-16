@@ -16,6 +16,9 @@ struct SettingsView: View {
     /// ResultView と同一キー (`oneTapRetryEnabled`) を共有
     @AppStorage("oneTapRetryEnabled") private var oneTapRetryEnabled: Bool = true
 
+    // MARK: - Sprint 3 v1.1 #12: 触覚フィードバック設定
+    @AppStorage("hapticsEnabled") private var hapticsEnabled: Bool = true
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -83,7 +86,7 @@ struct SettingsView: View {
 
     private var gameplaySection: some View {
         GameCard(title: "ゲームプレイ") {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("ワンタップリトライ")
@@ -99,6 +102,28 @@ struct SettingsView: View {
                     Spacer()
 
                     Toggle("", isOn: $oneTapRetryEnabled)
+                        .labelsHidden()
+                        .tint(Color(hex: GameColors.available))
+                }
+
+                Divider()
+                    .background(Color(hex: GameColors.gridBorder).opacity(0.3))
+
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("触覚フィードバック")
+                            .font(.fantasyBody())
+                            .foregroundColor(Color(hex: GameColors.textSecondary))
+
+                        Text("ビート・タップ・衝突時に振動を発生させます。OFF にすると一切振動しません")
+                            .font(.fantasyCaption())
+                            .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+
+                    Toggle("", isOn: $hapticsEnabled)
                         .labelsHidden()
                         .tint(Color(hex: GameColors.available))
                 }
