@@ -18,6 +18,9 @@ struct HomeView: View {
     @State private var path = NavigationPath()
     @State private var showAchievements = false
     @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
+    // Sprint 3 v1.1 動的オンボーディング用キー (docs/onboarding-v1.1-design.md §6)。
+    // OnboardingTutorialView 完成までは予約のみ、書き込まれない。
+    @AppStorage("hasSeenTutorialV1_1") private var hasSeenTutorialV1_1: Bool = false
     @State private var showTutorial = false
 
     var body: some View {
@@ -89,6 +92,27 @@ struct HomeView: View {
             if !hasSeenTutorial && UserDefaults.standard.bool(forKey: "tutorialCompleted") {
                 hasSeenTutorial = true
             }
+
+            // Sprint 3 v1.1: 表示判定の二段階化 (docs/onboarding-v1.1-design.md §6)。
+            // OnboardingTutorialView 完成後にこのブロックを有効化する。現状は読み取りのみ。
+            // キー併存ルール:
+            //   - hasSeenTutorialV1_1 == false → v1.1 動的版を表示 (完了時に両方 true セット)
+            //   - hasSeenTutorialV1_1 == true  → 表示しない (hasSeenTutorial の値は無視)
+            // 既存ユーザー (hasSeenTutorial==true / hasSeenTutorialV1_1==false) も
+            // v1.1 リリース後に 1 回だけ動的版を通る。
+            //
+            // 本実装で有効化する手順:
+            //   1. 下の `_ = hasSeenTutorialV1_1` 行を削除
+            //   2. 下の `if !hasSeenTutorial { showTutorial = true }` を以下の二段判定に置換:
+            //          if !hasSeenTutorialV1_1 {
+            //              showOnboardingTutorialV1_1 = true
+            //          } else if !hasSeenTutorial {
+            //              showTutorial = true
+            //          }
+            // 注意: `return` を使って早期脱出しないこと。
+            //   Sprint 2 F2 の `LeaderboardWatcher.shared.checkAndNotify()` (line 下方) を
+            //   オンボーディング表示ユーザーで silent skip させてしまう (抜かれ通知の regression)。
+            _ = hasSeenTutorialV1_1 // フラグの未使用警告抑制 (v1.1 本実装で削除)
 
             // 初回起動時のみチュートリアルを表示 (2 回目以降は自動スキップ)。
             if !hasSeenTutorial {
