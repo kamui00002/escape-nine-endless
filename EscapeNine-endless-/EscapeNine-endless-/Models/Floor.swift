@@ -19,11 +19,12 @@ struct Floor {
     }
 
     static func calculateBPM(for floor: Int) -> Double {
-        // v1.1 オンボーディング: Floor 0 はプロローグ専用で常に bpmCurveStart (60 BPM)。
+        // v1.1 オンボーディング: Floor 0 はプロローグ専用で 60 BPM (心拍音と同期)。
         // 既存の clampedFloor - 1 ロジックは floor=0 で負値になり pow() で破綻するため、
         // 明示的に早期 return する (docs/onboarding-v1.1-design.md §4 反映)。
+        // PR #29 の初期実装では誤って bpmCurveStart (70) を返していたため修正。
         if floor == TutorialConstants.prologueFloor {
-            return Constants.bpmCurveStart
+            return TutorialConstants.prologueBPM
         }
         // べき乗曲線: BPM = start + (end - start) * (floor/99)^exponent
         // 序盤は緩やか、終盤に急加速

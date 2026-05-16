@@ -132,6 +132,11 @@ enum TutorialConstants {
 
     /// プロローグフロア番号。`Floor.calculateBPM(for:)` で 0 を特別扱いする。
     static let prologueFloor: Int = 0
+
+    /// Floor 0 プロローグ専用 BPM (設計書 §4 / §5)。
+    /// 心拍音 (Step 3) と同じ 60 BPM で「結界の外」体験を統一する。
+    /// `Constants.bpmCurveStart` (Floor 1 用、現 70) とは独立した値であることに注意。
+    static let prologueBPM: Double = 60.0
 }
 
 enum GameColors {
