@@ -20,15 +20,13 @@ private let logger = Logger(
 /// 子 View (`TutorialHighlightView` / `DangerZoneView`) を盤面に重ねて
 /// チュートリアル意図を視覚化する。
 ///
-/// **本 PR スコープ**: 静的盤面プレビュー + Step 3 アクセシビリティ動線
-/// (Reduce Motion 完全 opt-out + 強演出予告 + Step 3 専用スキップ)。
+/// **v1.5.0 時点の実装範囲**: 4 ステップ動的オンボーディング全機能
+/// (静的盤面プレビュー + Step 3 アクセシビリティ動線 + Step 4 最小プレイアブル化
+/// + CLEAR バースト演出 + heartbeat.wav 心拍音 + 触覚スイッチ連携 / `HapticsHelper` 経由)。
 ///
-/// **本 PR スコープ外 (別 PR で追加予定)**:
-/// - CLEAR バースト演出 (Step 4)
-/// - 心拍音 .wav 音源 (Step 3、現状 no-op)
+/// **未実装 (別 PR で追加予定)**:
 /// - 赤フラッシュ演出 (まだ未実装)
-/// - 触覚スイッチ `@AppStorage("hapticsEnabled")` の SettingsView 追加
-/// - GameViewModel.startPrologueFloor() 経由のプレイアブル化
+/// - `GameViewModel.startPrologueFloor()` 経由の完全プレイアブル化 (現状はミニ盤面のみ)
 struct OnboardingTutorialView: View {
     @Binding var isPresented: Bool
 
@@ -136,10 +134,7 @@ struct OnboardingTutorialView: View {
                 playerPos: config.playerPos,
                 enemyPos: config.enemyPos,
                 highlightedPositions: config.highlightedPositions,
-                dangerPositions: config.dangerPositions,
-                stepNumber: currentStep,
-                totalSteps: totalSteps,
-                instructionTitle: Self.instructionCopy(for: currentStep).title
+                dangerPositions: config.dangerPositions
             )
             .frame(maxWidth: 320)
         }
@@ -439,9 +434,6 @@ private struct TutorialBoardPreview: View {
     let enemyPos: Int?
     let highlightedPositions: Set<Int>
     let dangerPositions: Set<Int>
-    let stepNumber: Int
-    let totalSteps: Int
-    let instructionTitle: String
 
     private let cellSpacing: CGFloat = 6
 
@@ -461,9 +453,10 @@ private struct TutorialBoardPreview: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .aspectRatio(1, contentMode: .fit)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Step \(stepNumber) / \(totalSteps): \(instructionTitle)")
-        .accessibilityValue(accessibilityDescription)
+        // review-full S1 反映 (2026-05-17): 親 TutorialStepInstructionView の
+        // accessibilityLabel と二重ナレーションを避けるため、本盤面は装飾要素として扱う。
+        // VoiceOver でのナレーションは親の Step n/4 + タイトル + 説明文に一本化。
+        .accessibilityHidden(true)
     }
 
     private func computeCellSize(for geometry: GeometryProxy) -> CGFloat {
@@ -504,20 +497,6 @@ private struct TutorialBoardPreview: View {
         }
         .frame(width: cellSize, height: cellSize)
     }
-
-    private var accessibilityDescription: String {
-        var parts: [String] = ["プレイヤー位置 \(playerPos)"]
-        if let enemyPos {
-            parts.append("鬼位置 \(enemyPos)")
-        }
-        if !highlightedPositions.isEmpty {
-            parts.append("移動可能マス \(highlightedPositions.count) 箇所")
-        }
-        if !dangerPositions.isEmpty {
-            parts.append("危険圏 \(dangerPositions.count) 箇所")
-        }
-        return parts.joined(separator: "、")
-    }
 }
 
 /// Step 4 専用のミニプレイアブル盤面 (タップで移動 + スクリプト敵 + 3 ターン)。
@@ -545,8 +524,9 @@ private struct TutorialStep4Game: View {
     @State private var hasCleared: Bool = false
     @State private var showingClearBurst: Bool = false
 
-    /// 敵スクリプト (1-indexed ターン)。3 ターン分用意し、最終ターンは固定位置に留める。
-    private let enemyScript: [Int] = [6, 3, 3]
+    /// 敵スクリプト (1-indexed ターン)。`TutorialConstants.step4EnemyScript` を参照。
+    /// review-full G4 反映 (2026-05-17): ハードコードを Constants.swift に一元管理。
+    private let enemyScript: [Int] = TutorialConstants.step4EnemyScript
     private let cellSpacing: CGFloat = 6
     private static let clearBurstDuration: TimeInterval = 1.8
 

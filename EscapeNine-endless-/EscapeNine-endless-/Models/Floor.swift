@@ -14,8 +14,10 @@ struct Floor {
     let aiLevel: AILevel
     
     /// ボスフロアかどうか（10の倍数階）
+    /// 注意: Floor 0 (v1.1 プロローグ) は `0 % 10 == 0` で誤って true にならないよう除外する。
+    /// review-full C1 反映 (2026-05-17): Floor 0 を boss override させない。
     static func isBossFloor(_ floor: Int) -> Bool {
-        floor % Constants.bossFloorInterval == 0
+        floor > 0 && floor % Constants.bossFloorInterval == 0
     }
 
     static func calculateBPM(for floor: Int) -> Double {
