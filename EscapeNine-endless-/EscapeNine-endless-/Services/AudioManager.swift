@@ -434,16 +434,28 @@ class AudioManager: ObservableObject {
 
     // MARK: - BeatEngine Suspend (Sprint 3 v1.1 オンボーディング Step 3 用)
 
+    /// `suspendBeatEngine()` が実際に停止させたかを記録するフラグ。
+    /// review-full C2 反映 (2026-05-17): `resumeBeatEngine()` を冪等にして、
+    /// suspend していないのに resume すると BeatEngine が意図せず起動するバグを防ぐ。
+    private var beatEngineWasSuspendedByCaller = false
+
     /// チュートリアル等で BeatEngine (メトロノーム) を一時停止する。
     /// 心拍音ループと既存のビート音が二重再生されるのを避けるため、Step 3 開始前に呼ぶ。
     /// 再開は `resumeBeatEngine()`。
+    /// 元々停止中なら no-op (フラグは立てない)。
     func suspendBeatEngine() {
+        guard beatEngine.isPlaying else { return }
         beatEngine.suspend()
+        beatEngineWasSuspendedByCaller = true
     }
 
     /// `suspendBeatEngine()` で停止した BeatEngine を再開する。
-    /// チュートリアル Step 3 から抜けるとき、または通常ゲームに戻るときに呼ぶ。
+    /// 「自分が停止させた場合」のみ resume を実行し、それ以外は no-op。
+    /// チュートリアル Step 1/2/4 で skip した経路など、suspend していない場合に
+    /// 呼ばれても BeatEngine が意図せず起動しないようにする (review-full C2 反映)。
     func resumeBeatEngine() {
+        guard beatEngineWasSuspendedByCaller else { return }
         beatEngine.resume()
+        beatEngineWasSuspendedByCaller = false
     }
 }

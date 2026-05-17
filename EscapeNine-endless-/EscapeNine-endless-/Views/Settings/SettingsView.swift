@@ -17,7 +17,9 @@ struct SettingsView: View {
     @AppStorage("oneTapRetryEnabled") private var oneTapRetryEnabled: Bool = true
 
     // MARK: - Sprint 3 v1.1 #12: 触覚フィードバック設定
-    @AppStorage("hapticsEnabled") private var hapticsEnabled: Bool = true
+    /// review-full P3 反映 (2026-05-17): キー文字列は `HapticsHelper.storageKey` を参照し
+    /// "hapticsEnabled" 文字列が 2 箇所にハードコードされないようにする。
+    @AppStorage(HapticsHelper.storageKey) private var hapticsEnabled: Bool = true
 
     var body: some View {
         GeometryReader { geometry in

@@ -137,6 +137,12 @@ enum TutorialConstants {
     /// 心拍音 (Step 3) と同じ 60 BPM で「結界の外」体験を統一する。
     /// `Constants.bpmCurveStart` (Floor 1 用、現 70) とは独立した値であることに注意。
     static let prologueBPM: Double = 60.0
+
+    /// Step 4 (プレイアブル盤面) で使用する敵スクリプト (1-indexed ターン)。
+    /// review-full G4 反映 (2026-05-17): OnboardingTutorialView 内のハードコードを集約。
+    /// player=1, enemy=9 開始 + [6,3,3] スクリプトで算数的に衝突不可になる配置。
+    /// 値を変える場合は `TutorialStep4Game.handleTap` の `isTappable` ロジックと合わせて確認。
+    static let step4EnemyScript: [Int] = [6, 3, 3]
 }
 
 enum GameColors {
