@@ -1,0 +1,11 @@
+firebase-debug.log
+.DS_Store
+/raw-screenshots/_*.png
+
+# screenshot-gen build artifacts (also covered by its own .gitignore)
+screenshot-gen/node_modules/
+screenshot-gen/.next/
+screenshot-gen/out/
+
+# Intermediate frame dumps (not tracked, kept for inspection)
+promo-video/**/_frames/
