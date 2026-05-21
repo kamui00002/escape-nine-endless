@@ -32,20 +32,21 @@ struct HomeView: View {
 
                     let buttonWidth = ResponsiveLayout.buttonWidth(for: geometry)
 
-                    VStack(spacing: ResponsiveLayout.isIPad() ? 60 : 50) {
-                        Spacer()
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: ResponsiveLayout.isIPad() ? 60 : 50) {
+                            titleSection
+                                .padding(.top, ResponsiveLayout.isIPad() ? 80 : 60)
 
-                        titleSection
+                            buttonSection(buttonWidth: buttonWidth)
 
-                        Spacer()
+                            highestFloorSection
 
-                        buttonSection(buttonWidth: buttonWidth)
-
-                        highestFloorSection
-
-                        Spacer()
+                            // バナー広告 (下部 ZStack overlay) と被らないようにする末尾余白
+                            Color.clear.frame(height: 100)
+                        }
+                        .padding(ResponsiveLayout.padding(for: geometry))
+                        .frame(maxWidth: .infinity)
                     }
-                    .padding(ResponsiveLayout.padding(for: geometry))
 
                     VStack {
                         Spacer()
