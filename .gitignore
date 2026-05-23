@@ -99,3 +99,8 @@ firebase-debug.log
 # Suno MCP (separate project)
 suno-mcp/
 ads/.env
+
+# Generated promo videos (再生成可能、Git LFS 未使用のため除外)
+# プロンプトテキストは marketing/seedance-prompts/ に保存して再現可能にする
+marketing/promo-video/
+screenshots/appstore/videos/
