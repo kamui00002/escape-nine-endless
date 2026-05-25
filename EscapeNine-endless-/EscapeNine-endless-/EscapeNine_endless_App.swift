@@ -39,10 +39,10 @@ struct EscapeNine_endless_App: App {
         #if canImport(FirebaseAnalytics)
         Analytics.setAnalyticsCollectionEnabled(true)
         Analytics.setConsent([
-            .analyticsStorage: .granted,
-            .adStorage: .granted,
-            .adUserData: .granted,
-            .adPersonalization: .granted
+            .analyticsStorage: .denied,
+            .adStorage: .denied,
+            .adUserData: .denied,
+            .adPersonalization: .denied
         ])
         logger.info("[App] Firebase Analytics有効化完了")
         #endif
@@ -104,6 +104,19 @@ struct EscapeNine_endless_App: App {
 
         let status = await ATTrackingManager.requestTrackingAuthorization()
         logger.info("[App] ATTステータス: \(status.rawValue)")
+        #if canImport(FirebaseAnalytics)
+        if status == .authorized {
+            Analytics.setConsent([
+                .analyticsStorage: .granted,
+                .adStorage: .granted,
+                .adUserData: .granted,
+                .adPersonalization: .granted
+            ])
+            logger.info("[App] ATT許可 → Consent .granted ×4")
+        } else {
+            logger.info("[App] ATT非許可 → .denied 維持")
+        }
+        #endif
 
         #if canImport(GoogleMobileAds)
         await MobileAds.shared.start()

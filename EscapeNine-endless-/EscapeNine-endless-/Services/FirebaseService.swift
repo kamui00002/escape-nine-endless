@@ -50,6 +50,11 @@ class FirebaseService: ObservableObject {
     @Published var currentUserId: String?
     @Published var isLoading: Bool = false
 
+    var isSignedIn: Bool {
+        if case .signedIn = authState { return true }
+        return false
+    }
+
     // MARK: - Private Properties
     #if canImport(FirebaseAuth)
     private var authStateHandle: AuthStateDidChangeListenerHandle?
@@ -88,9 +93,24 @@ class FirebaseService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        let result = try await Auth.auth().signInAnonymously()
-        currentUserId = result.user.uid
-        authState = .signedIn(userId: result.user.uid)
+        var lastError: Error?
+        for attempt in 1...3 {
+            do {
+                let result = try await Auth.auth().signInAnonymously()
+                currentUserId = result.user.uid
+                authState = .signedIn(userId: result.user.uid)
+                return
+            } catch {
+                lastError = error
+                logger.error("[FirebaseService] 認証失敗: \(attempt)/3: \(error.localizedDescription, privacy: .public)")
+                if attempt < 3 {
+                    let delay = pow(2.0, Double(attempt - 1))
+                    try? await Task.sleep(for: .seconds(delay))
+                }
+            }
+        }
+        authState = .signedOut
+        throw lastError ?? NSError(domain: "FirebaseService", code: -1)
     }
 
     func signInWithApple(idToken: String, nonce: String) async throws {
