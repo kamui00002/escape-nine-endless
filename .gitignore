@@ -104,3 +104,4 @@ ads/.env
 # プロンプトテキストは marketing/seedance-prompts/ に保存して再現可能にする
 marketing/promo-video/
 screenshots/appstore/videos/
+marketing/screenshot-gen/

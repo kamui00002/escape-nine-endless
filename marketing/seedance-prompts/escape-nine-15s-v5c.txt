@@ -1,0 +1,80 @@
+=== ESCAPE NINE: ENDLESS — 15s PROMO v5c ===
+
+@Image1 = first frame for S1. @Video1 = source for S2. @Image2 = grid for S3. @Image3 = grid for S4a/4b. @Image4 = HERO sprite (isolated). @Image5 = ONI sprite (isolated).
+
+REFERENCES:
+- @Image1 = HOME SCREEN
+- @Image2 = Floor 1 HUD/grid
+- @Image3 = Floor 50 HUD/grid
+- @Image4 = HERO (blonde, BLUE cape, silver sword)
+- @Image5 = ONI (RED demon, GOLD horns, spiked club)
+- @Video1 = Start screen "準備はできましたか？"
+
+ABSOLUTE RULES:
+1. START home (@Image1). NEVER skip S1/S2.
+2. HERO=@Image4, ONI=@Image5. NEVER duplicate hero or render oni as blue-caped.
+3. Grid=EXACTLY 3×3=9 cells. Coords (row,col): (1,1)(1,2)(1,3)/(2,1)(2,2)(2,3)/(3,1)(3,2)(3,3). Never 12 or 4×4.
+4. Move ONLY 4 cardinal (UP/DOWN/LEFT/RIGHT). DIAGONAL FORBIDDEN. Dash=EXACTLY 2 cells in 1 cardinal direction in 1 turn (NOT 1+1 cornering).
+5. Hero ALWAYS escapes, NEVER caught, NEVER same cell as oni. Ends in TRIUMPH.
+6. Hero NEVER enters X death cells.
+7. Transitions: ONLY soft cross-fade (0.5s). NEVER whip pan/glitch/hard cut.
+
+S1: HOME (0.0–2.5s, @Image1)
+9:16. Dark warm-brown (#2c1810). Gold glowing "ESCAPE NINE" title, cream "Endless Dungeon". Gold pill "冒険を始める" with play arrow, darker "キャラクター" below.
+- Camera: slow dolly-in (≤2%/s) toward gold button.
+- 0.0–2.0s: dolly-in. 2.0–2.3s: finger taps "冒険を始める". 2.3–2.5s: gold ripple (radial, 0.3s) — cross-fade.
+
+S2: START (2.5–4.5s, @Video1)
+Same bg. "準備はできましたか？" cream. Gold "1階層". Difficulty row [Easy gold highlight][Normal][Hard][Boss]. Gold pill "冒険を始める" pulsing (1Hz, ±5%). Dark "戻る".
+- Camera: locked-off.
+- 2.5–4.0s: hold. 4.0–4.3s: tap "冒険を始める". 4.3–4.5s: gold burst (radial, 0.2s) — cross-fade.
+
+S3: FLOOR 1 (4.5–7.5s, @Image2)
+HUD "階層 1 | BPM 70 | Slow". Gold countdown ring "3". "ターン 0/5" "ダッシュ 3/3". 3×3 grid: dark-brown tiles, gold borders.
+- Camera: fixed.
+- Hero (@Image4 crop) at (2,2). Oni (@Image5 crop) at (3,1).
+- Countdown "3→2→1→GO" (0.3s each).
+- TURN 1 (5.4–5.9s): Hero UP (2,2)→(1,2). Oni UP (3,1)→(2,1).
+- TURN 2 (5.9–6.4s): Hero RIGHT (1,2)→(1,3). Oni RIGHT (2,1)→(2,2).
+- Gold motion trails (linear 0.2s/move). Cardinal only.
+- Montage (0.4s/floor): 1 (6.4–6.8s) → 10 (6.8–7.0s) → 25 (7.0–7.2s) → 50 (7.2–7.5s). BPM 70→118.
+
+S4a: FLOOR 50 OPENING (7.5–10.5s, @Image3)
+HUD "階層 50 | BPM 118 | Normal". Ring red-orange urgent. "ターン 7/10" "ダッシュ 3/3".
+- Camera: fixed.
+- CELLS: DEATH (red X, cracked stone, red glow pulse 1.5s cycle ±10%): (3,1)(3,2) — HERO NEVER ENTERS. SAFE (gold borders): (1,1)(1,2)(1,3)(2,1)(2,2)(2,3)(3,3). Fog vignette on outer cells.
+- Start: Hero (2,3). Oni (1,1).
+- TURN 8 (8.0–8.7s): Hero UP (2,3)→(1,3). Oni RIGHT (1,1)→(1,2). Hero (1,3), oni (1,2).
+- TURN 9 (9.0–9.7s): Hero DOWN (1,3)→(2,3) — NEVER (3,1)(3,2). Oni RIGHT (1,2)→(1,3). Hero (2,3), oni (1,3).
+- 10.0–10.5s: "ダッシュ" button flashes brilliant gold (3Hz). Cross-fade prep.
+
+S4b: DASH ESCAPE (10.5–13.0s)
+- Camera: fixed, then 12.0–13.0s slow push-in (≤2%/s) on hero cell.
+- TURN 10 (10.5–11.5s): DASH. Hero LEFT 2 cells (2,3)→(2,1) in 1 turn (NOT 1+1 cornering), elongated gold trail. Oni DOWN (1,3)→(2,3). Final: hero (2,1), oni (2,3), 2-cell gap. MAXIMUM SAFE DISTANCE.
+- 11.5–13.0s: "ターン 10/10". Red X cells slow glow pulse (no faster).
+
+S5: CLEAR + LOGO (13.0–15.0s)
+- 13.0–13.3s: Gold light explosion (radial flash 0.3s).
+- 13.3–14.0s: "FLOOR CLEAR!" gold text, pixel sparkles from all 9 cells (particles only in S5).
+- 14.0–14.3s: Floor counter "階層 50→51".
+- 14.3–14.7s: Hero icon scales 105% over 0.4s then settles 100% over 0.3s at (2,1). NO multi bounces.
+- 14.7–15.0s: Pull back (≤4%/s). Black bg. Gold "ESCAPE NINE" logo center. Cream "Endless Dungeon". "App Storeで無料ダウンロード" badge fades in (0.3s linear).
+
+STYLE: SNES/GBA pixel art (match @Image4+@Image5), warm dungeon palette (#2c1810 base / #daa520 gold borders / #ffd700 highlights / #ff6347 X-cell red — 4 dominant), cinematic mobile capture, BPM-synced pulses ONLY in S3/S4a (not transitions), gold particles ONLY in S5.
+
+FORBIDDEN:
+- Starting at gameplay grid (must start @Image1)
+- Skipping S1 or S2
+- ANY diagonal movement
+- Grid cell count other than 9
+- Hero on (3,1) or (3,2)
+- Hero+oni sharing a cell
+- Two heroes / oni as blue-caped knight / hero as red-horned demon
+- DEFEAT/game-over/capture flash/hero shrinking/hero turning gray
+- Abstract animation verbs without amplitude/timing (NO "pulse"/"shimmer"/"bounce"/"victory glow" without numbers)
+- Camera faster than slow push/pull (≤2% scale/s)
+- Palette drift from 4 dominant colors
+- Generated JP text other than what's in @Image1/@Video1/@Image2/@Image3 (no extra HUD text/CTAs except App Store badge in S5)
+- Particles in scenes other than S5
+- Hero/oni off the grid (always on a cell)
+- Dash 1+1 cornering (must be 2 straight in 1 turn)
