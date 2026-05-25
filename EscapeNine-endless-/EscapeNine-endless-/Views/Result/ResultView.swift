@@ -36,6 +36,7 @@ struct ResultView: View {
     @StateObject private var playerViewModel = PlayerViewModel()
     @StateObject private var adMobService = AdMobService.shared
     @StateObject private var achievementManager = AchievementManager.shared
+    @StateObject private var firebaseService = FirebaseService.shared
     @State private var adShown = false
 
     // MARK: - Sprint 1: シェア用 state
@@ -110,7 +111,11 @@ struct ResultView: View {
                 personalBestSection
 
                 statsSection
-
+                if !firebaseService.isSignedIn {
+                    Text("ハイスコアの保存にはネット接続が必要です")
+                        .font(.fantasyCaption())
+                        .foregroundColor(Color(hex: GameColors.textSecondary))
+                }
                 // Sprint 1: 「あと1マスで生存」(惜しさメーター)
                 if shouldShowNearMiss {
                     nearMissBanner
