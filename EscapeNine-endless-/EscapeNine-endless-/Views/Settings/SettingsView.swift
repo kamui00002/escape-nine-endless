@@ -41,7 +41,7 @@ struct SettingsView: View {
                             debugSection
                             #endif
                         }
-                        .padding(.top, ResponsiveLayout.isIPad() ? 16 : 12)
+                        .padding(.top, ResponsiveLayout.adaptive(iPad: 16, iPhone: 12))
                         .padding(.bottom, 20)
                     }
                 }

@@ -22,7 +22,7 @@ struct CharacterSelectionView: View {
 
                 GeometryReader { geometry in
                     ScrollView {
-                        VStack(spacing: ResponsiveLayout.isIPad() ? 30 : 20) {
+                        VStack(spacing: ResponsiveLayout.adaptive(iPad: 30, iPhone: 20)) {
                             ForEach(CharacterType.allCases, id: \.self) { characterType in
                                 #if DEBUG
                                 let isDebugUnlocked = playerViewModel.debugUnlockAllCharacters
@@ -62,7 +62,7 @@ struct CharacterSelectionView: View {
                             }
                         }
                         .padding(.horizontal, ResponsiveLayout.padding(for: geometry))
-                        .padding(.top, ResponsiveLayout.isIPad() ? 20 : 16)
+                        .padding(.top, ResponsiveLayout.adaptive(iPad: 20, iPhone: 16))
                     }
                 }
             }
@@ -176,16 +176,16 @@ struct CharacterCardView: View {
                         )
                     )
                     .frame(
-                        width: ResponsiveLayout.isIPad() ? 160 : 110,
-                        height: ResponsiveLayout.isIPad() ? 160 : 110
+                        width: ResponsiveLayout.adaptive(iPad: 160, iPhone: 110),
+                        height: ResponsiveLayout.adaptive(iPad: 160, iPhone: 110)
                     )
 
                 Image(characterType.rawValue)
                     .resizable()
                     .scaledToFit()
                     .frame(
-                        width: ResponsiveLayout.isIPad() ? 140 : 95,
-                        height: ResponsiveLayout.isIPad() ? 140 : 95
+                        width: ResponsiveLayout.adaptive(iPad: 140, iPhone: 95),
+                        height: ResponsiveLayout.adaptive(iPad: 140, iPhone: 95)
                     )
                     .clipShape(Circle())
                     .opacity(isUnlocked ? 1.0 : 0.4)
@@ -201,11 +201,11 @@ struct CharacterCardView: View {
                         Circle()
                             .fill(Color.black.opacity(0.6))
                             .frame(
-                                width: ResponsiveLayout.isIPad() ? 140 : 95,
-                                height: ResponsiveLayout.isIPad() ? 140 : 95
+                                width: ResponsiveLayout.adaptive(iPad: 140, iPhone: 95),
+                                height: ResponsiveLayout.adaptive(iPad: 140, iPhone: 95)
                             )
                         Image(systemName: "lock.fill")
-                            .font(.system(size: ResponsiveLayout.isIPad() ? 40 : 30))
+                            .font(.system(size: ResponsiveLayout.adaptive(iPad: 40, iPhone: 30)))
                             .foregroundColor(Color(hex: GameColors.warning))
                     }
                 }

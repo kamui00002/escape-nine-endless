@@ -33,9 +33,9 @@ struct HomeView: View {
                     let buttonWidth = ResponsiveLayout.buttonWidth(for: geometry)
 
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: ResponsiveLayout.isIPad() ? 60 : 50) {
+                        VStack(spacing: ResponsiveLayout.adaptive(iPad: 60, iPhone: 50)) {
                             titleSection
-                                .padding(.top, ResponsiveLayout.isIPad() ? 80 : 60)
+                                .padding(.top, ResponsiveLayout.adaptive(iPad: 80, iPhone: 60))
 
                             buttonSection(buttonWidth: buttonWidth)
 
@@ -158,7 +158,7 @@ struct HomeView: View {
     // MARK: - Button Section
 
     private func buttonSection(buttonWidth: CGFloat) -> some View {
-        let spacing = ResponsiveLayout.isIPad() ? 30.0 : 20.0
+        let spacing = ResponsiveLayout.adaptive(iPad: 30.0, iPhone: 20.0)
 
         return VStack(spacing: spacing) {
             GameButton(title: "冒険を始める", icon: "play.fill", style: .primary, maxWidth: buttonWidth) {
@@ -273,7 +273,7 @@ struct HomeView: View {
                 .foregroundColor(Color(hex: GameColors.available))
                 .glow(color: Color(hex: GameColors.available), radius: 6, intensity: 0.3)
         }
-        .padding(.top, ResponsiveLayout.isIPad() ? 40 : 30)
+        .padding(.top, ResponsiveLayout.adaptive(iPad: 40, iPhone: 30))
         .slideIn(from: .bottom, delay: 1.0)
     }
 }

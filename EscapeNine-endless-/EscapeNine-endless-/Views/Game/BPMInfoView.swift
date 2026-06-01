@@ -36,7 +36,7 @@ struct BPMInfoView: View {
             let bpmPadding = ResponsiveLayout.bpmInfoPadding(for: geometry)
             let divHeight = geometry.size.height * 0.6
             let speedFontSize = ResponsiveLayout.scaleFontSize(14, for: geometry)
-            let hSpacing = ResponsiveLayout.isIPad() ? CGFloat(20) : CGFloat(16)
+            let hSpacing = ResponsiveLayout.adaptive(iPad: CGFloat(20), iPhone: CGFloat(16))
 
             HStack(spacing: hSpacing) {
                 // Floor
@@ -125,7 +125,7 @@ struct BPMInfoView: View {
             )
             .shadow(color: Color(hex: GameColors.available).opacity(0.15), radius: 8)
         }
-        .frame(height: ResponsiveLayout.isIPad() ? 82 : 66)
+        .frame(height: ResponsiveLayout.adaptive(iPad: 82, iPhone: 66))
     }
 }
 

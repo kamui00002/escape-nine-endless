@@ -38,7 +38,7 @@ struct GameButton: View {
             }
             .foregroundColor(foregroundColor)
             .frame(maxWidth: maxWidth ?? .infinity)
-            .padding(ResponsiveLayout.isIPad() ? 18 : 16)
+            .padding(ResponsiveLayout.adaptive(iPad: 18, iPhone: 16))
             .background(backgroundView)
         }
         .pressableButton(scale: style == .primary ? 0.96 : 0.95, shadowRadius: style == .primary ? 12 : 8)
