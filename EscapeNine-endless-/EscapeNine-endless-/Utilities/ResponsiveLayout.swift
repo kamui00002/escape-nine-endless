@@ -19,8 +19,9 @@ struct ResponsiveLayout {
     // 引数順はソースの三項演算子の読み順（iPad → iPhone）に合わせ、転記ミスを防ぐ。
 
     /// iPad なら iPad、それ以外は iPhone を返す汎用ヘルパ。
-    static func adaptive<T>(iPad: T, iPhone: T) -> T {
-        isIPad() ? iPad : iPhone
+    /// 引数は @autoclosure で遅延評価し、選択された側のみ評価する（三項演算子と同じ片枝評価を維持）。
+    static func adaptive<T>(iPad: @autoclosure () -> T, iPhone: @autoclosure () -> T) -> T {
+        isIPad() ? iPad() : iPhone()
     }
 
     /// ナビゲーションヘッダーの高さ（GameHeader / RankingView / ShopView で共通）。
