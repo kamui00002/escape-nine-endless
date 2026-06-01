@@ -464,3 +464,34 @@ struct ResultView: View {
         .slideIn(from: .bottom, delay: 0.6)
     }
 }
+
+#Preview("iPhone") {
+    ResultView(
+        floor: 42,
+        result: .lose,
+        defeatReason: .caughtByEnemy,
+        onPlayAgain: {},
+        onHome: {},
+        elapsedSeconds: 87,
+        nearMissDistance: 1,
+        playerPosition: 5,
+        enemyPosition: 6,
+        previousBest: 30
+    )
+}
+
+#Preview("iPad") {
+    ResultView(
+        floor: 42,
+        result: .lose,
+        defeatReason: .caughtByEnemy,
+        onPlayAgain: {},
+        onHome: {},
+        elapsedSeconds: 87,
+        nearMissDistance: 1,
+        playerPosition: 5,
+        enemyPosition: 6,
+        previousBest: 30
+    )
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

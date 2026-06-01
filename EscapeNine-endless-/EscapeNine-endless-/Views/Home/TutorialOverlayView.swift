@@ -92,8 +92,15 @@ struct TutorialOverlayView: View {
 
 // MARK: - Previews
 
-#Preview {
+#Preview("iPhone") {
     TutorialOverlayView {
         // no-op
     }
+}
+
+#Preview("iPad") {
+    TutorialOverlayView {
+        // no-op
+    }
+    .previewDevice("iPad Pro 13-inch (M4)")
 }

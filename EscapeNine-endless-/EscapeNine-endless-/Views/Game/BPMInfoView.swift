@@ -128,3 +128,18 @@ struct BPMInfoView: View {
         .frame(height: ResponsiveLayout.isIPad() ? 82 : 66)
     }
 }
+
+#Preview("iPhone") {
+    BPMInfoView(floor: 42, bpm: 119)
+        .frame(height: 80)
+        .padding()
+        .background(GameBackground())
+}
+
+#Preview("iPad") {
+    BPMInfoView(floor: 42, bpm: 119)
+        .frame(height: 100)
+        .padding()
+        .background(GameBackground())
+        .previewDevice("iPad Pro 13-inch (M4)")
+}

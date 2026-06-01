@@ -433,3 +433,16 @@ struct SettingsView: View {
     }
     #endif
 }
+
+#Preview("iPhone") {
+    NavigationStack {
+        SettingsView()
+    }
+}
+
+#Preview("iPad") {
+    NavigationStack {
+        SettingsView()
+    }
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

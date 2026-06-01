@@ -55,3 +55,22 @@ struct GameCard<Content: View>: View {
         ]
     }
 }
+
+#Preview("iPhone") {
+    GameCard(title: "カード見出し") {
+        Text("カードの中身")
+            .foregroundColor(.white)
+    }
+    .padding()
+    .background(GameBackground())
+}
+
+#Preview("iPad") {
+    GameCard(title: "カード見出し") {
+        Text("カードの中身")
+            .foregroundColor(.white)
+    }
+    .padding()
+    .background(GameBackground())
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

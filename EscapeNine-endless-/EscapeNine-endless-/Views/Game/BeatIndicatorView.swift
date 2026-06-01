@@ -194,3 +194,16 @@ struct BeatIndicatorView: View {
         timer = nil
     }
 }
+
+#Preview("iPhone") {
+    BeatIndicatorView(turnCountdown: 3, turnCount: 2)
+        .frame(width: 200, height: 200)
+        .background(GameBackground())
+}
+
+#Preview("iPad") {
+    BeatIndicatorView(turnCountdown: 1, turnCount: 7)
+        .frame(width: 300, height: 300)
+        .background(GameBackground())
+        .previewDevice("iPad Pro 13-inch (M4)")
+}

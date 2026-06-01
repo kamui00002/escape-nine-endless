@@ -62,3 +62,40 @@ struct GridBoardView: View {
     }
 }
 
+
+#Preview("iPhone") {
+    GridBoardView(
+        playerPosition: 1,
+        enemyPosition: 9,
+        availableMoves: [2, 4, 5],
+        selectedMove: nil,
+        isCellVisible: { _ in true },
+        isCellDisappeared: { _ in false },
+        onCellTap: { _ in },
+        onEnemyTap: {},
+        disabled: false,
+        playerSprite: "hero",
+        enemySprite: "red_oni"
+    )
+    .padding()
+    .background(GameBackground())
+}
+
+#Preview("iPad") {
+    GridBoardView(
+        playerPosition: 1,
+        enemyPosition: 9,
+        availableMoves: [2, 4, 5],
+        selectedMove: nil,
+        isCellVisible: { _ in true },
+        isCellDisappeared: { _ in false },
+        onCellTap: { _ in },
+        onEnemyTap: {},
+        disabled: false,
+        playerSprite: "hero",
+        enemySprite: "red_oni"
+    )
+    .padding()
+    .background(GameBackground())
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

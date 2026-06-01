@@ -365,3 +365,23 @@ extension Color {
     }
 }
 
+
+#Preview("iPhone") {
+    HStack(spacing: 12) {
+        GridCellView(position: 1, isPlayer: true, isEnemy: false, isAvailable: false, isSelected: false, isVisible: true, isDisappeared: false, onTap: {}, disabled: false, cellSize: 90, characterSize: 50, playerSprite: "hero", enemySprite: "red_oni")
+        GridCellView(position: 2, isPlayer: false, isEnemy: false, isAvailable: true, isSelected: false, isVisible: true, isDisappeared: false, onTap: {}, disabled: false, cellSize: 90, characterSize: 50, playerSprite: "hero", enemySprite: "red_oni")
+        GridCellView(position: 9, isPlayer: false, isEnemy: true, isAvailable: false, isSelected: false, isVisible: true, isDisappeared: false, onTap: {}, disabled: false, cellSize: 90, characterSize: 50, playerSprite: "hero", enemySprite: "red_oni")
+    }
+    .padding()
+    .background(GameBackground())
+}
+
+#Preview("iPad") {
+    HStack(spacing: 16) {
+        GridCellView(position: 1, isPlayer: true, isEnemy: false, isAvailable: false, isSelected: false, isVisible: true, isDisappeared: false, onTap: {}, disabled: false, cellSize: 120, characterSize: 66, playerSprite: "hero", enemySprite: "red_oni")
+        GridCellView(position: 9, isPlayer: false, isEnemy: true, isAvailable: false, isSelected: false, isVisible: true, isDisappeared: false, onTap: {}, disabled: false, cellSize: 120, characterSize: 66, playerSprite: "hero", enemySprite: "red_oni")
+    }
+    .padding()
+    .background(GameBackground())
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

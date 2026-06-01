@@ -96,3 +96,24 @@ struct GameButton: View {
         }
     }
 }
+
+#Preview("iPhone") {
+    VStack(spacing: 16) {
+        GameButton(title: "プレイ", icon: "play.fill") {}
+        GameButton(title: "設定", icon: "gearshape.fill", style: .secondary) {}
+        GameButton(title: "リセット", style: .danger) {}
+    }
+    .padding()
+    .background(GameBackground())
+}
+
+#Preview("iPad") {
+    VStack(spacing: 16) {
+        GameButton(title: "プレイ", icon: "play.fill") {}
+        GameButton(title: "設定", icon: "gearshape.fill", style: .secondary) {}
+        GameButton(title: "リセット", style: .danger) {}
+    }
+    .padding()
+    .background(GameBackground())
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

@@ -68,3 +68,20 @@ struct GameHeader: View {
         }
     }
 }
+
+#Preview("iPhone") {
+    VStack {
+        GameHeader(title: "ヘッダー")
+        Spacer()
+    }
+    .background(GameBackground())
+}
+
+#Preview("iPad") {
+    VStack {
+        GameHeader(title: "ヘッダー")
+        Spacer()
+    }
+    .background(GameBackground())
+    .previewDevice("iPad Pro 13-inch (M4)")
+}

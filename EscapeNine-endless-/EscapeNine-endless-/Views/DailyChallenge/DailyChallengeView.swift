@@ -168,3 +168,22 @@ struct DailyChallengeView: View {
         .padding(.bottom, 32)
     }
 }
+
+#Preview("iPhone") {
+    DailyChallengeView(challenge: DailyChallenge(
+        date: "2026-06-01",
+        conditions: [.noSkillAllowed, .forcedAI(.hard)],
+        isCompleted: false,
+        achievedFloor: nil
+    ))
+}
+
+#Preview("iPad") {
+    DailyChallengeView(challenge: DailyChallenge(
+        date: "2026-06-01",
+        conditions: [.noSkillAllowed, .forcedAI(.hard)],
+        isCompleted: false,
+        achievedFloor: nil
+    ))
+    .previewDevice("iPad Pro 13-inch (M4)")
+}
