@@ -38,7 +38,7 @@ struct GameButton: View {
             }
             .foregroundColor(foregroundColor)
             .frame(maxWidth: maxWidth ?? .infinity)
-            .padding(ResponsiveLayout.isIPad() ? 18 : 16)
+            .padding(ResponsiveLayout.adaptive(iPad: 18, iPhone: 16))
             .background(backgroundView)
         }
         .pressableButton(scale: style == .primary ? 0.96 : 0.95, shadowRadius: style == .primary ? 12 : 8)
@@ -95,4 +95,25 @@ struct GameButton: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
     }
+}
+
+#Preview("iPhone") {
+    VStack(spacing: 16) {
+        GameButton(title: "プレイ", icon: "play.fill") {}
+        GameButton(title: "設定", icon: "gearshape.fill", style: .secondary) {}
+        GameButton(title: "リセット", style: .danger) {}
+    }
+    .padding()
+    .background(GameBackground())
+}
+
+#Preview("iPad") {
+    VStack(spacing: 16) {
+        GameButton(title: "プレイ", icon: "play.fill") {}
+        GameButton(title: "設定", icon: "gearshape.fill", style: .secondary) {}
+        GameButton(title: "リセット", style: .danger) {}
+    }
+    .padding()
+    .background(GameBackground())
+    .previewDevice("iPad Pro 13-inch (M4)")
 }

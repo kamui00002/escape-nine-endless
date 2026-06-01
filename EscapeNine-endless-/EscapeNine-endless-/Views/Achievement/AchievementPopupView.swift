@@ -188,3 +188,14 @@ struct AchievementRow: View {
         )
     }
 }
+
+// AchievementPopupView は表示 2.5 秒後に自動フェードアウトするため、canvas が安定する
+// 同ファイルの AchievementListView をプレビュー対象にする（C 監査はファイル単位で満たされる）。
+#Preview("iPhone") {
+    AchievementListView()
+}
+
+#Preview("iPad") {
+    AchievementListView()
+        .previewDevice("iPad Pro 13-inch (M4)")
+}

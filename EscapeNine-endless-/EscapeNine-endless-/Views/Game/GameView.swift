@@ -145,8 +145,8 @@ struct GameView: View {
                 }
                 .font(.fantasyCaption())
                 .foregroundColor(Color(hex: GameColors.text))
-                .padding(.horizontal, ResponsiveLayout.isIPad() ? 16 : 12)
-                .padding(.vertical, ResponsiveLayout.isIPad() ? 10 : 6)
+                .padding(.horizontal, ResponsiveLayout.adaptive(iPad: 16, iPhone: 12))
+                .padding(.vertical, ResponsiveLayout.adaptive(iPad: 10, iPhone: 6))
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color(hex: GameColors.backgroundSecondary))
@@ -169,8 +169,8 @@ struct GameView: View {
                 Text(viewModel.gameStatus == .paused ? "再開" : "一時停止")
                     .font(.fantasyCaption())
                     .foregroundColor(Color(hex: GameColors.text))
-                    .padding(.horizontal, ResponsiveLayout.isIPad() ? 16 : 12)
-                    .padding(.vertical, ResponsiveLayout.isIPad() ? 10 : 6)
+                    .padding(.horizontal, ResponsiveLayout.adaptive(iPad: 16, iPhone: 12))
+                    .padding(.vertical, ResponsiveLayout.adaptive(iPad: 10, iPhone: 6))
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color(hex: GameColors.backgroundSecondary))
@@ -181,8 +181,8 @@ struct GameView: View {
                     )
             }
         }
-        .padding(.top, ResponsiveLayout.isIPad() ? 16 : 10)
-        .padding(.bottom, ResponsiveLayout.isIPad() ? 12 : 8)
+        .padding(.top, ResponsiveLayout.adaptive(iPad: 16, iPhone: 10))
+        .padding(.bottom, ResponsiveLayout.adaptive(iPad: 12, iPhone: 8))
     }
 
     // MARK: - Combo Display
@@ -346,7 +346,7 @@ struct GameView: View {
                 )
             }
             .disabled(viewModel.remainingSkillUses <= 0 || viewModel.gameStatus != .playing)
-            .frame(height: ResponsiveLayout.isIPad() ? 56 : 48)
+            .frame(height: ResponsiveLayout.adaptive(iPad: 56, iPhone: 48))
         }
     }
 
@@ -593,7 +593,7 @@ struct GameView: View {
 
             if viewModel.gameStartCountdown > 0 {
                 Text("\(viewModel.gameStartCountdown)")
-                    .font(.system(size: ResponsiveLayout.isIPad() ? 150 : 120, weight: .black, design: .rounded))
+                    .font(.system(size: ResponsiveLayout.adaptive(iPad: 150, iPhone: 120), weight: .black, design: .rounded))
                     .foregroundColor(Color(hex: GameColors.available))
                     .shadow(color: Color(hex: GameColors.available).opacity(0.8), radius: 30)
                     .scaleEffect(1.2)
@@ -601,7 +601,7 @@ struct GameView: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.5), value: viewModel.gameStartCountdown)
             } else {
                 Text("GO!")
-                    .font(.system(size: ResponsiveLayout.isIPad() ? 130 : 100, weight: .black, design: .rounded))
+                    .font(.system(size: ResponsiveLayout.adaptive(iPad: 130, iPhone: 100), weight: .black, design: .rounded))
                     .foregroundColor(Color(hex: GameColors.success))
                     .shadow(color: Color(hex: GameColors.success).opacity(0.8), radius: 30)
                     .scaleEffect(1.5)
@@ -629,14 +629,14 @@ struct GameView: View {
             VStack(spacing: 16) {
                 if viewModel.defeatReason == .caughtByEnemy {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: ResponsiveLayout.isIPad() ? 80 : 60))
+                        .font(.system(size: ResponsiveLayout.adaptive(iPad: 80, iPhone: 60)))
                         .foregroundColor(Color(hex: GameColors.warning))
                     Text("捕まった！")
                         .font(.fantasyHeading())
                         .foregroundColor(Color(hex: GameColors.warning))
                 } else {
                     Image(systemName: "clock.badge.xmark")
-                        .font(.system(size: ResponsiveLayout.isIPad() ? 80 : 60))
+                        .font(.system(size: ResponsiveLayout.adaptive(iPad: 80, iPhone: 60)))
                         .foregroundColor(Color.orange)
                     Text("時間切れ！")
                         .font(.fantasyHeading())

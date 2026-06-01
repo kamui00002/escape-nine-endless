@@ -37,7 +37,7 @@ struct RankingView: View {
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(height: ResponsiveLayout.isIPad() ? 100 : 80)
+                        .frame(height: ResponsiveLayout.headerHeight())
                         .overlay(
                             HStack {
                                 Button(action: { dismiss() }) {
@@ -75,7 +75,7 @@ struct RankingView: View {
                     }
                     
                     // My Record
-                    VStack(spacing: ResponsiveLayout.isIPad() ? 16 : 12) {
+                    VStack(spacing: ResponsiveLayout.adaptive(iPad: 16, iPhone: 12)) {
                         Text("あなたの記録")
                             .font(.fantasyCaption())
                             .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
@@ -89,7 +89,7 @@ struct RankingView: View {
                             .foregroundColor(Color(hex: GameColors.text).opacity(0.7))
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(ResponsiveLayout.isIPad() ? 20 : 16)
+                    .padding(ResponsiveLayout.adaptive(iPad: 20, iPhone: 16))
                     .background(
                         RoundedRectangle(cornerRadius: 16)
                             .fill(Color(hex: GameColors.backgroundSecondary))
@@ -168,7 +168,7 @@ struct RankingView: View {
                         Spacer()
                         VStack(spacing: 16) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: ResponsiveLayout.isIPad() ? 58 : 48))
+                                .font(.system(size: ResponsiveLayout.adaptive(iPad: 58, iPhone: 48)))
                                 .foregroundColor(Color(hex: GameColors.warning))
 
                             if let errorMessage = viewModel.errorMessage {
@@ -207,7 +207,7 @@ struct RankingView: View {
                         Spacer()
                         VStack(spacing: 12) {
                             Image(systemName: "chart.bar.fill")
-                                .font(.system(size: ResponsiveLayout.isIPad() ? 58 : 48))
+                                .font(.system(size: ResponsiveLayout.adaptive(iPad: 58, iPhone: 48)))
                                 .foregroundColor(Color(hex: GameColors.text).opacity(0.5))
 
                             Text("まだランキングがありません")
@@ -266,7 +266,7 @@ struct RankingView: View {
                     index == 2 ? Color(hex: GameColors.main) :
                     Color(hex: GameColors.text).opacity(0.7)
                 )
-                .frame(width: ResponsiveLayout.isIPad() ? 80 : 60)
+                .frame(width: ResponsiveLayout.adaptive(iPad: 80, iPhone: 60))
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -289,7 +289,7 @@ struct RankingView: View {
         .listRowBackground(
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color(hex: GameColors.backgroundSecondary))
-                .padding(.vertical, ResponsiveLayout.isIPad() ? 6 : 4)
+                .padding(.vertical, ResponsiveLayout.adaptive(iPad: 6, iPhone: 4))
         )
         .listRowSeparator(.hidden)
         .padding(.horizontal, ResponsiveLayout.padding(for: geometry))

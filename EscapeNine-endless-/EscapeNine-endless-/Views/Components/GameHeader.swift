@@ -23,7 +23,7 @@ struct GameHeader: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: ResponsiveLayout.isIPad() ? 100 : 80)
+            .frame(height: ResponsiveLayout.headerHeight())
             .overlay(
                 HStack {
                     Button(action: {
@@ -67,4 +67,21 @@ struct GameHeader: View {
             )
         }
     }
+}
+
+#Preview("iPhone") {
+    VStack {
+        GameHeader(title: "ヘッダー")
+        Spacer()
+    }
+    .background(GameBackground())
+}
+
+#Preview("iPad") {
+    VStack {
+        GameHeader(title: "ヘッダー")
+        Spacer()
+    }
+    .background(GameBackground())
+    .previewDevice("iPad Pro 13-inch (M4)")
 }

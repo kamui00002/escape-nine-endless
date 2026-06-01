@@ -105,3 +105,6 @@ ads/.env
 marketing/promo-video/
 screenshots/appstore/videos/
 marketing/screenshot-gen/
+
+# 監査レポート（scripts/audit-*.py の生成物、再生成可能）
+reports/

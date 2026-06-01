@@ -13,6 +13,22 @@ struct ResponsiveLayout {
         UIDevice.current.userInterfaceIdiom == .pad
     }
 
+    // MARK: - デバイス適応ヘルパ
+    // View 内で `ResponsiveLayout.isIPad() ? iPad値 : iPhone値` を直書きする代わりに使い、
+    // デバイス判定を ResponsiveLayout に一元化する（直接 isIPad() 分岐の禁止ルール対応）。
+    // 引数順はソースの三項演算子の読み順（iPad → iPhone）に合わせ、転記ミスを防ぐ。
+
+    /// iPad なら iPad、それ以外は iPhone を返す汎用ヘルパ。
+    /// 引数は @autoclosure で遅延評価し、選択された側のみ評価する（三項演算子と同じ片枝評価を維持）。
+    static func adaptive<T>(iPad: @autoclosure () -> T, iPhone: @autoclosure () -> T) -> T {
+        isIPad() ? iPad() : iPhone()
+    }
+
+    /// ナビゲーションヘッダーの高さ（GameHeader / RankingView / ShopView で共通）。
+    static func headerHeight() -> CGFloat {
+        isIPad() ? 100 : 80
+    }
+
     // MARK: - 比率ベースのレイアウト定数
     // iPad/iPhone共通で画面サイズに対する比率で計算し、はみ出しを防止
 

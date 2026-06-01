@@ -30,7 +30,7 @@ struct ShopView: View {
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(height: ResponsiveLayout.isIPad() ? 100 : 80)
+                        .frame(height: ResponsiveLayout.headerHeight())
                         .overlay(
                             HStack {
                                 Button(action: {
@@ -70,7 +70,7 @@ struct ShopView: View {
                     }
 
                     ScrollView {
-                        VStack(spacing: ResponsiveLayout.isIPad() ? 24 : 16) {
+                        VStack(spacing: ResponsiveLayout.adaptive(iPad: 24, iPhone: 16)) {
                             // Character Section
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("キャラクター")

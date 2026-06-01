@@ -31,3 +31,12 @@ struct GameBackground: View {
         }
     }
 }
+
+#Preview("iPhone") {
+    GameBackground(showParticles: true)
+}
+
+#Preview("iPad") {
+    GameBackground(showParticles: true)
+        .previewDevice("iPad Pro 13-inch (M4)")
+}
