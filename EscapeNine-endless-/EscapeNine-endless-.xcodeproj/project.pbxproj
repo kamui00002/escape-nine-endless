@@ -14,6 +14,7 @@
 		E0E5FE702F6D9950009A46C9 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41B2F5E7000008AD47D /* GoogleMobileAds */; };
 		E0E5FE712F6D9950009A46C9 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41C2F5E6BAA008AD47D /* FirebaseAnalytics */; };
 		E0E5FE722F6D9950009A46C9 /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41D2F5E6BAA008AD47D /* FirebaseAnalyticsIdentitySupport */; };
+		E0AD00032FB10000008AD47D /* UnityAdapterTarget in Frameworks */ = {isa = PBXBuildFile; productRef = E0AD00022FB10000008AD47D /* UnityAdapterTarget */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,6 +50,7 @@
 			files = (
 				E06A11DC2F9200EE0009071C /* FacebookCore in Frameworks */,
 				E0E5FE702F6D9950009A46C9 /* GoogleMobileAds in Frameworks */,
+				E0AD00032FB10000008AD47D /* UnityAdapterTarget in Frameworks */,
 				E0E5FE6F2F6D9950009A46C9 /* FirebaseCore in Frameworks */,
 				E0E5FE712F6D9950009A46C9 /* FirebaseAnalytics in Frameworks */,
 				E0E5FE722F6D9950009A46C9 /* FirebaseAnalyticsIdentitySupport in Frameworks */,
@@ -112,6 +114,7 @@
 				E004C41D2F5E6BAA008AD47D /* FirebaseAnalyticsIdentitySupport */,
 				E004C41B2F5E7000008AD47D /* GoogleMobileAds */,
 				E0FB00012FA00000008AD47D /* FacebookCore */,
+				E0AD00022FB10000008AD47D /* UnityAdapterTarget */,
 			);
 			productName = "EscapeNine-endless-";
 			productReference = E0A3852D2EC62A570058EC96 /* EscapeNine-endless-.app */;
@@ -145,6 +148,7 @@
 				E004C4132F5E6BAA008AD47D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				E004C41A2F5E7000008AD47D /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 				E0FB00002FA00000008AD47D /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
+				E0AD00012FB10000008AD47D /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-unity" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E0A3852E2EC62A570058EC96 /* Products */;
@@ -428,6 +432,14 @@
 				minimumVersion = 17.0.0;
 			};
 		};
+		E0AD00012FB10000008AD47D /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-unity" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/googleads-mobile-ios-mediation-unity.git";
+			requirement = {
+				kind = exactVersion;
+				version = 4.16.500;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -465,6 +477,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E0FB00002FA00000008AD47D /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
 			productName = FacebookCore;
+		};
+		E0AD00022FB10000008AD47D /* UnityAdapterTarget */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E0AD00012FB10000008AD47D /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-unity" */;
+			productName = UnityAdapterTarget;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
