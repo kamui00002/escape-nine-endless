@@ -47,6 +47,10 @@ struct EscapeNine_endless_App: App {
         logger.info("[App] Firebase Analytics有効化完了")
         #endif
 
+        // PostHog初期化（プロダクト分析。Firebaseと並行してAnalyticsLogger経由で送信）
+        AnalyticsLogger.configurePostHog()
+        logger.info("[App] PostHog初期化完了")
+
         #if canImport(FacebookCore)
         ApplicationDelegate.shared.application(
             UIApplication.shared,

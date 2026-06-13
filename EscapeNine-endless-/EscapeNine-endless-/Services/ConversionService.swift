@@ -11,6 +11,9 @@ import os
 #if canImport(FirebaseAnalytics)
 import FirebaseAnalytics
 #endif
+#if canImport(PostHog)
+import PostHog
+#endif
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.escapenine.app", category: "ConversionService")
 @MainActor
@@ -33,6 +36,9 @@ final class ConversionService {
         #if canImport(FirebaseAnalytics)
         Analytics.logEvent(AnalyticsEventTutorialComplete, parameters: nil)
         #endif
+        #if canImport(PostHog)
+        PostHogSDK.shared.capture("tutorial_complete")
+        #endif
     }
 
     // 階層クリアは AnalyticsLogger.logFloorCleared (eg_floor_cleared) に一本化 (2026-05-14、旧 floor_clear 削除、GA4→Ads import 経路)。
@@ -44,6 +50,14 @@ final class ConversionService {
             AnalyticsParameterItemID: productId,
             AnalyticsParameterValue: value,
             AnalyticsParameterCurrency: currency
+        ])
+        #endif
+        #if canImport(PostHog)
+        // PostHog でも課金イベントを記録（収益分析・ファネル用）
+        PostHogSDK.shared.capture("purchase", properties: [
+            "product_id": productId,
+            "value": value,
+            "currency": currency
         ])
         #endif
     }

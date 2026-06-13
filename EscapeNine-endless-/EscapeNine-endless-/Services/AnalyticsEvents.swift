@@ -16,6 +16,9 @@ import os
 #if canImport(FirebaseAnalytics)
 import FirebaseAnalytics
 #endif
+#if canImport(PostHog)
+import PostHog
+#endif
 
 // MARK: - Logger
 
@@ -113,6 +116,29 @@ enum AnalyticsDefeatReason: String {
 /// - Firebase が import できない環境 (テスト等) では no-op として動作する
 struct AnalyticsLogger {
 
+    // MARK: - PostHog セットアップ
+
+    #if canImport(PostHog)
+    // PostHog の Project API key は「クライアント公開キー」。GoogleService-Info.plist と同様に
+    // アプリ同梱前提のキーで、git にコミットして問題ない（データ閲覧は別の Personal API key の方）。
+    // EscapeNine 専用 PostHog プロジェクト (project_id 467042) の Project API key。
+    private static let postHogAPIKey = "phc_wsbTycdZEGSmfibMgW3fSfXoQK5K52Jfm6KEDWYhQLba"
+    private static let postHogHost = "https://us.i.posthog.com"
+    #endif
+
+    /// PostHog SDK を初期化する（アプリ起動時に一度だけ呼ぶ）。SDK 未リンク環境では no-op。
+    static func configurePostHog() {
+        #if canImport(PostHog)
+        let config = PostHogConfig(projectToken: postHogAPIKey, host: postHogHost)
+        // 起動・バックグラウンド遷移などのライフサイクルイベントを自動計測
+        config.captureApplicationLifecycleEvents = true
+        #if DEBUG
+        config.debug = true
+        #endif
+        PostHogSDK.shared.setup(config)
+        #endif
+    }
+
     // MARK: - Core
 
     /// 任意のカスタムイベントを送信する。
@@ -122,6 +148,10 @@ struct AnalyticsLogger {
     static func log(_ event: AnalyticsEvent, parameters: [String: Any] = [:]) {
         #if canImport(FirebaseAnalytics)
         Analytics.logEvent(event.rawValue, parameters: parameters.isEmpty ? nil : parameters)
+        #endif
+        #if canImport(PostHog)
+        // Firebase と同じイベントを PostHog にも送信（単一 choke point 経由）
+        PostHogSDK.shared.capture(event.rawValue, properties: parameters.isEmpty ? nil : parameters)
         #endif
         analyticsLogger.info("Analytics event: \(event.rawValue, privacy: .public) params=\(String(describing: parameters), privacy: .public)")
     }

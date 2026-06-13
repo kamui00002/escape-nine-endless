@@ -15,6 +15,7 @@
 		E0E5FE712F6D9950009A46C9 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41C2F5E6BAA008AD47D /* FirebaseAnalytics */; };
 		E0E5FE722F6D9950009A46C9 /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = E004C41D2F5E6BAA008AD47D /* FirebaseAnalyticsIdentitySupport */; };
 		E0AD00032FB10000008AD47D /* UnityAdapterTarget in Frameworks */ = {isa = PBXBuildFile; productRef = E0AD00022FB10000008AD47D /* UnityAdapterTarget */; };
+		B05705100000000000000003 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = B05705100000000000000002 /* PostHog */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +57,7 @@
 				E0E5FE722F6D9950009A46C9 /* FirebaseAnalyticsIdentitySupport in Frameworks */,
 				E0E5FE6E2F6D9950009A46C9 /* FirebaseFirestore in Frameworks */,
 				E0E5FE6D2F6D9950009A46C9 /* FirebaseAuth in Frameworks */,
+				B05705100000000000000003 /* PostHog in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -115,6 +117,7 @@
 				E004C41B2F5E7000008AD47D /* GoogleMobileAds */,
 				E0FB00012FA00000008AD47D /* FacebookCore */,
 				E0AD00022FB10000008AD47D /* UnityAdapterTarget */,
+				B05705100000000000000002 /* PostHog */,
 			);
 			productName = "EscapeNine-endless-";
 			productReference = E0A3852D2EC62A570058EC96 /* EscapeNine-endless-.app */;
@@ -149,6 +152,7 @@
 				E004C41A2F5E7000008AD47D /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 				E0FB00002FA00000008AD47D /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
 				E0AD00012FB10000008AD47D /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-unity" */,
+				B05705100000000000000001 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E0A3852E2EC62A570058EC96 /* Products */;
@@ -440,6 +444,14 @@
 				version = 4.16.500;
 			};
 		};
+		B05705100000000000000001 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PostHog/posthog-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.59.3;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -482,6 +494,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E0AD00012FB10000008AD47D /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-unity" */;
 			productName = UnityAdapterTarget;
+		};
+		B05705100000000000000002 /* PostHog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B05705100000000000000001 /* XCRemoteSwiftPackageReference "posthog-ios" */;
+			productName = PostHog;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
