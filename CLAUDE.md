@@ -2,6 +2,12 @@
 
 9マスの盤面で音楽のビートに合わせて逃げ続けるハイスピードエンドレスチャレンジ（iOS）。
 
+## 共通 iOS ルール（ロード）
+
+@~/.claude/CLAUDE-ios.md
+
+> 上記グローバル iOS ルール（Swift / SwiftUI / ViewModel / Firestore / テスト規約）を読み込む。本書と食い違う場合は本書を優先。
+
 ## 基本情報
 
 | 項目 | 値 |
@@ -113,3 +119,7 @@ let spacing = ResponsiveLayout.verticalSpacing(for: geometry)
 
 - コンベンショナルコミット（feat:, fix:, docs:, test:, refactor:, chore:）／日本語メッセージ
 - main への直接コミットは避ける
+
+
+## スコープ補足（iOS共通ルール）
+> 本 repo は共通 iOS ルール~/.claude/CLAUDE-ios.md を使わず、独自系統（MVVM + Combine /docs/DEVELOPMENT_SWIFT.md）で運用する。共通ルールの改善は必要時に手動で取り込む。

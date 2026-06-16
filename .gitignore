@@ -105,3 +105,11 @@ ads/.env
 marketing/promo-video/
 screenshots/appstore/videos/
 marketing/screenshot-gen/
+
+# 監査・レビューの生成レポート (再生成可能、コミットしない)
+reports/
+security-reports/
+
+# Python キャッシュ
+__pycache__/
+*.pyc
