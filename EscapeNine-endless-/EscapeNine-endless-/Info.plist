@@ -351,6 +351,8 @@
 	<string>$(FACEBOOK_CLIENT_TOKEN)</string>
 	<key>FacebookDisplayName</key>
 	<string>$(FACEBOOK_DISPLAY_NAME)</string>
+	<key>PostHogAPIKey</key>
+	<string>$(POSTHOG_API_KEY)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

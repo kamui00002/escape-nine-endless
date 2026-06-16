@@ -119,10 +119,11 @@ struct AnalyticsLogger {
     // MARK: - PostHog セットアップ
 
     #if canImport(PostHog)
-    // PostHog の Project API key は「クライアント公開キー」。GoogleService-Info.plist と同様に
-    // アプリ同梱前提のキーで、git にコミットして問題ない（データ閲覧は別の Personal API key の方）。
-    // EscapeNine 専用 PostHog プロジェクト (project_id 467042) の Project API key。
-    private static let postHogAPIKey = "phc_wsbTycdZEGSmfibMgW3fSfXoQK5K52Jfm6KEDWYhQLba"
+    // PostHog の Project API key は「クライアント公開キー」（アプリ同梱前提）。ただし GitGuardian の
+    // 誤検知回避とローテーション容易化のため、Secrets.xcconfig (gitignore 済み) → Info.plist 経由で
+    // 読み込む（Facebook キーと同じ仕組み）。値は EscapeNine 専用プロジェクト (project_id 467042)。
+    // セットアップ: Secrets.xcconfig.example をコピーして POSTHOG_API_KEY を設定すること。
+    private static let postHogAPIKey = Bundle.main.object(forInfoDictionaryKey: "PostHogAPIKey") as? String ?? ""
     private static let postHogHost = "https://us.i.posthog.com"
     #endif
 
