@@ -1,0 +1,35 @@
+name: Unity Core Tests (headless)
+
+# unity/ 配下の C# コア (UnityEngine 非依存) を素の .NET で検証する。
+# Unity Editor 不要のため GitHub ホストランナーでそのまま走る。
+# ローカル再現: cd unity/verify/Core.Tests && dotnet test
+
+on:
+  push:
+    paths:
+      - "unity/EscapeNine/Assets/Scripts/Core/**"
+      - "unity/EscapeNine/Assets/Tests/EditMode/**"
+      - "unity/verify/**"
+      - ".github/workflows/unity-core-tests.yml"
+  pull_request:
+    paths:
+      - "unity/EscapeNine/Assets/Scripts/Core/**"
+      - "unity/EscapeNine/Assets/Tests/EditMode/**"
+      - "unity/verify/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Run Core tests
+        run: dotnet test unity/verify/Core.Tests/Core.Tests.csproj --nologo
+
+      - name: Build simulator (compile check)
+        run: dotnet build unity/verify/Sim/Sim.csproj -c Release --nologo
