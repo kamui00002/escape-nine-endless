@@ -5,6 +5,9 @@
 背景: PostHog / Firebase の実測で判明した「配信ボトルネック」（公開3ヶ月で実プレイヤー約2名, `docs/aso/sprint-1-baseline.md` §4）を踏まえ、オーナー判断で **Unity 全面移行 + 新機能全振り** の方向に決定。
 本書の役割: その決定を**成功させるための現実的な実行計画**と、正直なコスト・リスク・意思決定ゲートを提示する。
 
+**実装状況 (2026-07-01)**: `unity/` に **Phase 0 (Conductor) + Phase 1 (純ロジック) の C# 足場 + EditMode テスト**を Swift 正本から忠実移植して配置済み。
+ただし **Linux 環境のためコンパイル・実行は未検証**（Unity Editor 必須の作業は `unity/README.md` の手順に人間タスクとして明記）。まず Editor で EditMode テスト green → Phase 0 実機検証 → GO/NO-GO の順で進める。
+
 ---
 
 ## 0. 方針（重要な期待値設定）

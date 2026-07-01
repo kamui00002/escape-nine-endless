@@ -1,0 +1,33 @@
+# Unity generated / build artifacts (Editor が自動生成するもの)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Unity 自動生成の csproj / sln (Editor が再生成)
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Asset meta は Editor 初回 import 時に自動生成される。
+# 本 repo では手書きせず Editor 生成に委ねる (GUID 衝突回避)。
+*.meta
+
+# OS
+.DS_Store
+.vs/
