@@ -69,8 +69,20 @@ if [[ -d "$PROJECT_PATH/Assets" ]]; then
   log "既存プロジェクトを検出。作成をスキップ: $PROJECT_PATH"
 else
   log "空プロジェクトを作成中..."
-  run_unity -batchmode -quit -createProject "$PROJECT_PATH" | tail -n 5 || true
-  [[ -d "$PROJECT_PATH/Assets" ]] || { err "プロジェクト作成に失敗しました。"; exit 1; }
+  CREATE_LOG="$(run_unity -batchmode -quit -createProject "$PROJECT_PATH" || true)"
+  echo "$CREATE_LOG" | tail -n 5
+  if [[ ! -d "$PROJECT_PATH/Assets" ]]; then
+    if echo "$CREATE_LOG" | grep -q "No valid Unity Editor license"; then
+      err "Unity ライセンスが未アクティベートです (batchmode はライセンス必須)。修復手順:"
+      err "  1. Unity Hub を開いてサインイン"
+      err "  2. 設定(歯車) → ライセンス → 『Add license』→ 無料の Personal ライセンスを取得"
+      err "  3. 本スクリプトを再実行"
+      err "  それでも失敗する場合: Hub から一度 Editor を GUI で起動してから再実行。"
+      err "  最終手段: Hub GUI で $PROJECT_PATH に 2D プロジェクトを手動作成 → 再実行 (作成はスキップされ続行します)"
+    fi
+    err "プロジェクト作成に失敗しました。"
+    exit 1
+  fi
   log "プロジェクト作成完了"
 fi
 
