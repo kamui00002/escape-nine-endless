@@ -110,5 +110,18 @@ namespace EscapeNine.Runtime
             double tolerance = GameConfig.TimingTolerance(bpm);   // 拍間隔に対する比率
             return distanceToNearestBeat <= tolerance;
         }
+
+        /// <summary>
+        /// コンボ用のタイミング精度3段階。Swift: BeatEngine.timingGrade()
+        /// 最寄り拍までの位相比率で Just/Good/Miss を返す。
+        /// </summary>
+        public TimingGrade TimingGradeNow()
+        {
+            if (_dspSongStart < 0) return TimingGrade.Miss;
+            double beatPos = SongPositionBeats;
+            double frac = beatPos - Math.Floor(beatPos);
+            double phaseRatio = Math.Min(frac, 1.0 - frac);
+            return ComboTiming.Grade(phaseRatio);
+        }
     }
 }

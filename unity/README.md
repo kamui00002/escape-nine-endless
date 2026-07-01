@@ -35,7 +35,14 @@ unity/EscapeNine/Assets/
 │   │   ├── IRandomSource.cs    ← 乱数注入 (テスト決定論化のための意図的追加)
 │   │   ├── Skill.cs            ← Models/Skill.swift
 │   │   ├── Character.cs        ← Models/Character.swift
-│   │   └── GameStateData.cs    ← Models/GameState.swift (struct GameState)
+│   │   ├── GameStateData.cs    ← Models/GameState.swift (struct GameState)
+│   │   ├── TimingGrade.cs      ← BeatEngine.timingGrade (コンボ判定)
+│   │   ├── SeededRng.cs        ← DailyChallengeService.SeededRNG (LCG)
+│   │   ├── DailyChallenge.cs   ← Models/DailyChallenge.swift
+│   │   ├── DailyChallengeGenerator.cs ← DailyChallengeService.buildChallenge (日付シード生成)
+│   │   ├── ShareTextBuilder.cs ← ShareSheet.ShareTextBuilder (Wordle風シェア)
+│   │   ├── Achievement.cs      ← Models/Achievement.swift (実績判定は純関数化)
+│   │   └── GameSession.cs      ← GameViewModel のターン進行 (UI/音声非依存のヘッドレス版)
 │   └── Runtime/        # UnityEngine 依存
 │       ├── Conductor.cs        ← Services/BeatEngine.swift を dspTime ベースに再設計 (Phase 0 の核)
 │       └── Phase0Harness.cs    ← Phase 0 タイミング検証の最小プレイアブル (HIT/MISS ログ)
@@ -45,7 +52,12 @@ unity/EscapeNine/Assets/
     └── EditMode/       # NUnit 回帰テスト (Swift と同一入出力を担保)
         ├── FloorTests.cs
         ├── GameEngineTests.cs
-        └── AIEngineTests.cs
+        ├── AIEngineTests.cs
+        ├── SeededRngTests.cs
+        ├── DailyChallengeGeneratorTests.cs
+        ├── ShareTextBuilderTests.cs
+        ├── AchievementCheckerTests.cs
+        └── GameSessionTests.cs
 
 unity/setup/            # ローカル立ち上げの完全自動化
 ├── RUNBOOK.md          # ← ローカル Claude Code 用の一気通貫ランブック
