@@ -1,0 +1,12 @@
+{
+  "_comment": "Claude Code 用 MCP サーバ設定のフォールバック例。repo ルートの .mcp.json にマージして使う。推奨は各サーバ付属の自動セットアップCLI (RUNBOOK.md §3)。command/args は選んだ Unity MCP サーバの README で最新を確認して置換すること。",
+  "mcpServers": {
+    "unity": {
+      "command": "npx",
+      "args": ["-y", "REPLACE_WITH_UNITY_MCP_SERVER_PACKAGE"],
+      "env": {
+        "UNITY_PROJECT_PATH": "${HOME}/EscapeNineUnity"
+      }
+    }
+  }
+}

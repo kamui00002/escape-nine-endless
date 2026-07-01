@@ -2,6 +2,11 @@
 
 親プラン: `../docs/unity-migration-plan.md`
 
+> 🚀 **ローカル Mac で立ち上げるなら → `setup/RUNBOOK.md`（完全自動化ランブック）**。
+> `bash unity/setup/bootstrap.sh` 一発で「プロジェクト作成 → 足場コピー → EditMode テスト → Phase 0 シーン生成」まで
+> ヘッドレス実行。MCP 設定と Phase 0 実機検証（GO/NO-GO）も RUNBOOK に手順化済み。
+> 下記の §手順 は自動化を使わない場合の手動リファレンス。
+
 ---
 
 ## ⚠️ 重要 — このフォルダの正直な状態
@@ -32,12 +37,20 @@ unity/EscapeNine/Assets/
 │   │   ├── Character.cs        ← Models/Character.swift
 │   │   └── GameStateData.cs    ← Models/GameState.swift (struct GameState)
 │   └── Runtime/        # UnityEngine 依存
-│       └── Conductor.cs        ← Services/BeatEngine.swift を dspTime ベースに再設計 (Phase 0 の核)
+│       ├── Conductor.cs        ← Services/BeatEngine.swift を dspTime ベースに再設計 (Phase 0 の核)
+│       └── Phase0Harness.cs    ← Phase 0 タイミング検証の最小プレイアブル (HIT/MISS ログ)
+├── Editor/             # Editor 専用 (CLI 自動化)
+│   └── Phase0SceneBuilder.cs   ← Phase 0 シーンをプログラム生成 (-executeMethod で呼ぶ)
 └── Tests/
     └── EditMode/       # NUnit 回帰テスト (Swift と同一入出力を担保)
         ├── FloorTests.cs
         ├── GameEngineTests.cs
         └── AIEngineTests.cs
+
+unity/setup/            # ローカル立ち上げの完全自動化
+├── RUNBOOK.md          # ← ローカル Claude Code 用の一気通貫ランブック
+├── bootstrap.sh        # 作成〜テスト〜Phase0シーン生成 (headless)
+└── mcp.example.json    # Claude Code MCP 設定のフォールバック例
 ```
 
 ## 移植方針・意図的な差分

@@ -1,0 +1,19 @@
+{
+    "name": "EscapeNine.EditorTools",
+    "rootNamespace": "EscapeNine.EditorTools",
+    "references": [
+        "EscapeNine.Core",
+        "EscapeNine.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
