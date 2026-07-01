@@ -57,6 +57,10 @@ bash unity/setup/bootstrap.sh
 **検証ゲート①**: EditMode テストが全 pass すること（＝Swift→C# 移植が忠実である一次証明）。
 `failed=0` を確認。失敗があれば §6 トラブルシュート。
 
+> 📗 前段検証済み (2026-07-01): Core + 全60テストは `unity/verify/Core.Tests` の `dotnet test` で
+> .NET 8 (C# 9) 上で **60/60 green** を確認済み。Editor で失敗する場合は Unity 側の設定
+> (Test Framework 未導入 / asmdef 解決) を疑うのが先。
+
 ---
 
 ## 3. MCP セットアップ（対話フェーズ用）

@@ -202,6 +202,13 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - **Phase 6a（Steam体験版）を前倒し**: 体験版に IAP/広告は不要（むしろ無い方がよい）ので Phase 3 に依存しない。Steam は"発見される場所"であり、Next Fest 等への露出 = 集客ボトルネックの実質的な解。UI + juice が揃った時点で最短で出せる。
 - **Phase 4（juice）は Phase 2 直後**: 短尺動画映えする15秒素材が撮れる状態を早く作る（これも集客素材）。
 
+### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
+
+- **Core コンパイル + 全 60 テスト green**（`unity/verify/Core.Tests`, C# 9 固定）→ ゲート①のリスクは大幅低減
+- **バランスシミュレーション 15構成×1000ラン**（`unity/verify/BALANCE_REPORT.md`）主要所見:
+  完璧タイミングでも100階クリアはほぼ不可能 / 魔法使いが突出（中央値34-66階）/ 盗賊が最弱 /
+  Hard AI が魔法使い相手に Normal より弱い創発 → **Phase 5 のバランス設計の一級資料**
+
 ### 最初の90分（今日やること — ほぼ Tier 0）
 
 1. `git pull` → `bash unity/setup/bootstrap.sh`（AI不要）

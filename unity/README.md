@@ -11,11 +11,10 @@
 
 ## ⚠️ 重要 — このフォルダの正直な状態
 
-このフォルダの C# は **Linux コンテナ上でテキストとして書かれたもので、Unity Editor でのビルド・実行・テストは未実施 (未検証)** です。
-Swift 正本からの **忠実移植** ですが、コンパイル確認はあなたの Unity 環境で行う必要があります。
-
-- ✅ **移植済 (コードとして完成、要コンパイル確認)**: Phase 1 の純ロジック + Phase 0 の Conductor + EditMode テスト
-- ❌ **未実施 (Editor が必要なため本環境では作れない)**: Unity プロジェクト本体の生成、`.meta` 生成、SDK パッケージ導入、シーン/プレハブ、各プラットフォームのビルド
+- ✅ **Core は .NET 8 で検証済み (2026-07-01)**: `unity/verify/Core.Tests` で実コンパイル + **全 60 テスト green** (C# 9 固定 = Unity 2022/6 互換)。再現: `cd unity/verify/Core.Tests && dotnet test`
+- ✅ **バランスシミュレーション実行済み**: `unity/verify/Sim` (15構成 × 1000ラン) → `unity/verify/BALANCE_REPORT.md`
+- 🟡 **Unity Editor 上での Test Runner 再確認は未実施** (Runtime/Editor スクリプト = Conductor/Phase0 系は UnityEngine 依存のため本環境ではコンパイル不可)。RUNBOOK ゲート①で確認する — ただし Core は前段検証済みのためリスクは小さい
+- ❌ **未実施 (Editor が必要)**: Unity プロジェクト本体の生成、`.meta` 生成、SDK パッケージ導入、シーン/プレハブ、各プラットフォームのビルド
 
 「作ったフリ」を避けるため、Editor 依存の作業は下の §手順 に人間タスクとして明記しています。
 
