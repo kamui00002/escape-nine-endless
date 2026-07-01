@@ -171,7 +171,48 @@ Phase 0: ビート同期プロトタイプ (1-2週)  ←★最重要
 
 ---
 
-## 8. 関連ドキュメント
+## 8. Fable 5 開始後の実行計画（2026-07-01 改訂）
+
+### 変わった前提
+
+1. **Fable 5 が利用可能に** → `/finish-unity` + ultracode での実行フェーズへ移行
+2. **クレジット従量消費が発生中**（プラン付属枠超過 → extra usage 課金） → **トークン = 実費**。ultracode の無計画な全自走は禁物
+
+### コスト階層（Tier）— 安い順に実行する
+
+| Tier | 手段 | コスト | 対象作業 |
+|---|---|---|---|
+| **0** | シェルのみ（AI不要） | ほぼ無料 | `bootstrap.sh` 実行 / EditModeテスト / Phase0シーン生成 / iOS実機ビルド |
+| **1** | 通常 Claude Code（ultracode なし） | 小 | コンパイルエラー修正 / 小さな結線 / MCP設定 |
+| **2** | ultracode + **予算指定必須**（`+200k` 等） | 大 | UI再構築 / ローグライク設計 / Swift↔C# 敵対的検証 |
+
+**ルール**: 機械的な作業に ultracode を使わない。マスター全自走ではなく `/finish-unity <N>` でフェーズ単位。ultracode 起動時は必ず予算指定を付け、`/usage` でクレジット残高を随時確認。
+
+### 改訂フェーズ順（§3 の順を上書き）
+
+```
+Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
+→ Phase 4 juice (Tier 2) → Phase 6a Steam体験版 (Tier 1-2) ★前倒し
+→ Phase 5 ローグライク (Tier 2) → Phase 3 収益化 (Tier 1) ★後ろへ
+→ Phase 6b Android → Phase 7 リリース
+```
+
+**順序変更の理由**:
+- **Phase 3（収益化再統合）を後ろへ**: 実プレイヤー約2名の現状で IAP/広告の結線は価値が低い。人が入ってから結線しても遅くない。
+- **Phase 6a（Steam体験版）を前倒し**: 体験版に IAP/広告は不要（むしろ無い方がよい）ので Phase 3 に依存しない。Steam は"発見される場所"であり、Next Fest 等への露出 = 集客ボトルネックの実質的な解。UI + juice が揃った時点で最短で出せる。
+- **Phase 4（juice）は Phase 2 直後**: 短尺動画映えする15秒素材が撮れる状態を早く作る（これも集客素材）。
+
+### 最初の90分（今日やること — ほぼ Tier 0）
+
+1. `git pull` → `bash unity/setup/bootstrap.sh`（AI不要）
+2. EditMode テスト全 pass 確認 = **検証ゲート①**（コンパイルエラーが出たら Tier 1 で修正）
+3. `bash unity/setup/install-slash-command.sh` → MCP設定（RUNBOOK §3、Tier 1）
+4. Phase 0 シーンを iOS 実機へ → **リズム精度 GO/NO-GO**（人間ゲート）
+5. GO なら `/finish-unity 2` を**予算付き**で起動（ここが最初の Tier 2）
+
+---
+
+## 9. 関連ドキュメント
 
 - 配信ボトルネックの根拠: `docs/aso/sprint-1-baseline.md` §4（実プレイヤー約2名）
 - 現行ゲーム仕様: `docs/game-spec.md` / `docs/要件定義書_EscapeNine.md`
