@@ -11,7 +11,9 @@
 [Rr]ecordings/
 
 # Unity 自動生成の csproj / sln (Editor が再生成)
+# ただし verify/ 配下は手書きの検証プロジェクトなので追跡する
 *.csproj
+!verify/**/*.csproj
 *.unityproj
 *.sln
 *.suo

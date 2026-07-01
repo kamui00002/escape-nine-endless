@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Unity 外で Core ロジック + EditMode テストを検証する headless プロジェクト。
+    Core は UnityEngine 非依存 (noEngineReferences) のため、素の .NET でそのまま
+    コンパイル・テストできる。Unity Editor での Test Runner 実行 (RUNBOOK ゲート①) の
+    前段検証として、CI やこのコンテナ環境で `dotnet test` する用途。
+    LangVersion は Unity 2022/6 互換の C# 9 に固定。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../EscapeNine/Assets/Scripts/Core/**/*.cs" />
+    <Compile Include="../../EscapeNine/Assets/Tests/EditMode/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+  </ItemGroup>
+
+</Project>
