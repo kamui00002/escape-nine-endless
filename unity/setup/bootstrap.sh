@@ -79,6 +79,12 @@ else
       err "  3. 本スクリプトを再実行"
       err "  それでも失敗する場合: Hub から一度 Editor を GUI で起動してから再実行。"
       err "  最終手段: Hub GUI で $PROJECT_PATH に 2D プロジェクトを手動作成 → 再実行 (作成はスキップされ続行します)"
+    elif echo "$CREATE_LOG" | grep -q "Could not find Unity Package Manager"; then
+      err "Unity のインストールが破損しています (Package Manager サーバ欠損)。修復手順:"
+      err "  1. Unity Hub → Installs → 該当バージョンの『⋮』→ Uninstall"
+      err "  2. Install Editor から 2022.3 LTS (以降) を入れ直す"
+      err "     ※ モジュール選択で『iOS Build Support』に必ずチェック (Phase 0 実機ビルドで必要)"
+      err "  3. 本スクリプトを再実行"
     fi
     err "プロジェクト作成に失敗しました。"
     exit 1
