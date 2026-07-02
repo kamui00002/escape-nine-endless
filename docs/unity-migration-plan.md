@@ -202,6 +202,12 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - **Phase 6a（Steam体験版）を前倒し**: 体験版に IAP/広告は不要（むしろ無い方がよい）ので Phase 3 に依存しない。Steam は"発見される場所"であり、Next Fest 等への露出 = 集客ボトルネックの実質的な解。UI + juice が揃った時点で最短で出せる。
 - **Phase 4（juice）は Phase 2 直後**: 短尺動画映えする15秒素材が撮れる状態を早く作る（これも集客素材）。
 
+### ✅ Phase 0 ゲート通過（2026-07-02）
+
+- Unity 6.3 LTS (6000.3.19f1) / EditMode テスト **60/60 green**（Unity 上で確認）
+- Phase 0 シーン（Conductor + Phase0Harness + bgm_early）が Editor・**iOS 実機**で動作
+- **リズム精度: オーナー実機判定で GO** → 本移行を正式に続行。次は MCP 設定 → Phase 2 (UI) へ
+
 ### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
 
 - **Core コンパイル + 全 60 テスト green**（`unity/verify/Core.Tests`, C# 9 固定）→ ゲート①のリスクは大幅低減
