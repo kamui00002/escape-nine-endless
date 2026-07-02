@@ -103,6 +103,30 @@ else
 fi
 log "コピー完了 (.meta は Editor が初回 import 時に自動生成)"
 
+# ---- 3.5. Test Framework パッケージ確保 ----
+# -createProject の素のプロジェクトには com.unity.test-framework が含まれず、
+# EditMode テストが NUnit 不在 (CS0246: 'Test' not found) でコンパイルに失敗する。
+MANIFEST="$PROJECT_PATH/Packages/manifest.json"
+if [[ -f "$MANIFEST" ]] && ! grep -q "com.unity.test-framework" "$MANIFEST"; then
+  log "Test Framework を manifest.json に追加中..."
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$MANIFEST" <<'PY'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    manifest = json.load(f)
+manifest.setdefault("dependencies", {})["com.unity.test-framework"] = "1.4.5"
+with open(path, "w") as f:
+    json.dump(manifest, f, indent=2)
+    f.write("\n")
+print("[bootstrap] com.unity.test-framework 1.4.5 を追加")
+PY
+  else
+    err "python3 が見つかりません。手動で $MANIFEST の dependencies に"
+    err '  "com.unity.test-framework": "1.4.5" を追加してください。'
+  fi
+fi
+
 # ---- 4. EditMode テスト ----
 log "EditMode テストを実行中 (batchmode)..."
 set +e
