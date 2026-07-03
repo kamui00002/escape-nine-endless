@@ -129,7 +129,7 @@ namespace EscapeNine.Runtime.UI
             RectTransform oneTap = UIFactory.Panel(transform, "OneTapRetryLayer", new Color(0f, 0f, 0f, 0f));
             Button oneTapButton = oneTap.gameObject.AddComponent<Button>();
             oneTapButton.transition = Selectable.Transition.None; // 透明レイヤーなので視覚フィードバック無し
-            oneTapButton.onClick.AddListener(HandleRetry);
+            oneTapButton.onClick.AddListener(TriggerRetry);
             _oneTapLayer = oneTap.gameObject;
 
             // ---- コンテンツはセーフエリア内に収める (SwiftUI では自動処理されていた部分) ----
@@ -223,7 +223,7 @@ namespace EscapeNine.Runtime.UI
             // Swift は available→success の対角グラデーション + glow。単色 (中間色) に簡略化 (Phase 4)。
             Color retryBg = Color.Lerp(UITheme.Available, UITheme.Success, 0.5f);
             Button retryButton = UIFactory.TextButton(safe, "RetryButton", "もう一回", 64,
-                retryBg, Color.white, HandleRetry);
+                retryBg, Color.white, TriggerRetry);
             var retryRt = (RectTransform)retryButton.transform;
             UIFactory.Place(retryRt, 0.5f, 0.30f, 0.88f, 0.11f);
             AddBorder(retryRt, UITheme.WithAlpha(Color.white, 0.25f), 0.006f, 0.03f);
@@ -555,8 +555,11 @@ namespace EscapeNine.Runtime.UI
 
         // MARK: - ボタンハンドラ
 
-        /// <summary>リトライ (巨大ボタン + ワンタップレイヤー共通)。Swift: onPlayAgain</summary>
-        private void HandleRetry()
+        /// <summary>
+        /// リトライ (巨大ボタン + ワンタップレイヤー共通)。Swift: onPlayAgain
+        /// Phase 6a (デスクトップ): KeyboardInput.cs (R/Space/Enter) からも同処理を呼べるよう公開する。
+        /// </summary>
+        public void TriggerRetry()
         {
             if (App.I == null) return;
 

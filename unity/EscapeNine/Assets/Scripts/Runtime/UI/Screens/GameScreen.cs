@@ -749,6 +749,15 @@ namespace EscapeNine.Runtime.UI
             else if (session.Status == GameStatus.Paused) App.I.Game.ResumeGame();
         }
 
+        /// <summary>
+        /// Phase 6a (デスクトップ): キーボード (Esc/P) からの一時停止トグル。
+        /// ヘッダーの一時停止ボタンと同処理を公開する (KeyboardInput.cs から呼ばれる)。
+        /// </summary>
+        public void TogglePauseFromKeyboard()
+        {
+            HandlePauseTapped();
+        }
+
         private void HandleResumeTapped()
         {
             App.I.Audio.PlaySfx("button_tap"); // Swift: GameButton 内蔵の buttonTap

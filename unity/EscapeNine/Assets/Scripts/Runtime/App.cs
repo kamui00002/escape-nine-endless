@@ -90,6 +90,11 @@ namespace EscapeNine.Runtime
                 EscapeNine.Runtime.UI.Fx.FxLayer.Install(fxParent);
             }
 
+            // Phase 6a (デスクトップ/Steam体験版基盤): モバイルでは無害な追加コンポーネント。
+            // ピラーボックスは Fx と同じ contentRoot (screenRoot) を対象にする。
+            DesktopPillarbox.Install(screenRoot);
+            gameObject.AddComponent<KeyboardInput>();
+
             Router.Show(ScreenId.Home);
             Audio.PlayMenuBgm();
         }

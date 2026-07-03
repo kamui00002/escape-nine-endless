@@ -230,6 +230,15 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - 技術判断の記録: カメラシェイク不可（Overlay）→ RectTransform シェイク / timeScale HitStop は dspTime 駆動 Conductor と干渉しない0.1s以下限定 / BGMフェードは未実装のまま（次スプリント候補）
 - 既知の軽微リスク（統合レビュー申告）: FxKit 演出中に host の StopAllCoroutines が走ると scale が中間値で固着し得る（発生頻度極小・視覚影響軽微。FloorClear オーバーレイは位置リセットで対処済み）/ 演出検知が「OnTurnResolved が OnStateChanged より先」というイベント順序に依存
 
+### ✅ Phase 6a 技術基盤完了（2026-07-03） — Steam体験版のデスクトップ対応
+
+- **DesktopPillarbox**: 横長ウィンドウで縦画面コンテンツ (1170:2532) を中央カラム拘束 + 左右暗色フィル。モバイルでは無効
+- **KeyboardInput**: 盤面 1-9 / QWEASDZXC / テンキー(空間反転) → 移動、F/Shift=スキル、B=拘束、Esc/P=ポーズ、Space/Enter=階層クリア進行・リトライ・プレイ開始
+- **BuildScripts.BuildMac()**: メニュー + batchmode 両対応、結果マーカーファイル出力方式
+- **検証済み**: EditMode 80/80 / **macOS スタンドアロンビルド成功（errors=0, 186.6MB）→ 実起動確認（ピラーボックス動作・Player.log 例外ゼロ・スクショ取得）**
+- 残タスク（人間ゲート/環境）: Steamworks 連携（Steam アカウント/AppID 必要）/ Windows ビルド（Unity Hub で Windows Build Support モジュール追加が必要、現状 mac/iOS/Android のみ）/ Steam ストアページ・体験版設定
+- 既知の軽微課題: キーボード移動時に JUST/GOOD 表示バナーが出ない（内部状態は正常）/ デスクトップでチュートリアル説明文がカード枠を僅かにはみ出す
+
 ### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
 
 - **Core コンパイル + 全 60 テスト green**（`unity/verify/Core.Tests`, C# 9 固定）→ ゲート①のリスクは大幅低減

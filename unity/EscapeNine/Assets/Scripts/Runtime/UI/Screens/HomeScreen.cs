@@ -161,7 +161,7 @@ namespace EscapeNine.Runtime.UI
 
             // 1. 冒険を始める (primary: 明色背景 + 濃色文字。glow/pulse は Phase 4 送り)
             var play = UIFactory.TextButton(parent, "PlayButton", "冒険を始める", 60,
-                UITheme.Main, UITheme.Background, OnPlayTapped);
+                UITheme.Main, UITheme.Background, TriggerPlay);
             UIFactory.Place((RectTransform)play.transform, 0.5f, 0.685f, w, 0.06f);
             var playLabel = play.GetComponentInChildren<Text>();
             if (playLabel != null) playLabel.fontStyle = FontStyle.Bold;
@@ -204,8 +204,9 @@ namespace EscapeNine.Runtime.UI
         /// AI 難易度は PlayerState.SelectedAILevel を使用。開始階層はデフォルト 1
         /// (DEBUG ビルドでは GameController.StartNewRun 内で DebugStartFloor が適用される)。
         /// StartNewRun → Show(Game) の順: GameScreen.OnShow が新しい Session を読めるようにするため。
+        /// Phase 6a (デスクトップ): KeyboardInput.cs (Space/Enter) からも同処理を呼べるよう公開する。
         /// </summary>
-        private void OnPlayTapped()
+        public void TriggerPlay()
         {
             App.I.Audio.PlaySfx("button_tap");
             var player = App.I.Player;
