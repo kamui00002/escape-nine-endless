@@ -7,11 +7,16 @@
 //     セルとは独立に配置する。セル側は背景色ハイライトのみ担当。
 //   - SwiftUI の .aspectRatio(1.0, contentMode: .fit) は AspectRatioFitter(FitInParent) で再現。
 //     位置・サイズは全て親比率 0..1 (UIFactory.Place) = 固定 px 禁止ルール準拠。
+//
+// 担当A juice (Phase 4): 移動ホップ (PunchScale)・拍パルス (BeatPulse)・
+// 衝突演出用の Flash/BurstAt/Shake 公開メソッド・霧/消失セルのフェード駆動 (Tick) を追加。
+// GameController の既存イベント購読・状態参照は変更しない (GameScreen 側からのみ呼ばれる)。
 
 using System;
 using UnityEngine;
 using UnityEngine.UI;
 using EscapeNine.Core;
+using EscapeNine.Runtime.UI.Fx;
 
 namespace EscapeNine.Runtime.UI
 {
@@ -29,6 +34,10 @@ namespace EscapeNine.Runtime.UI
 
         /// <summary>移動スライド補間の所要秒 (タスク指定: Lerp 0.1s 程度)。</summary>
         private const float MoveDuration = 0.1f;
+
+        /// <summary>移動ホップ (PunchScale) のパンチ量 / 秒数 (担当A juice: squash&amp;stretch 風の強調)。</summary>
+        private const float MoveHopPunch = 0.18f;
+        private const float MoveHopDuration = 0.18f;
 
         /// <summary>セルサイズ (正方形盤面に対する比率)。3 列 + 隙間で 0.31 × 3 + 余白。</summary>
         private const float CellSize = 0.31f;
@@ -71,6 +80,11 @@ namespace EscapeNine.Runtime.UI
             var fitter = square.gameObject.AddComponent<AspectRatioFitter>();
             fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             fitter.aspectRatio = 1f;
+
+            // BPM に合わせて盤面全体 (セル + キャラスプライトの親) がわずかに脈動する
+            // (担当A juice: 盤面背景/外周フレームへの BeatPulse 装着)。Graphic が無いので
+            // scale のみ脈動し、alphaAmount は無視される (BeatPulse は null Graphic を許容する)。
+            square.gameObject.AddComponent<BeatPulse>();
 
             for (int pos = 1; pos <= GameConfig.GridSize; pos++)
             {
@@ -202,6 +216,10 @@ namespace EscapeNine.Runtime.UI
                 to = target;
                 t = 0f;
                 Apply(rt, from);
+
+                // 移動ホップ (担当A juice: squash&stretch 風の強調)。ラン開始/階層切替の
+                // 即時再配置 (_snapNext 分岐) では鳴らさない — 実際の移動時のみ。
+                FxKit.PunchScale(this, rt, MoveHopPunch, MoveHopDuration);
             }
         }
 
@@ -210,13 +228,42 @@ namespace EscapeNine.Runtime.UI
             // 同時移動 (プレイヤーと鬼が同じターンで動く) を両方 0.1 秒でスライドさせる
             Advance(ref _playerFrom, ref _playerTo, ref _playerT, _playerRt);
             Advance(ref _enemyFrom, ref _enemyTo, ref _enemyT, _enemyRt);
+
+            // 霧/消失マスのフェード進行 (担当A juice: GridCellWidget は非 MonoBehaviour のため駆動する)
+            float dt = Time.deltaTime;
+            for (int pos = 1; pos <= GameConfig.GridSize; pos++)
+            {
+                _cells[pos].Tick(dt);
+            }
         }
 
         private static void Advance(ref Vector2 from, ref Vector2 to, ref float t, RectTransform rt)
         {
             if (t >= 1f) return;
             t = Mathf.Min(1f, t + Time.deltaTime / MoveDuration);
-            Apply(rt, Vector2.Lerp(from, to, t));
+            // 単純 Lerp より着地感が出るイージングで強化 (担当A juice)。
+            float eased = Mathf.SmoothStep(0f, 1f, t);
+            Apply(rt, Vector2.Lerp(from, to, eased));
+        }
+
+        // MARK: - 衝突演出フック (担当A juice: GameScreen から呼ばれる公開 API)
+
+        /// <summary>プレイヤースプライトを瞬間的に指定色へフラッシュする (透明化吸収=紫 / 盾消費=青 / 敗北=赤)。</summary>
+        public void FlashPlayer(Color color, float duration = 0.2f)
+        {
+            FxKit.Flash(this, _playerImage, color, duration);
+        }
+
+        /// <summary>プレイヤー位置を中心に破片バーストを放つ (透明化吸収 / 敗北時)。</summary>
+        public void BurstAtPlayer(Color color, int count = 12, float speed = 600f)
+        {
+            if (FxLayer.I != null) FxLayer.I.BurstAt(_playerRt, color, count, speed);
+        }
+
+        /// <summary>盤面全体を振動させる (敗北時)。</summary>
+        public void Shake(float amplitude = 12f, float duration = 0.3f)
+        {
+            FxKit.ShakeRect(this, (RectTransform)transform, amplitude, duration);
         }
 
         private static void Apply(RectTransform rt, Vector2 center)

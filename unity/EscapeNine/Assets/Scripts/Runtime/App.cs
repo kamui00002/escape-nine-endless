@@ -80,6 +80,16 @@ namespace EscapeNine.Runtime
                 Router.Register(screen);
             }
 
+            // Fx 基盤 (Phase 4 juice): screenRoot の最後の子として常駐させ、
+            // 画面切替に関わらず常に最前面へ破片バースト等を描画できるようにする。
+            RectTransform fxParent = screenRoot != null
+                ? screenRoot
+                : (screens.Length > 0 ? screens[0].transform.parent as RectTransform : null);
+            if (fxParent != null)
+            {
+                EscapeNine.Runtime.UI.Fx.FxLayer.Install(fxParent);
+            }
+
             Router.Show(ScreenId.Home);
             Audio.PlayMenuBgm();
         }

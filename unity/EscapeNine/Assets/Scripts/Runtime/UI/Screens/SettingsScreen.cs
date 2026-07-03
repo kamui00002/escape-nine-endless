@@ -31,8 +31,8 @@ namespace EscapeNine.Runtime.UI
         private const string SupportUrl = "https://github.com/kamui00002/escape-nine-endless";
 
         // スクロールコンテンツの総高さ = ビューポートの何倍か。
-        // カード合計 1.49 + 間隔 0.175 = 1.665 を収める (全カード比率の合計と連動して調整すること)。
-        private const float ContentHeightRatio = 1.7f;
+        // カード合計 1.63 (FxCard 0.14 追加後) + 間隔 0.175 = 1.805 を収める (全カード比率の合計と連動して調整すること)。
+        private const float ContentHeightRatio = 1.87f;
 
         /// <summary>カード間の縦間隔 (ビューポート高さ比)。Swift: VStack(spacing: 24) 相当。</summary>
         private const float SectionGap = 0.025f;
@@ -51,6 +51,8 @@ namespace EscapeNine.Runtime.UI
         private Text _oneTapLabel;
         private Image _hapticsBg;            // 触覚フィードバックのトグル背景
         private Text _hapticsLabel;
+        private Image _reduceMotionBg;       // 視覚効果を減らす (Phase 4 juice) のトグル背景
+        private Text _reduceMotionLabel;
         private Slider _bgmSlider;
         private Text _bgmPercentLabel;
         private Slider _sfxSlider;
@@ -142,6 +144,7 @@ namespace EscapeNine.Runtime.UI
             _cursor = 1f;
             BuildPlayerInfoCard();
             BuildGameplayCard();
+            BuildFxCard();
             BuildSoundCard();
             BuildTutorialCard();
             BuildAboutCard();
@@ -210,6 +213,18 @@ namespace EscapeNine.Runtime.UI
                 Bg = btn.GetComponent<Image>(),
                 Label = btn.GetComponentInChildren<Text>()
             };
+        }
+
+        // MARK: - Card 2.5: 演出設定 (Phase 4 juice。Swift 正本に対応なし、Unity 独自の追加設定)
+
+        private void BuildFxCard()
+        {
+            var card = AddCard("FxCard", "演出設定", 0.14f);
+
+            BuildToggleRow(card, "ReduceMotion",
+                "視覚効果を減らす",
+                "パンチ・シェイク・破片・ビート脈動などの演出を抑えます",
+                0.40f, ToggleReduceMotion, out _reduceMotionBg, out _reduceMotionLabel);
         }
 
         // MARK: - Card 3: サウンド設定 (Swift: soundSection)
@@ -360,6 +375,15 @@ namespace EscapeNine.Runtime.UI
             RefreshDynamic();
         }
 
+        private void ToggleReduceMotion()
+        {
+            App.I.Audio.PlaySfx("button_tap");
+            var player = App.I.Player;
+            player.ReduceMotionEnabled = !player.ReduceMotionEnabled;
+            player.Save();
+            RefreshDynamic();
+        }
+
         private void SelectAiLevel(AILevel level)
         {
             App.I.Audio.PlaySfx("button_tap");
@@ -401,6 +425,7 @@ namespace EscapeNine.Runtime.UI
 
             ApplyToggleVisual(_oneTapBg, _oneTapLabel, player.OneTapRetryEnabled);
             ApplyToggleVisual(_hapticsBg, _hapticsLabel, player.HapticsEnabled);
+            ApplyToggleVisual(_reduceMotionBg, _reduceMotionLabel, player.ReduceMotionEnabled);
 
             if (_aiSegments != null)
             {

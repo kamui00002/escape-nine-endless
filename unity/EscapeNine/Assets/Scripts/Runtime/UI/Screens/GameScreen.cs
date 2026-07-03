@@ -21,6 +21,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using EscapeNine.Core;
+using EscapeNine.Runtime.UI.Fx;
 
 namespace EscapeNine.Runtime.UI
 {
@@ -33,6 +34,10 @@ namespace EscapeNine.Runtime.UI
         private const float BossWarningSeconds = 2.0f;  // ボス出現警告
         private const float SkillResetSeconds = 2.0f;   // スキル回復通知
         private const float GradeDisplaySeconds = 0.8f; // タイミング判定 (JUST/GOOD/MISS)
+
+        // ---- 担当A juice (Phase 4): 衝突演出の色 ----
+        private static readonly Color InvisibleAbsorbColor = new Color(0.72f, 0.42f, 0.98f); // 紫 (透明化吸収)
+        private static readonly Color ShieldAbsorbColor = new Color(0.35f, 0.62f, 1f);        // 青 (盾ガード消費)
 
         /// <summary>
         /// プレゲームの AI 難易度選択肢 (Swift: GameView.aiLevelSelector の
@@ -87,6 +92,7 @@ namespace EscapeNine.Runtime.UI
         private GameObject _pausedOverlay;
 
         private GameObject _countdownOverlay;
+        private Image _countdownBg;
         private Text _countdownLabel;
 
         private GameObject _gameOverOverlay;
@@ -117,6 +123,17 @@ namespace EscapeNine.Runtime.UI
 
         /// <summary>タイミング判定の表示開始時刻 (負 = 非表示)。0.8 秒で自動消去 (UI 側の責務)。</summary>
         private float _gradeShownAt = -1f;
+
+        // ---- 担当A juice (Phase 4): 衝突/コンボ演出のエッジ検知用スナップショット ----
+
+        /// <summary>直近 RefreshAll 時点の Game.IsInvisible (透明化吸収の立ち上がり検知用)。</summary>
+        private bool _prevIsInvisible;
+
+        /// <summary>直近 RefreshAll 時点の Session.ShieldActive (盾ガード消費の立ち下がり検知用)。</summary>
+        private bool _prevShieldActive;
+
+        /// <summary>直近のコンボ数 (3/5 到達エッジでの PunchScale トリガー用)。</summary>
+        private int _lastComboCount;
 
         // スプライトキャッシュ (再描画のたびに Resources.Load しないため)
         private Sprite _playerSprite;
@@ -399,6 +416,7 @@ namespace EscapeNine.Runtime.UI
         {
             var overlay = UIFactory.Panel(transform, "CountdownOverlay", new Color(0f, 0f, 0f, 0.7f));
             _countdownOverlay = overlay.gameObject;
+            _countdownBg = overlay.GetComponent<Image>();
 
             _countdownLabel = UIFactory.Label(overlay, "CountLabel", "3", 280, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -609,7 +627,35 @@ namespace EscapeNine.Runtime.UI
             {
                 ShowFloorClear(); // 「スタート」で AdvanceToNextFloor (自動遷移しないのが正本仕様)
             }
-            // Continued / Defeated の再描画は直後の OnStateChanged / OnGameOver が担う
+            else if (result == TurnResult.Continued)
+            {
+                // 担当A juice: 透明化吸収 / 盾ガード消費の演出 (敗北しなかった衝突のみ該当)
+                HandleCollisionAbsorbFx();
+            }
+            // Defeated の再描画は直後の OnGameOver が担う
+        }
+
+        /// <summary>
+        /// 透明化吸収 (Game.IsInvisible 立ち上がり) / 盾ガード消費 (Session.ShieldActive 立ち下がり) を
+        /// 検知して演出する (担当A juice)。_prevIsInvisible / _prevShieldActive は RefreshAll の末尾で
+        /// 「このターン解決の直前」の値を保持している (OnTurnResolved は同じ拍の OnStateChanged より前に
+        /// 発火するため) — ここで現在値と比較するだけで立ち上がり/立ち下がりを検知できる。
+        /// </summary>
+        private void HandleCollisionAbsorbFx()
+        {
+            var game = App.I.Game;
+            var session = game.Session;
+            if (session == null) return;
+
+            if (!_prevIsInvisible && game.IsInvisible)
+            {
+                _board.FlashPlayer(InvisibleAbsorbColor);
+                _board.BurstAtPlayer(InvisibleAbsorbColor);
+            }
+            else if (_prevShieldActive && !session.ShieldActive)
+            {
+                _board.FlashPlayer(ShieldAbsorbColor);
+            }
         }
 
         private void HandleFloorAdvanced(int newFloor)
@@ -642,6 +688,12 @@ namespace EscapeNine.Runtime.UI
             _gameOverText.color = caught ? UITheme.Warning : BeatIndicatorWidget.SwiftOrange;
             _gameOverOverlay.SetActive(true);
             // 1.5 秒後の EndGame → OnStateChanged がリザルトへ遷移させる (OnHide で消える)
+
+            // 担当A juice: 敗北の「間」— ヒットストップ + 盤面シェイク + 赤フラッシュ + 破片
+            FxKit.HitStop(this, 0.08f);
+            _board.Shake();
+            _board.FlashPlayer(UITheme.Warning);
+            _board.BurstAtPlayer(UITheme.Warning);
         }
 
         private void HandleBossWarning()
@@ -779,6 +831,7 @@ namespace EscapeNine.Runtime.UI
             _countdownLabel.fontSize = 280;
             _countdownLabel.color = UITheme.Available; // Swift: カウント数字は available (金)
             _countdownOverlay.SetActive(true);
+            FxKit.PunchScale(this, (RectTransform)_countdownLabel.transform); // 担当A juice
         }
 
         private void ShowGo()
@@ -787,6 +840,10 @@ namespace EscapeNine.Runtime.UI
             _countdownLabel.fontSize = 240;
             _countdownLabel.color = UITheme.Success; // Swift: GO! は success (緑)
             _countdownOverlay.SetActive(true);
+
+            // 担当A juice: GO! の強調パンチ + 背景の一瞬の明滅
+            FxKit.PunchScale(this, (RectTransform)_countdownLabel.transform, 0.3f, 0.3f);
+            FxKit.Flash(this, _countdownBg, UITheme.WithAlpha(UITheme.Success, 0.85f), 0.35f);
 
             if (_goHideRoutine != null) StopCoroutine(_goHideRoutine);
             _goHideRoutine = StartCoroutine(HideCountdownAfterGo());
@@ -805,7 +862,17 @@ namespace EscapeNine.Runtime.UI
             if (session == null) return;
             _floorClearFloorLabel.text = session.CurrentFloor + "階層";
             _floorClearNextLabel.text = "次: " + (session.CurrentFloor + 1) + "階層";
+
+            // RefreshAll は IsFloorClearPending の間 (次階層へ進むまで) 毎拍このメソッドを呼び直す。
+            // 演出は「非表示 → 表示」に切り替わった瞬間だけ鳴らす (担当A juice)。
+            bool wasActive = _floorClearOverlay.activeSelf;
             _floorClearOverlay.SetActive(true);
+            if (!wasActive)
+            {
+                FxKit.SlideIn(this, (RectTransform)_floorClearOverlay.transform, new Vector2(0f, -100f));
+                if (FxLayer.I != null) FxLayer.I.BurstScreen(new Vector2(0.5f, 0.55f), UITheme.GoldText);
+                FxKit.PunchScale(this, (RectTransform)_floorClearNextLabel.transform, 0.3f, 0.35f);
+            }
         }
 
         private void ShowSkillResetToast()
@@ -868,7 +935,18 @@ namespace EscapeNine.Runtime.UI
             _skillResetRoutine = null;
             _gradeShownAt = -1f;
 
-            if (_floorClearOverlay != null) _floorClearOverlay.SetActive(false);
+            // 担当A juice: 画面再表示時に前ランの衝突/コンボ差分を誤検知しないようリセットする
+            _prevIsInvisible = false;
+            _prevShieldActive = false;
+            _lastComboCount = 0;
+
+            if (_floorClearOverlay != null)
+            {
+                _floorClearOverlay.SetActive(false);
+                // 担当A juice: StopAllCoroutines() で SlideIn が中断された場合、
+                // anchoredPosition が中間値のまま残り次回の演出が原点からズレるのを防ぐ。
+                ((RectTransform)_floorClearOverlay.transform).anchoredPosition = Vector2.zero;
+            }
             if (_skillResetToast != null) _skillResetToast.SetActive(false);
             if (_pregameOverlay != null) _pregameOverlay.SetActive(false);
             if (_pausedOverlay != null) _pausedOverlay.SetActive(false);
@@ -926,6 +1004,11 @@ namespace EscapeNine.Runtime.UI
             else _floorClearOverlay.SetActive(false);
 
             RenderBoard(session);
+
+            // 担当A juice: 次回 HandleCollisionAbsorbFx (OnTurnResolved) が「このターン解決直前」の
+            // 値と比較できるよう、今回描画した最新値をここで控えておく。
+            _prevIsInvisible = game.IsInvisible;
+            _prevShieldActive = session.ShieldActive;
         }
 
         /// <summary>コンボ / タイミング判定行 (Swift: comboDisplay)。</summary>
@@ -943,8 +1026,10 @@ namespace EscapeNine.Runtime.UI
             {
                 double multiplier = session.ScoreMultiplier;
                 _comboLabel.text = "×" + combo + " コンボ";
-                // Swift: 倍率発動中はコンボ文字が金色に昇格
-                _comboLabel.color = multiplier > 1.0 ? UITheme.GoldText : UITheme.TextColor;
+                // Swift: 倍率発動中はコンボ文字が金色に昇格。担当A juice: さらに combo>=5 で警告色に昇格。
+                _comboLabel.color = combo >= GameConfig.ComboMultiplierThreshold2 ? UITheme.Warning
+                    : multiplier > 1.0 ? UITheme.GoldText
+                    : UITheme.TextColor;
 
                 if (multiplier > 1.0)
                 {
@@ -952,6 +1037,14 @@ namespace EscapeNine.Runtime.UI
                     _multiplierLabel.gameObject.SetActive(true);
                 }
             }
+
+            // 担当A juice: コンボが 3/5 の節目に到達した瞬間だけ強調パンチ (毎フレーム再トリガーしない)。
+            if (combo != _lastComboCount
+                && (combo == GameConfig.ComboMultiplierThreshold1 || combo == GameConfig.ComboMultiplierThreshold2))
+            {
+                FxKit.PunchScale(this, (RectTransform)_comboLabel.transform, 0.25f, 0.3f);
+            }
+            _lastComboCount = combo;
 
             _comboRow.SetActive(gradeVisible || comboVisible);
         }

@@ -32,6 +32,7 @@ namespace EscapeNine.Runtime
         private const string HasSeenTutorialV11Key = "hasSeenTutorialV1_1";
         private const string OneTapRetryEnabledKey = "oneTapRetryEnabled";
         private const string HapticsEnabledKey = "hapticsEnabled"; // Swift: HapticsHelper.storageKey
+        private const string ReduceMotionEnabledKey = "reduceMotionEnabled"; // Phase 4 (juice): Swift 正本に対応キー無し。Unity 独自の演出軽減設定
         private const string PurchasedProductsKey = "purchasedProductIDs"; // Swift は Keychain 保存。Unity は PlayerPrefs (Phase 3 で StoreKit/IAP 導入時にセキュア化を検討)
         private const string AILevelKey = "aiLevel"; // Swift は非永続 (GameView の @State)。Unity では画面間受け渡しのため永続化 (意図的差分)
 
@@ -73,6 +74,9 @@ namespace EscapeNine.Runtime
         public bool HasSeenTutorialV11 { get; set; }
         public bool OneTapRetryEnabled { get; set; } = true;
         public bool HapticsEnabled { get; set; } = true;
+
+        /// <summary>Phase 4 (juice) の演出軽減設定。true でパンチ/シェイク/破片/ビートパルス等を抑制する。</summary>
+        public bool ReduceMotionEnabled { get; set; }
 
         /// <summary>選択中の AI 難易度 (Home/Game 画面間の受け渡し用)。</summary>
         public AILevel SelectedAILevel { get; set; } = AILevel.Easy;
@@ -130,6 +134,7 @@ namespace EscapeNine.Runtime
             HasSeenTutorialV11 = GetBool(HasSeenTutorialV11Key, false);
             OneTapRetryEnabled = GetBool(OneTapRetryEnabledKey, true);
             HapticsEnabled = GetBool(HapticsEnabledKey, true);
+            ReduceMotionEnabled = GetBool(ReduceMotionEnabledKey, false);
             SelectedAILevel = ParseAILevel(PlayerPrefs.GetString(AILevelKey, "Easy"), AILevel.Easy);
 
             string purchasedRaw = PlayerPrefs.GetString(PurchasedProductsKey, "");
@@ -183,6 +188,7 @@ namespace EscapeNine.Runtime
             SetBool(HasSeenTutorialV11Key, HasSeenTutorialV11);
             SetBool(OneTapRetryEnabledKey, OneTapRetryEnabled);
             SetBool(HapticsEnabledKey, HapticsEnabled);
+            SetBool(ReduceMotionEnabledKey, ReduceMotionEnabled);
             PlayerPrefs.SetString(AILevelKey, SelectedAILevel.RawValue());
             PlayerPrefs.SetString(PurchasedProductsKey, string.Join(",", PurchasedProducts));
 

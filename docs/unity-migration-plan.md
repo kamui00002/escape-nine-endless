@@ -220,6 +220,16 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - **Phase 2.5 バックログ**（検証で確定した残移植、次スプリントで対応）: ① デイリーチャレンジのフロー統合（開始経路・条件適用・完了記録）と画面 ② 実績 UI（Home ボタン+一覧+Result 解除ポップアップ。判定・永続化は結線済み） ③ デイリーチャレンジ完了状態表示
 - **意図的差分として維持**（文書化）: AI難易度の永続化（Swift はセッション毎 Easy リセット→UX 改善として保持）/ 壊れセーブ時に勇者を残す安全化 / SFX 音量 0.7 統一（Swift の 0.8/0.7 二重経路の負債解消）/ Conductor.CheckMoveTiming の判定窓（現行フロー未使用 API。使用時に要再検討）/ FloorClear 中のポーズ不可（Swift は可）
 
+### ✅ Phase 4 完了（2026-07-03） — ゲームフィール (juice)
+
+- **FX 基盤**: FxKit（PunchScale/ShakeRect/Flash/HitStop/SlideIn、コルーチンベース・外部Tweenライブラリなし）/ FxLayer（プール式 UI スプライトバースト。ParticleSystem 不使用＝Overlay Canvas と描画順問題を回避）/ BeatPulse（Conductor 拍位相同期の脈動）
+- **Reduce Motion 対応**: PlayerState.ReduceMotionEnabled + 設定画面トグル。全エフェクトが FxKit.MotionEnabled の単一ゲートを通る
+- **盤面演出**: 移動ホップ(squash&stretch) / 透明化吸収=紫Flash+バースト / 盾=青Flash / 敗北=HitStop0.08s+盤面シェイク+赤Flash+バースト / GO!演出 / 階層クリア=SlideIn+金バースト / 盤面BeatPulse / コンボ3・5で色エスカレーション / 霧・消失のクロスフェード化
+- **Result 発射台**: DEFEAT が上から落下+着地シェイク / スコアカード時差 SlideIn / NEW RECORD 金バーストループ / 巨大リトライの拍パルス / ニアミス赤Flash / BeatIndicator 拍ヒット発光 / BPM 値変更ポップ
+- **検証済み**: コンパイル green / EditMode 80/80 / PlayMode 耐久スモーク＝オートパイロットが **floor 1→16 を260秒・例外ゼロ**で走破（BPM変化・ボス階10・スキルリセット・AI自然スケーリング跨ぎ）。スクショ3枚（盤面/クリア演出/Result floor16 NEW RECORD）取得
+- 技術判断の記録: カメラシェイク不可（Overlay）→ RectTransform シェイク / timeScale HitStop は dspTime 駆動 Conductor と干渉しない0.1s以下限定 / BGMフェードは未実装のまま（次スプリント候補）
+- 既知の軽微リスク（統合レビュー申告）: FxKit 演出中に host の StopAllCoroutines が走ると scale が中間値で固着し得る（発生頻度極小・視覚影響軽微。FloorClear オーバーレイは位置リセットで対処済み）/ 演出検知が「OnTurnResolved が OnStateChanged より先」というイベント順序に依存
+
 ### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
 
 - **Core コンパイル + 全 60 テスト green**（`unity/verify/Core.Tests`, C# 9 固定）→ ゲート①のリスクは大幅低減

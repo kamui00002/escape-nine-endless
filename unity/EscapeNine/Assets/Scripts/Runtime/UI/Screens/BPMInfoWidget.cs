@@ -3,7 +3,14 @@
 // 「階層 | BPM | 速度」の 3 カラム情報パネル。速度レベルの区分・色は Swift と同一。
 // 毎フレーム処理を持たないため MonoBehaviour ではなく素のクラス
 // (GameScreen が階層変化時に Render を呼ぶだけ)。
+//
+// Phase 4 (juice) 追記 (担当B): BPM 値が変わった瞬間 (階層クリアで加速した瞬間) に
+// 数値を PunchScale + 一瞬 Warning 色へ Flash する。本クラスは MonoBehaviour ではないため
+// FxKit の host には常駐シングルトン FxLayer.I を使う (Render は FxLayer.Install 済みの
+// タイミングでのみ呼ばれるため null になることはない想定だが、host==null は FxKit 側で
+// 安全に no-op されるため未初期化でも例外にはならない)。
 
+using EscapeNine.Runtime.UI.Fx;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,6 +21,9 @@ namespace EscapeNine.Runtime.UI
         private readonly Text _floorValue;
         private readonly Text _bpmValue;
         private readonly Text _speedValue;
+
+        // Phase 4 (juice): 直前の BPM。double.NaN = 未初期化 (初回 Render で誤発火しない)。
+        private double _lastBpm = double.NaN;
 
         /// <summary>配置用 (GameScreen が UIFactory.Place で位置決めする)。</summary>
         public RectTransform Rect { get; }
@@ -35,6 +45,15 @@ namespace EscapeNine.Runtime.UI
         {
             _floorValue.text = floor.ToString();
             _bpmValue.text = ((int)bpm).ToString();
+
+            // Phase 4 (juice): BPM 変更 (階層クリアによる加速) を数値パンチ + 一瞬 Warning 色で強調。
+            // CalculateBPM(floor) は純関数 (同じ floor なら常に同じ bpm) のため、変化検知に等価比較で十分。
+            if (!double.IsNaN(_lastBpm) && bpm != _lastBpm)
+            {
+                FxKit.PunchScale(FxLayer.I, (RectTransform)_bpmValue.transform, 0.3f, 0.3f);
+                FxKit.Flash(FxLayer.I, _bpmValue, UITheme.Warning, 0.35f);
+            }
+            _lastBpm = bpm;
 
             // Swift の switch bpm { ..<80 / 80..<120 / 120..<180 / 180..<220 / default } と同一区分
             if (bpm < 80)

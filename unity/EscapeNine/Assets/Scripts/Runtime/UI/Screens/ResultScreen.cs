@@ -13,6 +13,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using EscapeNine.Core;
+using EscapeNine.Runtime.UI.Fx;
 
 namespace EscapeNine.Runtime.UI
 {
@@ -86,6 +87,18 @@ namespace EscapeNine.Runtime.UI
         /// <summary>Swift: appearTime。eg_retry_tapped.seconds_until_tap の基準 (Phase 3 計装用)。</summary>
         private float _shownAtRealtime;
 
+        // MARK: - Phase 4 (juice) 演出用の参照・コルーチンハンドル
+        // 「発射台」演出 (担当B): 既存の ApplyData (表示 ON/OFF ロジック) は変更せず、
+        // 演出だけをここに追加する。参照は BuildUI で 1 回だけ捕捉する。
+        private RectTransform _statsCardRt;      // 統計カード (時差 SlideIn 用。Swift: statsSection.slideIn(from:.bottom, delay:0.4))
+        private RectTransform _retryButtonRt;    // 巨大リトライボタン (BeatPulse + フォールバックパルス用)
+        private Image _bestBadgeImage;           // 「自己ベスト!」バッジの背景 (Flash用)
+        private Image _nearMissBannerImage;      // 惜しさメーターの背景 (Flash用)
+
+        private Coroutine _entranceRoutine;
+        private Coroutine _newRecordLoopRoutine;
+        private Coroutine _retryFallbackPulseRoutine;
+
         // MARK: - BuildUI
 
         public override void BuildUI()
@@ -134,6 +147,7 @@ namespace EscapeNine.Runtime.UI
             _bestBadge = UIFactory.Panel(safe, "PersonalBestBadge", UITheme.WithAlpha(UITheme.Available, 0.18f));
             UIFactory.Place(_bestBadge, 0.5f, 0.825f, 0.56f, 0.048f);
             AddBorder(_bestBadge, UITheme.WithAlpha(UITheme.Available, 0.6f), 0.010f, 0.06f);
+            _bestBadgeImage = _bestBadge.GetComponent<Image>(); // Phase4 juice: NEW RECORD ループ内で Flash する対象
             Text badgeLabel = UIFactory.Label(_bestBadge, "Label", "自己ベスト!", 48, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)badgeLabel.transform, 0.5f, 0.5f, 1f, 1f);
@@ -146,6 +160,7 @@ namespace EscapeNine.Runtime.UI
             RectTransform card = UIFactory.Panel(safe, "StatsCard", UITheme.BackgroundSecondary);
             UIFactory.Place(card, 0.5f, 0.615f, 0.84f, 0.30f);
             AddBorder(card, UITheme.WithAlpha(UITheme.GridBorder, 0.5f), 0.008f, 0.012f); // GameCard のゴールド枠
+            _statsCardRt = card; // Phase4 juice: タイトルより遅れて SlideIn する時差演出用
 
             Text floorCaption = UIFactory.Label(card, "FloorCaption", "到達階層",
                 32, UITheme.WithAlpha(UITheme.TextColor, 0.7f));
@@ -199,6 +214,7 @@ namespace EscapeNine.Runtime.UI
             _nearMissBanner = UIFactory.Panel(safe, "NearMissBanner", UITheme.WithAlpha(UITheme.Warning, 0.15f));
             UIFactory.Place(_nearMissBanner, 0.5f, 0.435f, 0.72f, 0.05f);
             AddBorder(_nearMissBanner, UITheme.WithAlpha(UITheme.Warning, 0.55f), 0.008f, 0.06f);
+            _nearMissBannerImage = _nearMissBanner.GetComponent<Image>(); // Phase4 juice: 表示時に赤 Flash 1 回
             Text nearMissLabel = UIFactory.Label(_nearMissBanner, "Label", "あと1マスで生存だった!",
                 40, UITheme.Warning, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)nearMissLabel.transform, 0.5f, 0.5f, 1f, 1f);
@@ -211,6 +227,13 @@ namespace EscapeNine.Runtime.UI
             var retryRt = (RectTransform)retryButton.transform;
             UIFactory.Place(retryRt, 0.5f, 0.30f, 0.88f, 0.11f);
             AddBorder(retryRt, UITheme.WithAlpha(Color.white, 0.25f), 0.006f, 0.03f);
+            _retryButtonRt = retryRt;
+            // Phase4 juice: 曲が再生中 (Conductor が拍を刻んでいる) の間は拍に合わせて微パルス。
+            // 停止中 (Result 画面の常態) は RetryFallbackPulseRoutine が 1 秒周期の自前パンチで代替する。
+            BeatPulse retryBeatPulse = retryRt.gameObject.AddComponent<BeatPulse>();
+            retryBeatPulse.scaleAmount = 0.05f;
+            retryBeatPulse.alphaAmount = 0f;
+            retryBeatPulse.onlyWhilePlaying = true;
 
             // ---- 補助ボタン (シェア / ホーム)。Swift: 横並び 2 分割・控えめトーン ----
             Color subBg = UITheme.WithAlpha(UITheme.TextColor, 0.08f);
@@ -258,6 +281,7 @@ namespace EscapeNine.Runtime.UI
             _shownAtRealtime = Time.realtimeSinceStartup; // Swift: appearTime = Date()
             _data = ResolveData(payload as ResultPayload);
             ApplyData();
+            PlayEntranceEffects(); // Phase4 juice: 表示データ確定後に演出を開始 (ApplyData のロジックには手を入れない)
 
             // Swift: onAppear の Haptic (win=heavy / lose=medium) は Phase 4 送り。
             // Swift: InterstitialAdPresenter.show (表示 0.5 秒後) は Phase 3 (広告) のため置かない。
@@ -266,6 +290,7 @@ namespace EscapeNine.Runtime.UI
         public override void OnHide()
         {
             HideToast();
+            StopEntranceEffects();
         }
 
         private void OnDestroy()
@@ -418,6 +443,114 @@ namespace EscapeNine.Runtime.UI
             _oneTapLayer.SetActive(oneTap);
 
             HideToast();
+        }
+
+        // MARK: - Phase 4 (juice) 演出 — 発射台型 GameOver
+        // Swift 正本の bounceIn/slideIn/shimmer 相当を FxKit で移植する。
+        // ここは演出専任: 表示 ON/OFF の判定は ApplyData に残したまま、副作用として動かすだけ。
+
+        /// <summary>OnShow のたびに演出一式を (再) トリガーする。多重起動防止のため必ず前回分を止めてから開始する。</summary>
+        private void PlayEntranceEffects()
+        {
+            if (_entranceRoutine != null) StopCoroutine(_entranceRoutine);
+            _entranceRoutine = StartCoroutine(EntranceRoutine());
+
+            if (_newRecordLoopRoutine != null) StopCoroutine(_newRecordLoopRoutine);
+            _newRecordLoopRoutine = _data.IsNewBest ? StartCoroutine(NewRecordLoopRoutine()) : null;
+
+            // 惜しさメーター (Swift: shouldShowNearMiss) が出るときだけ赤フラッシュ 1 回
+            if (!_data.IsVictory && _data.NearMissDistance == 1 && _nearMissBannerImage != null)
+            {
+                FxKit.Flash(this, _nearMissBannerImage, UITheme.Warning, 0.4f);
+            }
+
+            if (_retryFallbackPulseRoutine != null) StopCoroutine(_retryFallbackPulseRoutine);
+            _retryFallbackPulseRoutine = StartCoroutine(RetryFallbackPulseRoutine());
+        }
+
+        /// <summary>OnHide で確実に演出コルーチンを止める (SetActive(false) でも自動停止されるが、明示的に手当てする)。</summary>
+        private void StopEntranceEffects()
+        {
+            if (_entranceRoutine != null) { StopCoroutine(_entranceRoutine); _entranceRoutine = null; }
+            if (_newRecordLoopRoutine != null) { StopCoroutine(_newRecordLoopRoutine); _newRecordLoopRoutine = null; }
+            if (_retryFallbackPulseRoutine != null) { StopCoroutine(_retryFallbackPulseRoutine); _retryFallbackPulseRoutine = null; }
+        }
+
+        /// <summary>
+        /// Swift: resultTitle.bounceIn(delay:0.1) → statsSection.slideIn(from:.bottom, delay:0.4) の時差演出。
+        /// タイトルは上から滑り込んで着地時に軽くシェイク、統計カードは少し遅れて下から滑り込む。
+        /// </summary>
+        private IEnumerator EntranceRoutine()
+        {
+            // 再入防御: 直前の OnShow 中に演出が OnHide (SetActive(false)) で強制中断された場合、
+            // anchoredPosition が中間値のまま残ることがある。Place() は offsetMin/Max=0 で
+            // 配置しているため「静止位置 = (0,0)」が保証される — 毎回ここへ揃えてから滑り込ませる。
+            var titleRt = (RectTransform)_titleLabel.transform;
+            titleRt.anchoredPosition = Vector2.zero;
+
+            Vector2 statsCardOffset = new Vector2(0f, -260f);
+            if (_statsCardRt != null)
+            {
+                // カードは常時アクティブ (ApplyData で SetActive 制御されない) なので、
+                // 遅延中は「静止位置のまま丸見え」にならないよう最初からオフセット位置に置く。
+                // SlideIn 呼び出し直前に静止位置へ戻し、そこを target として滑り込ませる
+                // (Reduce Motion 時は事前オフセットをスキップし静止位置のまま据え置く)。
+                _statsCardRt.anchoredPosition = FxKit.MotionEnabled ? statsCardOffset : Vector2.zero;
+            }
+
+            const float titleSlideDuration = 0.3f;
+            FxKit.SlideIn(this, titleRt, new Vector2(0f, 240f), titleSlideDuration);
+            yield return new WaitForSecondsRealtime(titleSlideDuration);
+            FxKit.ShakeRect(this, titleRt, 10f, 0.22f);
+
+            yield return new WaitForSecondsRealtime(0.15f); // 時差演出: カードはタイトルより遅れて登場
+            if (_statsCardRt != null)
+            {
+                _statsCardRt.anchoredPosition = Vector2.zero; // SlideIn の target = ここを静止位置として捕捉させる
+                FxKit.SlideIn(this, _statsCardRt, statsCardOffset, 0.35f);
+            }
+        }
+
+        /// <summary>
+        /// NEW RECORD! の間、2 秒周期で控えめに祝福を繰り返す: バッジのパンチ + 金の破片バースト +
+        /// 自己ベストバッジのフラッシュ。無限ループだが OnHide / 画面非活性で必ず止まる。
+        /// </summary>
+        private IEnumerator NewRecordLoopRoutine()
+        {
+            // 再入防御: 中断された前回ループの残り scale を静止値へ揃えてから開始する。
+            _newRecordBadge.localScale = Vector3.one;
+
+            // カード (バッジの親) の SlideIn 演出が落ち着くまで初回バーストを待つ (EntranceRoutine の
+            // 合計尺 ≈ 0.3 + 0.15 + 0.35 秒に合わせる)。バッジがまだオフスクリーン付近にある間に
+            // 破片が散ると見た目が揃わないため。
+            yield return new WaitForSecondsRealtime(0.8f);
+
+            while (true)
+            {
+                FxKit.PunchScale(this, _newRecordBadge, 0.12f, 0.4f);
+                if (FxLayer.I != null) FxLayer.I.BurstAt(_newRecordBadge, UITheme.Available, 10, 500f);
+                if (_bestBadgeImage != null) FxKit.Flash(this, _bestBadgeImage, UITheme.GoldText, 0.5f);
+                yield return new WaitForSecondsRealtime(2.0f);
+            }
+        }
+
+        /// <summary>
+        /// 巨大リトライボタンの「押したくなる」誘導。BeatPulse は Conductor 再生中のみ脈動するため、
+        /// Result 画面のように BGM の拍が進んでいない間は自前の 1 秒周期パンチでフォールバックする。
+        /// </summary>
+        private IEnumerator RetryFallbackPulseRoutine()
+        {
+            while (true)
+            {
+                yield return new WaitForSecondsRealtime(1.0f);
+                bool conductorPlaying = App.I != null && App.I.Conductor != null && App.I.Conductor.SongPositionBeats > 0.0;
+                if (!conductorPlaying && _retryButtonRt != null)
+                {
+                    // Result 画面では Conductor 停止が常態のため、実質こちらが「押したくなる」誘導の本体。
+                    // Swift の glow(radius:18, intensity:0.7) 相当の主張度を狙い、控えめな BeatPulse (0.05) より強め。
+                    FxKit.PunchScale(this, _retryButtonRt, 0.09f, 0.5f);
+                }
+            }
         }
 
         // MARK: - ボタンハンドラ
