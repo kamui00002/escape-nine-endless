@@ -49,6 +49,9 @@ namespace EscapeNine.EditorTools
         {
             ApplyDesktopPlayerSettings();
 
+            // Phase 4.5 Wave 0: フレッシュなプロジェクトでも URP が構成された状態でビルドされるようにする。
+            UrpBootstrap.EnsureConfigured();
+
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string resultMarkerPath = Path.Combine(projectRoot, ResultMarkerFileName);
 
