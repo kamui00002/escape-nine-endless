@@ -25,6 +25,9 @@ namespace EscapeNine.Runtime
         /// <summary>ローカルランキング (契約外の追加公開。Ranking 画面 / Result 画面が参照)。</summary>
         public RankingStore Ranking;
 
+        /// <summary>デイリーチャレンジ (契約外の追加公開、Phase 2.5)。Home / DailyChallenge 画面が参照。</summary>
+        public DailyChallengeStore DailyChallenge;
+
         /// <summary>
         /// 画面 (ScreenBase) 群の親。画面は App の子ではなく Canvas/ScreenRoot の子に置かれるため、
         /// MainSceneBuilder がシーン生成時にここへ参照を割り当てる。
@@ -46,6 +49,7 @@ namespace EscapeNine.Runtime
             // --- サービス初期化 ---
             Player = new PlayerState();
             Ranking = new RankingStore();
+            DailyChallenge = new DailyChallengeStore();
 
             // UnityEngine.Object の null 判定は == を使う (?? は偽 null を貫通するため不可)
             Audio = GetComponent<AudioDirector>();
@@ -60,7 +64,7 @@ namespace EscapeNine.Runtime
 
             Game = GetComponent<GameController>();
             if (Game == null) Game = gameObject.AddComponent<GameController>();
-            Game.Configure(Conductor, Audio, Player, Ranking);
+            Game.Configure(Conductor, Audio, Player, Ranking, DailyChallenge);
 
             // --- UI 構築 ---
             // 画面は Canvas/ScreenRoot 配下 (= App の子ではない) ため、screenRoot 経由で発見する。

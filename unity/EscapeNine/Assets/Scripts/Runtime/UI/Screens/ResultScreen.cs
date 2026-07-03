@@ -10,6 +10,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using EscapeNine.Core;
@@ -66,6 +67,12 @@ namespace EscapeNine.Runtime.UI
         private RectTransform _toast;
         private Text _toastLabel;
         private Coroutine _toastRoutine;
+
+        // ---- 実績解除ポップアップ (Swift: AchievementPopupView) ----
+        private RectTransform _achievementPopup;
+        private Image _achievementPopupImage;
+        private Text _achievementPopupLabel;
+        private Coroutine _achievementPopupRoutine;
 
         // MARK: - 内部状態
 
@@ -208,7 +215,6 @@ namespace EscapeNine.Runtime.UI
 
             // TODO(Phase 3): Firebase 未サインイン時の「ハイスコアの保存にはネット接続が必要です」
             //                注記 (Swift: firebaseService.isSignedIn)。Firebase 導入時に追加。
-            // TODO(Phase 3): 実績解除ポップアップ (Swift: AchievementPopupView)。実績永続化ストアと同時に導入。
 
             // ---- 惜しさメーター (Swift: nearMissBanner。敗北 + 隣接死亡時のみ) ----
             _nearMissBanner = UIFactory.Panel(safe, "NearMissBanner", UITheme.WithAlpha(UITheme.Warning, 0.15f));
@@ -252,6 +258,18 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place((RectTransform)_toastLabel.transform, 0.5f, 0.5f, 1f, 1f);
             _toast.gameObject.SetActive(false);
 
+            // ---- 実績解除ポップアップ (Swift: AchievementPopupView。簡易バナー) ----
+            // 最後に生成し、他の全要素より手前に描画されるようにする (Toast と同じ作法)。
+            // 画面上端ぎりぎりに置くことで Title (cy=0.905, 高さ 0.08 → 上端 0.945) との重なりを避ける。
+            _achievementPopup = UIFactory.Panel(safe, "AchievementPopup", UITheme.BackgroundSecondary);
+            UIFactory.Place(_achievementPopup, 0.5f, 0.972f, 0.86f, 0.055f);
+            AddBorder(_achievementPopup, UITheme.WithAlpha(UITheme.Available, 0.6f), 0.008f, 0.05f);
+            _achievementPopupImage = _achievementPopup.GetComponent<Image>(); // FxKit.Flash 対象
+            _achievementPopupLabel = UIFactory.Label(_achievementPopup, "Label", "", 32, Color.white,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)_achievementPopupLabel.transform, 0.5f, 0.5f, 0.92f, 0.85f);
+            _achievementPopup.gameObject.SetActive(false);
+
             TrySubscribe();
         }
 
@@ -291,6 +309,7 @@ namespace EscapeNine.Runtime.UI
         {
             HideToast();
             StopEntranceEffects();
+            if (_achievementPopup != null) _achievementPopup.gameObject.SetActive(false);
         }
 
         private void OnDestroy()
@@ -466,6 +485,13 @@ namespace EscapeNine.Runtime.UI
 
             if (_retryFallbackPulseRoutine != null) StopCoroutine(_retryFallbackPulseRoutine);
             _retryFallbackPulseRoutine = StartCoroutine(RetryFallbackPulseRoutine());
+
+            // 実績解除ポップアップ (Swift: AchievementPopupView)。新規解除が無ければ何もしない。
+            if (_achievementPopupRoutine != null) StopCoroutine(_achievementPopupRoutine);
+            var unlocked = (App.I != null && App.I.Game != null) ? App.I.Game.LastUnlockedAchievements : null;
+            _achievementPopupRoutine = (unlocked != null && unlocked.Count > 0)
+                ? StartCoroutine(AchievementPopupRoutine(unlocked))
+                : null;
         }
 
         /// <summary>OnHide で確実に演出コルーチンを止める (SetActive(false) でも自動停止されるが、明示的に手当てする)。</summary>
@@ -474,6 +500,32 @@ namespace EscapeNine.Runtime.UI
             if (_entranceRoutine != null) { StopCoroutine(_entranceRoutine); _entranceRoutine = null; }
             if (_newRecordLoopRoutine != null) { StopCoroutine(_newRecordLoopRoutine); _newRecordLoopRoutine = null; }
             if (_retryFallbackPulseRoutine != null) { StopCoroutine(_retryFallbackPulseRoutine); _retryFallbackPulseRoutine = null; }
+            if (_achievementPopupRoutine != null) { StopCoroutine(_achievementPopupRoutine); _achievementPopupRoutine = null; }
+        }
+
+        /// <summary>
+        /// 実績解除ポップアップ (Swift: AchievementPopupView の移植。簡易バナー + FxKit SlideIn/Flash)。
+        /// 複数解除時は 1 件ずつ順番に表示する (Swift は解除ごとに個別ポップアップが出る挙動を踏襲)。
+        /// </summary>
+        private IEnumerator AchievementPopupRoutine(IReadOnlyList<Achievement> achievements)
+        {
+            foreach (var achievement in achievements)
+            {
+                _achievementPopupLabel.text = "実績解除！ " + achievement.Title() + "\n" + achievement.Description();
+
+                var rt = _achievementPopup;
+                rt.anchoredPosition = Vector2.zero; // 中断残留対策 (EntranceRoutine と同じ作法)
+                _achievementPopup.gameObject.SetActive(true);
+
+                FxKit.SlideIn(this, rt, new Vector2(0f, 80f), 0.25f);
+                if (_achievementPopupImage != null) FxKit.Flash(this, _achievementPopupImage, UITheme.Available, 0.3f);
+
+                yield return new WaitForSecondsRealtime(2.5f); // Swift: 2.5 秒表示
+
+                _achievementPopup.gameObject.SetActive(false);
+                yield return new WaitForSecondsRealtime(0.15f); // 次のポップアップとの間隔
+            }
+            _achievementPopupRoutine = null;
         }
 
         /// <summary>

@@ -9,7 +9,7 @@
 //   - "Main Camera"  : 2D 想定 (orthographic / solid color = UITheme.Background) + AudioListener
 //   - "EventSystem"  : Active Input Handling に応じた入力モジュール (下記コメント参照)
 //   - "Canvas"       : Screen Space Overlay / CanvasScaler ScaleWithScreenSize 1170x2532 match 0.5
-//     └ "ScreenRoot" : 8 画面 (ScreenBase) の親コンテナ (全画面 inactive で待機)
+//     └ "ScreenRoot" : 10 画面 (ScreenBase) の親コンテナ (全画面 inactive で待機)
 //   - "App"          : App + GameController + AudioDirector + Conductor + AudioSource
 //   + Build Settings の index 0 に Main を登録 (Phase0 は残す)
 
@@ -129,7 +129,7 @@ namespace EscapeNine.EditorTools
             return rootRt;
         }
 
-        // MARK: - Screens (8 画面。初期は全て inactive — Router.Show(Home) が Home だけ点灯する)
+        // MARK: - Screens (10 画面。初期は全て inactive — Router.Show(Home) が Home だけ点灯する)
 
         private static void BuildScreens(RectTransform screenRoot)
         {
@@ -141,6 +141,8 @@ namespace EscapeNine.EditorTools
             AddScreen<CharacterScreen>(screenRoot, "CharacterScreen");   // ScreenId.CharacterSelect
             AddScreen<SettingsScreen>(screenRoot, "SettingsScreen");
             AddScreen<TutorialScreen>(screenRoot, "TutorialScreen");
+            AddScreen<DailyChallengeScreen>(screenRoot, "DailyChallengeScreen"); // Phase 2.5
+            AddScreen<AchievementScreen>(screenRoot, "AchievementScreen");       // Phase 2.5
         }
 
         private static void AddScreen<T>(RectTransform parent, string name) where T : ScreenBase

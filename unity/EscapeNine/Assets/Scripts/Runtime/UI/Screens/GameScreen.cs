@@ -802,6 +802,14 @@ namespace EscapeNine.Runtime.UI
         private void HandlePregameBack()
         {
             App.I.Audio.PlaySfx("button_tap");
+
+            // デイリーチャレンジ画面からの pending challenge をここで破棄する (Phase 2.5 発見・修正)。
+            // DailyChallengeScreen が PendingChallenge をセットして本画面 (プレゲーム AI 選択) へ遷移した後、
+            // ここで「戻る」を押すとラン開始 (StartNewRun) を経由しないため消費されないまま残ってしまい、
+            // 次に通常の「冒険を始める」で StartNewRun を呼んだ際、意図せずデイリーチャレンジ条件
+            // (キャラ固定/AI固定/開始階層) が通常ランに適用されてしまう。ここで明示的にクリアする。
+            if (App.I.DailyChallenge != null) App.I.DailyChallenge.PendingChallenge = null;
+
             App.I.Router.Show(ScreenId.Home);
         }
 

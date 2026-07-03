@@ -111,10 +111,13 @@ namespace EscapeNine.Core
             EnemyPosition = e;
             PendingPlayerMove = null;
 
+            // Swift 順序踏襲 (GameViewModel.startGame): デイリーチャレンジの条件適用 (startFloor 上書き
+            // 含む) を先に行い、特殊ルール/消失マスは「上書き後」の CurrentFloor で計算する。
+            // 逆順だと StartFloor 条件付きチャレンジで霧/消失マスの発動階層がずれる (Phase 2.5 で発見・修正)。
+            if (DailyChallengeMode) ApplyDailyChallengeConditions();
+
             CurrentSpecialRule = Floor.GetSpecialRule(CurrentFloor);
             UpdateDisappearedCells();
-
-            if (DailyChallengeMode) ApplyDailyChallengeConditions();
         }
 
         /// <summary>次階層へ。Swift: nextFloor() のロジック部分。100階層踏破で GameWon。</summary>

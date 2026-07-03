@@ -72,11 +72,19 @@ namespace EscapeNine.Runtime
         /// <summary>敗北時の敵との Chebyshev 距離 (1 = あと 1 マス)。Swift: nearMissDistance</summary>
         public int NearMissDistance { get; private set; }
 
+        /// <summary>
+        /// 直近のラン (EndGame) で新規解除された実績一覧。ラン開始 (StartNewRun) のたびにリセットされる。
+        /// Swift: AchievementPopupView に渡す「初めて解除された」実績集合 (AchievementManager 相当の
+        /// 判定は PersistUnlockedAchievements 内で行う)。ResultScreen が OnShow で読み、ポップアップ演出を出す。
+        /// </summary>
+        public IReadOnlyList<Achievement> LastUnlockedAchievements { get; private set; } = Array.Empty<Achievement>();
+
         // MARK: - 依存 (App が Configure で注入)
         private Conductor _conductor;
         private AudioDirector _audio;
         private PlayerState _player;
         private RankingStore _ranking;
+        private DailyChallengeStore _dailyChallenge;
 
         // MARK: - 内部状態
         private Phase _phase = Phase.Idle;
@@ -90,18 +98,22 @@ namespace EscapeNine.Runtime
         private float _floorStartRealtime;                          // Swift: floorStartTime (Phase 3 の計装用)
         private const float GameOverOverlaySeconds = 1.5f;          // Swift: asyncAfter(.now() + 1.5)
         private const float GameStartGoDisplaySeconds = 0.5f;       // Swift: asyncAfter(.now() + 0.5) — GO! 表示 & 入力ブロック猶予
-        private const string UnlockedAchievementsKey = "unlockedAchievements"; // Swift: AchievementManager.achievementsKey
+        // Swift: AchievementManager.achievementsKey。internal: AchievementScreen (Phase 2.5, 実績一覧画面) が
+        // 同一書式 (enum 名 CSV) で読むために同アセンブリ内へ公開する (定数複製禁止のため widen のみ)。
+        internal const string UnlockedAchievementsKey = "unlockedAchievements";
 
         /// <summary>
         /// App の Awake から呼ぶ依存注入。Conductor.OnBeat の購読もここで 1 回だけ行う。
         /// </summary>
-        public void Configure(Conductor conductor, AudioDirector audio, PlayerState player, RankingStore ranking)
+        public void Configure(Conductor conductor, AudioDirector audio, PlayerState player, RankingStore ranking,
+            DailyChallengeStore dailyChallenge)
         {
             if (_conductor != null) _conductor.OnBeat -= HandleBeat; // 再 Configure 安全
             _conductor = conductor;
             _audio = audio;
             _player = player;
             _ranking = ranking;
+            _dailyChallenge = dailyChallenge;
             _conductor.OnBeat += HandleBeat;
         }
 
@@ -140,6 +152,23 @@ namespace EscapeNine.Runtime
 
             // ルール本体は GameSession に委譲 (配置・特殊ルール・消失マスまで全部)
             Session = new GameSession(Character.GetCharacter(c), lvl);
+
+            // デイリーチャレンジ: pending challenge があれば適用 (Swift: startGame 内の
+            // `if let pending = DailyChallengeService.shared.pendingChallenge` 分岐)。
+            // StartGame() を呼ぶ「前」に DailyChallengeMode/Conditions を設定しておくことで、
+            // StartGame() 内部の特殊ルール計算 (GameSession.cs) が「startFloor 上書き後」の
+            // 階層を使うようになる (Core 側の適用順序も Swift に合わせて修正済み)。
+            // 差分: Swift の「pendingChallenge が無ければ dailyChallengeMode を見て再適用」分岐は、
+            //       Unity では Session を毎回新規生成する (dailyChallengeMode が前ランから持ち越されない)
+            //       ため到達不能であり、意図的に移植していない。
+            if (_dailyChallenge != null && _dailyChallenge.PendingChallenge != null)
+            {
+                var pending = _dailyChallenge.PendingChallenge;
+                _dailyChallenge.PendingChallenge = null;
+                Session.DailyChallengeMode = true;
+                Session.DailyChallengeConditions = pending.Conditions;
+            }
+
             Session.StartGame(startFloor);
 
             // ラン計測の初期化 (Swift: gameStartTime / floorStartTime / elapsedSeconds / nearMissDistance)
@@ -152,9 +181,7 @@ namespace EscapeNine.Runtime
             IsInvisible = false; // 前ランの透明化表示フラグを持ち越さない
             TurnCountdown = _turnBeats;
             _resultPersisted = false; // 新しいランのスコア送信/自己ベスト更新をまた許可する
-
-            // TODO(Phase 2.5): DailyChallengeService.pendingChallenge の適用 (Swift: startGame 内)。
-            //                GameSession.DailyChallengeMode / ApplyDailyChallengeConditions は Core に移植済み。
+            LastUnlockedAchievements = Array.Empty<Achievement>(); // 前ランのポップアップ対象を持ち越さない
 
             // --- 音 → 状態 → 通知 の順 (Swift: startGame と同順) ---
             _audio.PlaySfx("game_start");                    // Swift: playSoundEffect(.gameStart)
@@ -558,14 +585,21 @@ namespace EscapeNine.Runtime
                 _audio.PlayResultBgm(won: false);
             }
 
-            // TODO(Phase 2.5): デイリーチャレンジ完了記録 (Swift: DailyChallengeService.markCompleted)。
+            // デイリーチャレンジ完了記録 (勝利時のみ)。Swift: endGame(result:) の
+            // `if result == .win && dailyChallengeMode { DailyChallengeService.shared.markCompleted(...) }`
+            if (won && Session.DailyChallengeMode)
+            {
+                _dailyChallenge?.MarkCompleted(Session.CurrentFloor);
+                Session.DailyChallengeMode = false; // Swift: dailyChallengeMode = false
+            }
 
             // 4) スコア送信 + 自己ベスト更新 (敗北は HandleDefeat で即時実行済み。
             //    PersistRunResult 内の _resultPersisted ガードにより二重送信はしない)
             PersistRunResult();
 
             // 5) 実績チェック（勝利時のみ）。Swift: GameViewModel.swift:954-964 (AchievementManager.checkAchievements)。
-            //    ポップアップ UI / 効果音は Phase 2.5 で実装予定のため、ここでは解除の記録 (PlayerPrefs) のみ行う。
+            //    新規解除は LastUnlockedAchievements に控え、ResultScreen がポップアップ演出を出す (Phase 2.5)。
+            //    実績解除の効果音は Phase 3/4 送り (Swift 側にも専用 SE は無い)。
             if (won)
             {
                 bool skillUsed = Session.SkillUsageCount > 0;
@@ -580,14 +614,25 @@ namespace EscapeNine.Runtime
         }
 
         /// <summary>
-        /// 実績解除の記録のみを PlayerPrefs へ永続化する (Swift: AchievementManager.unlock/saveAchievements の
-        /// 最小結線)。解除済み実績との和集合をとって保存するため、二度目以降の呼び出しでも既存の解除は失われない。
-        /// ポップアップ通知・効果音は Phase 2.5 で実装予定のため未実装。
+        /// 実績解除の記録を PlayerPrefs へ永続化する (Swift: AchievementManager.unlock/saveAchievements)。
+        /// 解除済み実績との和集合をとって保存するため、二度目以降の呼び出しでも既存の解除は失われない。
+        /// 併せて「今回のランで初めて解除された」実績を LastUnlockedAchievements に控える
+        /// (Swift の AchievementManager が初回のみポップアップ表示するのと同じ判定を、ここで
+        /// 「保存前の解除済み集合に含まれていなかったか」で代替する)。
         /// </summary>
         private void PersistUnlockedAchievements(HashSet<Achievement> achievements)
         {
             string existingRaw = PlayerPrefs.GetString(UnlockedAchievementsKey, "");
-            var merged = new HashSet<string>(existingRaw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
+            var existing = new HashSet<string>(existingRaw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
+
+            var newlyUnlocked = new List<Achievement>();
+            foreach (var a in achievements)
+            {
+                if (!existing.Contains(a.ToString())) newlyUnlocked.Add(a);
+            }
+            LastUnlockedAchievements = newlyUnlocked;
+
+            var merged = new HashSet<string>(existing);
             foreach (var a in achievements) merged.Add(a.ToString());
 
             PlayerPrefs.SetString(UnlockedAchievementsKey, string.Join(",", merged));

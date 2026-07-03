@@ -32,9 +32,11 @@ namespace EscapeNine.Runtime.UI
         private Image _characterImage;       // 選択中キャラのスプライト
         private Text _characterNameLabel;    // 選択中キャラの名前
         private GameObject _dailyButtonRoot; // デイリーチャレンジボタン (階層10未到達では非表示)
+        private Text _dailyMainLabel;        // 同ボタンのメインテキスト (完了状態で色切替。Swift: isCompleted 分岐)
+        private Text _dailySubLabel;         // 同ボタンのサブテキスト (完了状態で文言切替)
+        private GameObject _dailyNewBadge;   // NEW バッジ (未クリア時のみ表示)
 
-        // 準備中トースト (デイリーチャレンジ画面が Phase 2.5 未実装のため、タップへの応答用。
-        // ShopScreen の同名パターンを踏襲した簡易実装)
+        // トースト (記録確認等の簡易通知用。ShopScreen の同名パターンを踏襲した簡易実装)
         private RectTransform _toast;
         private Text _toastLabel;
         private Coroutine _toastRoutine;
@@ -157,7 +159,10 @@ namespace EscapeNine.Runtime.UI
         private void BuildButtonSection(RectTransform parent)
         {
             const float w = 0.72f;  // Swift: ResponsiveLayout.buttonWidth 相当を比率で固定
-            const float h = 0.05f;
+            // セカンダリボタンが 5→6 個 (実績追加) になったため、行高/行間を詰めて
+            // 最高到達階層セクションとの重なりを避ける (Phase 2.5)。
+            const float h = 0.046f;
+            const float gap = 0.050f;
 
             // 1. 冒険を始める (primary: 明色背景 + 濃色文字。glow/pulse は Phase 4 送り)
             var play = UIFactory.TextButton(parent, "PlayButton", "冒険を始める", 60,
@@ -169,18 +174,19 @@ namespace EscapeNine.Runtime.UI
             // 2. デイリーチャレンジ (Swift: highestFloor >= 10 のときだけ表示。可視制御は RefreshDynamic)
             BuildDailyChallengeButton(parent, w);
 
-            // 3〜7. セカンダリボタン群 (Swift: GameButton style: .secondary)
+            // 3〜8. セカンダリボタン群 (Swift: GameButton style: .secondary、並び順も正本どおり
+            // キャラクター→ランキング→ショップ→実績→遊び方→設定)
             CreateSecondaryButton(parent, "CharacterButton", "キャラクター", 0.550f, w, h,
                 () => NavigateTo(ScreenId.CharacterSelect));
-            CreateSecondaryButton(parent, "RankingButton", "ランキング", 0.490f, w, h,
+            CreateSecondaryButton(parent, "RankingButton", "ランキング", 0.550f - gap, w, h,
                 () => NavigateTo(ScreenId.Ranking));
-            CreateSecondaryButton(parent, "ShopButton", "ショップ", 0.430f, w, h,
+            CreateSecondaryButton(parent, "ShopButton", "ショップ", 0.550f - gap * 2, w, h,
                 () => NavigateTo(ScreenId.Shop));
-            // Swift の「実績」(AchievementListView sheet) は ScreenId に実績画面が無いため未移植
-            // = TODO Phase 2.5 (実績永続化ストアとセットで追加)。
-            CreateSecondaryButton(parent, "HowToButton", "遊び方", 0.370f, w, h,
+            CreateSecondaryButton(parent, "AchievementButton", "実績", 0.550f - gap * 3, w, h,
+                () => NavigateTo(ScreenId.Achievements));
+            CreateSecondaryButton(parent, "HowToButton", "遊び方", 0.550f - gap * 4, w, h,
                 () => NavigateTo(ScreenId.Tutorial));
-            CreateSecondaryButton(parent, "SettingsButton", "設定", 0.310f, w, h,
+            CreateSecondaryButton(parent, "SettingsButton", "設定", 0.550f - gap * 5, w, h,
                 () => NavigateTo(ScreenId.Settings));
         }
 
@@ -220,38 +226,52 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildDailyChallengeButton(RectTransform parent, float w)
         {
-            // 遷移先画面が未実装のため、ボタンのみ設置 (タスク指定: 遷移は TODO Phase 2.5)
             var btn = UIFactory.TextButton(parent, "DailyChallengeButton", "デイリーチャレンジ", 48,
                 UITheme.BackgroundSecondary, UITheme.GoldText, () =>
                 {
                     App.I.Audio.PlaySfx("button_tap");
-                    // TODO(Phase 2.5): DailyChallenge 画面へ遷移 (Swift: HomeDestination.dailyChallenge)。
-                    //                  DailyChallengeService の完了状態永続化とセットで実装する。
-                    Debug.Log("[HomeScreen] デイリーチャレンジ画面は Phase 2.5 で実装予定");
-                    // 遷移先が未実装のためサイレント無反応になっていた分の応答を補う (準備中トースト)。
-                    ShowToast("準備中です");
+                    App.I.Router.Show(ScreenId.DailyChallenge);
                 });
             var rt = (RectTransform)btn.transform;
             UIFactory.Place(rt, 0.5f, 0.617f, w, 0.05f);
             _dailyButtonRoot = btn.gameObject;
 
             // メインラベルを上寄せにして、下段にサブテキストを置く (Swift の 2 行構成を再現)
-            var mainLabel = btn.GetComponentInChildren<Text>();
-            if (mainLabel != null)
+            _dailyMainLabel = btn.GetComponentInChildren<Text>();
+            if (_dailyMainLabel != null)
             {
-                UIFactory.Place((RectTransform)mainLabel.transform, 0.42f, 0.66f, 0.8f, 0.55f);
-                mainLabel.alignment = TextAnchor.MiddleLeft;
+                UIFactory.Place((RectTransform)_dailyMainLabel.transform, 0.42f, 0.66f, 0.8f, 0.55f);
+                _dailyMainLabel.alignment = TextAnchor.MiddleLeft;
             }
-            var sub = UIFactory.Label(rt, "SubLabel", "毎日新しい挑戦", 30,
+            _dailySubLabel = UIFactory.Label(rt, "SubLabel", "毎日新しい挑戦", 30,
                 UITheme.WithAlpha(UITheme.TextColor, 0.6f), TextAnchor.MiddleLeft);
-            UIFactory.Place((RectTransform)sub.transform, 0.42f, 0.24f, 0.8f, 0.4f);
+            UIFactory.Place((RectTransform)_dailySubLabel.transform, 0.42f, 0.24f, 0.8f, 0.4f);
 
-            // NEW バッジ (Swift: 未クリア時のみ赤地白文字。完了状態の取得は Phase 2.5 のため常時表示)
-            var badge = UIFactory.ColorRect(rt, "NewBadge", Color.red);
-            UIFactory.Place((RectTransform)badge.transform, 0.90f, 0.5f, 0.13f, 0.5f);
-            var badgeText = UIFactory.Label((RectTransform)badge.transform, "NewBadgeLabel", "NEW", 26,
+            // NEW バッジ (Swift: 未クリア時のみ赤地白文字。表示可否は RefreshDailyChallengeButton で切替)
+            _dailyNewBadge = UIFactory.ColorRect(rt, "NewBadge", Color.red).gameObject;
+            UIFactory.Place((RectTransform)_dailyNewBadge.transform, 0.90f, 0.5f, 0.13f, 0.5f);
+            var badgeText = UIFactory.Label((RectTransform)_dailyNewBadge.transform, "NewBadgeLabel", "NEW", 26,
                 Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)badgeText.transform, 0.5f, 0.5f, 1f, 1f);
+        }
+
+        /// <summary>デイリーチャレンジボタンの完了状態表示。Swift: HomeView.swift:212-243 の isCompleted 分岐。</summary>
+        private void RefreshDailyChallengeButton()
+        {
+            bool completed = App.I.DailyChallenge != null && App.I.DailyChallenge.TodaysChallenge.IsCompleted;
+
+            if (_dailyMainLabel != null)
+            {
+                _dailyMainLabel.color = completed ? UITheme.Success : UITheme.TextColor;
+            }
+            if (_dailySubLabel != null)
+            {
+                _dailySubLabel.text = completed ? "本日クリア済み" : "毎日新しい挑戦";
+            }
+            if (_dailyNewBadge != null)
+            {
+                _dailyNewBadge.SetActive(!completed);
+            }
         }
 
         // MARK: - Highest Floor Section (Swift: highestFloorSection)
@@ -335,6 +355,7 @@ namespace EscapeNine.Runtime.UI
             {
                 _dailyButtonRoot.SetActive(player.HighestFloor >= GameConfig.ThiefUnlockFloor);
             }
+            RefreshDailyChallengeButton();
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             RefreshDangerZone();

@@ -21,6 +21,8 @@ namespace EscapeNine.Runtime.UI
         CharacterSelect, // CharacterSelectionView
         Settings,        // SettingsView
         Tutorial,        // TutorialOverlayView
+        DailyChallenge,  // DailyChallengeView (Phase 2.5)
+        Achievements,    // AchievementListView (Phase 2.5)
     }
 
     /// <summary>

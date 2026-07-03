@@ -247,6 +247,15 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - **defer（製品判断・要オーナー確認）**: ⚠️ **階層到達実績 (Floor10/25/50/75) が敗北時にチェックされず実質解除不能** — Swift 正本由来の潜在バグで、**配信中の iOS 版でも発生している**。修正は Swift/Unity 両側同時 + FirstWin 実績への gameWon ゲート追加が必要（単純に「常に呼ぶ」と敗北で「初勝利」が解除される新バグになる）。Phase 2.5 実績 UI 作業と併せて判断
 - 検証済みのシロ: UITheme 15色・バランス定数・Product ID・Swift 行番号引用コメントは全数照合で正本一致
 
+### ✅ Phase 2.5 完了（2026-07-03） — デイリーチャレンジ統合 + 実績 UI
+
+- **デイリーチャレンジ**: DailyChallengeStore（DailyChallengeService 移植、UTC 日付 + Core の LCG Generator）/ DailyChallengeScreen（本日の条件表示・挑戦開始・完了表示）/ GameController への開始経路・条件適用・勝利時完了記録の結線 / Home ボタンの実遷移 + 完了状態表示
+- **実績 UI**: AchievementScreen（9 実績の一覧・解除状態・進捗 0/9 表示）/ Home に実績ボタン / Result に新規解除ポップアップ（順次表示）
+- **Core バグ修正 1 件**: GameSession.StartGame でデイリー条件適用が特殊ルール計算の後だったため、StartFloor 条件付きチャレンジで霧/消失の発動階層がずれるバグを発見・修正（Swift の適用順序に一致させた。条件4種が特殊ルールを直接触らないことを検算済み）
+- **潜在バグ防御 1 件**: デイリー→プレゲーム→「戻る」で PendingChallenge が残留し次の通常ランに誤適用される穴をガード（Swift 側にも同型の潜在動作あり、Unity は安全側）
+- **検証済み**: コンパイル green / EditMode 80/80 / Main.unity 再生成（10 画面）/ PlayMode でデイリー画面（本日条件の LCG 生成表示）・実績画面（9 種一覧）の描画確認・例外ゼロ
+- 未実装のまま: ChallengeCondition.CharacterLock は Swift/Core とも no-op（View 側ロック）を踏襲 / ネイティブ alert はトーストで代替
+
 ### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
 
 - **Core コンパイル + 全 60 テスト green**（`unity/verify/Core.Tests`, C# 9 固定）→ ゲート①のリスクは大幅低減
