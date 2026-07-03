@@ -35,13 +35,14 @@ namespace EscapeNine.Runtime.UI
         private const float GradeDisplaySeconds = 0.8f; // タイミング判定 (JUST/GOOD/MISS)
 
         /// <summary>
-        /// プレゲームの AI 難易度選択肢。
-        /// 差分: Swift は AILevel.allCases を列挙するため Boss も表示される (quirk) が、
-        /// Boss はボスフロア用の内部実効難易度であり選ばせる意図の値ではないため意図的に除外する。
+        /// プレゲームの AI 難易度選択肢 (Swift: GameView.aiLevelSelector の
+        /// `ForEach(AILevel.allCases, id: \.self)`。全 4 種を忠実に列挙する)。
+        /// Boss を選ぶと Floor.GetEffectiveAILevel が全階層で AILevel.Boss を返す
+        /// (= 常時ボス相当の高難度) ため、意図された 1 つの難易度選択肢として扱う。
         /// </summary>
         private static readonly AILevel[] SelectableAiLevels =
         {
-            AILevel.Easy, AILevel.Normal, AILevel.Hard
+            AILevel.Easy, AILevel.Normal, AILevel.Hard, AILevel.Boss
         };
 
         // ---- 二重構築ガード (App.Awake は BuildUI → Register(内部でも BuildUI) の順で呼ぶ) ----
@@ -339,13 +340,19 @@ namespace EscapeNine.Runtime.UI
 
             _aiButtonImages = new Image[SelectableAiLevels.Length];
             _aiButtonLabels = new Text[SelectableAiLevels.Length];
+            // Swift の HStack は要素数ぶん均等に並ぶ。3→4 種になっても崩れないよう、
+            // 固定 3 枠の cx 式ではなく [areaLeft, areaRight] を要素数で均等割りする式にする
+            // (n=3 のときは概ね旧来の 0.23/0.50/0.77, 幅 0.24 と同等になる)。
+            const float areaLeft = 0.08f;
+            const float areaRight = 0.92f;
+            float slotWidth = (areaRight - areaLeft) / SelectableAiLevels.Length;
             for (int i = 0; i < SelectableAiLevels.Length; i++)
             {
                 AILevel level = SelectableAiLevels[i]; // クロージャ用固定
                 var btn = UIFactory.TextButton(overlay, "Ai" + level, level.RawValue(), 40,
                     UITheme.BackgroundSecondary, UITheme.TextColor, () => HandleAiLevelSelected(level));
-                float cx = 0.23f + 0.27f * i; // 0.23 / 0.50 / 0.77
-                UIFactory.Place((RectTransform)btn.transform, cx, 0.49f, 0.24f, 0.045f);
+                float cx = areaLeft + slotWidth * (i + 0.5f);
+                UIFactory.Place((RectTransform)btn.transform, cx, 0.49f, slotWidth * 0.88f, 0.045f);
                 _aiButtonImages[i] = btn.GetComponent<Image>();
                 _aiButtonLabels[i] = btn.GetComponentInChildren<Text>();
             }
@@ -742,8 +749,9 @@ namespace EscapeNine.Runtime.UI
             // 遷移前ランの終了状態でリザルトへ誤遷移しないよう塞いでおく (開始時に解除)
             _resultShown = true;
 
+            // Boss は SelectableAiLevels に含まれる正規の選択肢になったため、
+            // 以前あった「選択肢外への強制ダウングレード」は行わない (Swift の allCases 挙動に合わせる)。
             _selectedAILevel = App.I.Player.SelectedAILevel;
-            if (_selectedAILevel == AILevel.Boss) _selectedAILevel = AILevel.Easy; // 選択肢外の防御
             _pregameFloorLabel.text = _pendingStartFloor + "階層";
             RefreshAiButtons();
             _pregameOverlay.SetActive(true);
@@ -956,9 +964,11 @@ namespace EscapeNine.Runtime.UI
             _skillButton.gameObject.SetActive(show);
             if (!show) return;
 
-            // 差分: Swift の isInvisible (透明化発動の 0.1 秒点灯) は GameSession に
-            // 相当する永続状態が無いため、透明化キャラの ON 表示は行わない (衝突時自動消費)。
+            // Swift: isActive = (dash && isSkillActive) || (invisible && isInvisible) || (shield && shieldActive)
+            // (GameView.swift skillButton)。GameController.IsInvisible は担当A (GameController.cs) 側で
+            // 追加予定のプロパティ — 未追加の間はこの参照がコンパイルエラーになる (要 GameController 側対応)。
             bool isActive = (type == SkillType.Dash && session.IsSkillActive)
+                         || (type == SkillType.Invisible && App.I.Game.IsInvisible)
                          || (type == SkillType.Shield && session.ShieldActive);
             int remaining = session.RemainingSkillUses;
 

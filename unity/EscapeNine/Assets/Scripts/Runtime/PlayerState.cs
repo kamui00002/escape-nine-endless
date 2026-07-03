@@ -137,7 +137,10 @@ namespace EscapeNine.Runtime
                 ? new HashSet<string>()
                 : new HashSet<string>(purchasedRaw.Split(',').Where(s => !string.IsNullOrEmpty(s)));
 
-            // Debug (Swift 同様、0 はデフォルトへフォールバック)
+            // Debug (Swift: #if DEBUG の対称。リリースビルドでは端末に残った旧 PlayerPrefs 値や
+            // 外部からの改変を読み込ませず、常にデフォルト(無効)値にする)
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Swift 同様、0 はデフォルトへフォールバック
             DebugStartFloor = PlayerPrefs.GetInt(DebugStartFloorKey, 1);
             if (DebugStartFloor == 0) DebugStartFloor = 1;
             DebugAILevel = ParseAILevel(PlayerPrefs.GetString(DebugAILevelKey, "Normal"), AILevel.Normal);
@@ -155,6 +158,14 @@ namespace EscapeNine.Runtime
                     CharacterType.Hero, CharacterType.Thief, CharacterType.Wizard, CharacterType.Elf, CharacterType.Knight
                 };
             }
+#else
+            DebugStartFloor = 1;
+            DebugAILevel = AILevel.Normal;
+            DebugUnlockAllCharacters = false;
+            DebugBPMOverride = 0f;
+            DebugTurnCountdownBeats = GameConfig.TurnCountdownBeats;
+            DebugSkipStartCountdown = false;
+#endif
         }
 
         /// <summary>全プロパティを PlayerPrefs へ書き込む。Swift: PlayerViewModel.saveData()</summary>
@@ -198,10 +209,19 @@ namespace EscapeNine.Runtime
             }
         }
 
-        /// <summary>アンロック済み (またはデバッグ全開放) の場合のみ選択。Swift: selectCharacter(_:)</summary>
+        /// <summary>
+        /// アンロック済み (またはデバッグ全開放) の場合のみ選択。Swift: selectCharacter(_:)
+        /// Swift は #if DEBUG / #else でデバッグ全開放バイパスの有無を切り替えており、
+        /// リリースビルドではその分岐自体が存在しない。Load() で DebugUnlockAllCharacters が
+        /// 常に false になる防御と合わせ、こちらも同じ #if で対称に絶つ (二重の安全策)。
+        /// </summary>
         public bool SelectCharacter(CharacterType character)
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (DebugUnlockAllCharacters || UnlockedCharacters.Contains(character))
+#else
+            if (UnlockedCharacters.Contains(character))
+#endif
             {
                 SelectedCharacter = character;
                 Save();

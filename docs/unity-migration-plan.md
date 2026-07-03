@@ -215,7 +215,10 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - アセット移送: スプライト9・SFX9・BGM6 を `Assets/Resources/` へ（Point filter/PPU64/SFX=DecompressOnLoad 自動適用）
 - **検証済み**: コンパイル green / EditMode テスト **80/80 green**（既存60+新規20）/ PlayMode スモーク＝起動→チュートリアル自動表示→Home→開始カウントダウン→floor1 を5ターン逃げ切りクリア→階層クリア演出→floor2→敗北（敵に捕まった）→Result（NEW RECORD・敗因表示・ニアミス表示）→リトライ、を Editor 上でオートパイロット実証。時間切れ敗北も別ランで実証
 - 環境注意: `~/EscapeNineUnity/Packages/manifest.json` に `com.unity.ugui: 2.0.0` が必要（bootstrap 素マニフェストに無い。PackageBootstrap の自動追記スクリプトも同梱）
-- 意図的な先送り: IAP/広告/Firebase/GameCenter/ネイティブ共有＝Phase 3、アニメ・パーティクル・scale演出・カスタムフォント＝Phase 4、デイリーチャレンジ画面＝Phase 2.5、**iOS 実機での見た目・SafeArea 確認は未実施**（次の実機ビルド時に確認）
+- 意図的な先送り: IAP/広告/Firebase/GameCenter/ネイティブ共有＝Phase 3、アニメ・パーティクル・scale演出・BGMフェード・カスタムフォント＝Phase 4、デイリーチャレンジ画面＝Phase 2.5、**iOS 実機での見た目・SafeArea 確認は未実施**（次の実機ビルド時に確認）
+- **敵対的検証（Swift↔C# 差分レビュー 3レーン）実施済み**: コア数値は完全一致を確認（GameColors 15色 / バランス定数全項目 / BPM曲線 / 鬼階層帯 / Product ID / BGMマッピング / メトロノーム音源パラメータ）。CONFIRMED 差分 9 件は修正済み（ポーズ連打の時間切れ回避穴 / リリースビルドでデバッグ設定有効 / 開始カウントダウン1秒固定化 / GO後0.5s入力ブロック / 衝突死ターンのmove音 / 実績チェック結線+永続化 / Boss難易度選択 / 透明化ONバッジ / v1.1オンボーディング判定+デイリーボタン準備中トースト+DEBUG設定2項目）
+- **Phase 2.5 バックログ**（検証で確定した残移植、次スプリントで対応）: ① デイリーチャレンジのフロー統合（開始経路・条件適用・完了記録）と画面 ② 実績 UI（Home ボタン+一覧+Result 解除ポップアップ。判定・永続化は結線済み） ③ デイリーチャレンジ完了状態表示
+- **意図的差分として維持**（文書化）: AI難易度の永続化（Swift はセッション毎 Easy リセット→UX 改善として保持）/ 壊れセーブ時に勇者を残す安全化 / SFX 音量 0.7 統一（Swift の 0.8/0.7 二重経路の負債解消）/ Conductor.CheckMoveTiming の判定窓（現行フロー未使用 API。使用時に要再検討）/ FloorClear 中のポーズ不可（Swift は可）
 
 ### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
 

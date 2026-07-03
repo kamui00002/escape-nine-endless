@@ -33,8 +33,17 @@ namespace EscapeNine.Runtime.UI
         private Text _characterNameLabel;    // 選択中キャラの名前
         private GameObject _dailyButtonRoot; // デイリーチャレンジボタン (階層10未到達では非表示)
 
+        // 準備中トースト (デイリーチャレンジ画面が Phase 2.5 未実装のため、タップへの応答用。
+        // ShopScreen の同名パターンを踏襲した簡易実装)
+        private RectTransform _toast;
+        private Text _toastLabel;
+        private Coroutine _toastRoutine;
+        private const float ToastDisplaySeconds = 1.5f;
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private Text _dbgFloorValueLabel;    // 開始階層の現在値
+        private Text _dbgBpmValueLabel;      // BPMオーバーライドの現在値
+        private Text _dbgTurnCountdownValueLabel; // ターンカウントダウンビート数の現在値
         private Text _dbgAiLabel;            // AI難易度サイクルボタンのラベル
         private Text _dbgUnlockLabel;        // 全キャラ解放トグルのラベル
         private Text _dbgSkipLabel;          // 開始カウントダウン省略トグルのラベル
@@ -71,6 +80,9 @@ namespace EscapeNine.Runtime.UI
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             BuildDangerZone(safe);
 #endif
+
+            // トーストは最後に構築し、DangerZone (DEBUG時) を含む他要素より必ず手前に描画されるようにする
+            BuildToast(safe);
         }
 
         public override void OnShow(object payload)
@@ -87,19 +99,28 @@ namespace EscapeNine.Runtime.UI
             // 初回起動はチュートリアルへ自動遷移 (Swift: fullScreenCover(showTutorial))。
             // 注意: ここで直接 Router.Show を呼ぶと Router.Show(Home) の実行途中に再入して
             //       _current / active 状態が壊れるため、必ず 1 フレーム遅らせる。
-            // v1.1 動的オンボーディング (hasSeenTutorialV1_1 / OnboardingTutorialView) は
-            // 専用画面が未移植のため未対応 = TODO Phase 2.5 (Tutorial 画面側で拡張)。
-            if (!App.I.Player.HasSeenTutorial)
+            // Swift の二段階判定 (HomeView.onAppear): hasSeenTutorialV1_1 == false なら
+            // v1.1 動的オンボーディングを表示し、true なら hasSeenTutorial の値に関わらず
+            // 表示しない。本画面の TutorialScreen は v1.1 の 6 ページ構成を移植したものなので、
+            // 判定基準は HasSeenTutorialV11 に一本化する (HasSeenTutorial 単独では判定しない)。
+            // TutorialScreen.Complete() は両方のフラグを true にするため、旧キー
+            // (HasSeenTutorial のみ true) の既存ユーザーも 1 回だけ通る migration 挙動を保つ。
+            if (!App.I.Player.HasSeenTutorialV11)
             {
                 StartCoroutine(ShowTutorialNextFrame());
             }
         }
 
+        public override void OnHide()
+        {
+            HideToast();
+        }
+
         private IEnumerator ShowTutorialNextFrame()
         {
             yield return null;
-            // HasSeenTutorial=true の書き込みは Tutorial 画面完了時の責務
-            // (Swift: TutorialOverlayView 完了クロージャで hasSeenTutorial = true)。
+            // HasSeenTutorial / HasSeenTutorialV11 の書き込みは Tutorial 画面完了時の責務
+            // (Swift: OnboardingTutorialView 完了時に hasSeenTutorialV1_1 = true)。
             App.I.Router.Show(ScreenId.Tutorial);
         }
 
@@ -206,6 +227,8 @@ namespace EscapeNine.Runtime.UI
                     // TODO(Phase 2.5): DailyChallenge 画面へ遷移 (Swift: HomeDestination.dailyChallenge)。
                     //                  DailyChallengeService の完了状態永続化とセットで実装する。
                     Debug.Log("[HomeScreen] デイリーチャレンジ画面は Phase 2.5 で実装予定");
+                    // 遷移先が未実装のためサイレント無反応になっていた分の応答を補う (準備中トースト)。
+                    ShowToast("準備中です");
                 });
             var rt = (RectTransform)btn.transform;
             UIFactory.Place(rt, 0.5f, 0.617f, w, 0.05f);
@@ -242,6 +265,42 @@ namespace EscapeNine.Runtime.UI
             _floorNumberLabel = UIFactory.Label(parent, "FloorNumberLabel", "0", 96, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)_floorNumberLabel.transform, 0.5f, 0.19f, 0.6f, 0.05f);
+        }
+
+        // MARK: - Toast (デイリーチャレンジ等、未実装遷移のタップへの簡易応答。ShopScreen と同じ方式)
+
+        private void BuildToast(RectTransform parent)
+        {
+            _toast = UIFactory.Panel(parent, "Toast", UITheme.WithAlpha(Color.black, 0.75f));
+            UIFactory.Place(_toast, 0.5f, 0.155f, 0.7f, 0.04f);
+            _toastLabel = UIFactory.Label(_toast, "Label", "", 30, UITheme.GoldText);
+            UIFactory.Place((RectTransform)_toastLabel.transform, 0.5f, 0.5f, 1f, 1f);
+            _toast.gameObject.SetActive(false);
+        }
+
+        private void ShowToast(string message)
+        {
+            _toastLabel.text = message;
+            if (_toastRoutine != null) StopCoroutine(_toastRoutine);
+            _toastRoutine = StartCoroutine(ToastRoutine());
+        }
+
+        private IEnumerator ToastRoutine()
+        {
+            _toast.gameObject.SetActive(true);
+            yield return new WaitForSeconds(ToastDisplaySeconds);
+            _toast.gameObject.SetActive(false);
+            _toastRoutine = null;
+        }
+
+        private void HideToast()
+        {
+            if (_toastRoutine != null)
+            {
+                StopCoroutine(_toastRoutine);
+                _toastRoutine = null;
+            }
+            if (_toast != null) _toast.gameObject.SetActive(false);
         }
 
         // MARK: - 動的要素の更新 (Swift の @Published バインディング相当を OnShow で一括再描画)
@@ -289,48 +348,75 @@ namespace EscapeNine.Runtime.UI
         private void BuildDangerZone(RectTransform parent)
         {
             var panel = UIFactory.Panel(parent, "DangerZone", UITheme.WithAlpha(UITheme.BackgroundSecondary, 0.9f));
-            UIFactory.Place(panel, 0.5f, 0.075f, 0.92f, 0.115f);
+            // BPM オーバーライド / ターンカウントダウン行の追加で 2 行→4 行になったため、
+            // 元の 0.115 から縦幅を拡張する (画面下端をはみ出さないよう cy も合わせて調整)。
+            UIFactory.Place(panel, 0.5f, 0.115f, 0.92f, 0.20f);
 
             // 枠線代わりの警告色バー (Swift: GameCard(borderColor: warning) の簡略表現)
             var topBar = UIFactory.ColorRect(panel, "WarnBar", UITheme.Warning);
-            UIFactory.Place((RectTransform)topBar.transform, 0.5f, 0.985f, 1f, 0.03f);
+            UIFactory.Place((RectTransform)topBar.transform, 0.5f, 0.99f, 1f, 0.018f);
 
             var title = UIFactory.Label(panel, "DangerTitle", "管理者用設定 (DEBUG)", 34, UITheme.Warning,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
-            UIFactory.Place((RectTransform)title.transform, 0.5f, 0.86f, 0.9f, 0.22f);
+            UIFactory.Place((RectTransform)title.transform, 0.5f, 0.90f, 0.9f, 0.16f);
 
             // --- 1 行目: 開始階層 (Swift: Picker 1...maxFloors → ステッパーに簡略化) ---
             var floorCaption = UIFactory.Label(panel, "FloorCaption", "開始階層", 30,
                 UITheme.WithAlpha(UITheme.TextColor, 0.7f), TextAnchor.MiddleLeft);
-            UIFactory.Place((RectTransform)floorCaption.transform, 0.13f, 0.60f, 0.20f, 0.24f);
+            UIFactory.Place((RectTransform)floorCaption.transform, 0.13f, 0.695f, 0.20f, 0.19f);
 
             _dbgFloorValueLabel = UIFactory.Label(panel, "FloorValue", "1", 36, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
-            UIFactory.Place((RectTransform)_dbgFloorValueLabel.transform, 0.30f, 0.60f, 0.12f, 0.24f);
+            UIFactory.Place((RectTransform)_dbgFloorValueLabel.transform, 0.30f, 0.695f, 0.12f, 0.19f);
 
-            CreateDebugStepButton(panel, "FloorMinus10", "-10", 0.46f, -10);
-            CreateDebugStepButton(panel, "FloorMinus1", "-1", 0.58f, -1);
-            CreateDebugStepButton(panel, "FloorPlus1", "+1", 0.70f, +1);
-            CreateDebugStepButton(panel, "FloorPlus10", "+10", 0.82f, +10);
+            CreateDebugStepButton(panel, "FloorMinus10", "-10", 0.46f, 0.695f, -10);
+            CreateDebugStepButton(panel, "FloorMinus1", "-1", 0.58f, 0.695f, -1);
+            CreateDebugStepButton(panel, "FloorPlus1", "+1", 0.70f, 0.695f, +1);
+            CreateDebugStepButton(panel, "FloorPlus10", "+10", 0.82f, 0.695f, +10);
 
-            // --- 2 行目: AI 難易度 / 全キャラ解放 / 開始カウントダウン省略 ---
+            // --- 2 行目: BPM オーバーライド (Swift: SettingsView.swift Slider 0...300 step10。
+            //             uGUI 依存を増やさないよう Slider ではなく ±10 ボタンに簡略化) ---
+            var bpmCaption = UIFactory.Label(panel, "BpmCaption", "BPM上書き", 30,
+                UITheme.WithAlpha(UITheme.TextColor, 0.7f), TextAnchor.MiddleLeft);
+            UIFactory.Place((RectTransform)bpmCaption.transform, 0.13f, 0.50f, 0.20f, 0.19f);
+
+            _dbgBpmValueLabel = UIFactory.Label(panel, "BpmValue", "自動", 32, UITheme.Available,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)_dbgBpmValueLabel.transform, 0.38f, 0.50f, 0.20f, 0.19f);
+
+            CreateBpmStepButton(panel, "BpmMinus10", "-10", 0.68f, 0.50f, -10f);
+            CreateBpmStepButton(panel, "BpmPlus10", "+10", 0.85f, 0.50f, +10f);
+
+            // --- 3 行目: ターンカウントダウンビート数 (Swift: Stepper 1...10) ---
+            var turnCaption = UIFactory.Label(panel, "TurnCdCaption", "ターンCD", 30,
+                UITheme.WithAlpha(UITheme.TextColor, 0.7f), TextAnchor.MiddleLeft);
+            UIFactory.Place((RectTransform)turnCaption.transform, 0.13f, 0.305f, 0.20f, 0.19f);
+
+            _dbgTurnCountdownValueLabel = UIFactory.Label(panel, "TurnCdValue", "3", 36, UITheme.Available,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)_dbgTurnCountdownValueLabel.transform, 0.38f, 0.305f, 0.12f, 0.19f);
+
+            CreateTurnCountdownStepButton(panel, "TurnCdMinus1", "-1", 0.68f, 0.305f, -1);
+            CreateTurnCountdownStepButton(panel, "TurnCdPlus1", "+1", 0.85f, 0.305f, +1);
+
+            // --- 4 行目: AI 難易度 / 全キャラ解放 / 開始カウントダウン省略 ---
             var aiBtn = UIFactory.TextButton(panel, "AiCycleButton", "", 30,
                 UITheme.Background, UITheme.TextColor, CycleDebugAiLevel);
-            UIFactory.Place((RectTransform)aiBtn.transform, 0.18f, 0.20f, 0.30f, 0.30f);
+            UIFactory.Place((RectTransform)aiBtn.transform, 0.18f, 0.105f, 0.30f, 0.19f);
             _dbgAiLabel = aiBtn.GetComponentInChildren<Text>();
 
             var unlockBtn = UIFactory.TextButton(panel, "UnlockAllButton", "", 30,
                 UITheme.Background, UITheme.TextColor, ToggleUnlockAllCharacters);
-            UIFactory.Place((RectTransform)unlockBtn.transform, 0.50f, 0.20f, 0.28f, 0.30f);
+            UIFactory.Place((RectTransform)unlockBtn.transform, 0.50f, 0.105f, 0.28f, 0.19f);
             _dbgUnlockLabel = unlockBtn.GetComponentInChildren<Text>();
 
             var skipBtn = UIFactory.TextButton(panel, "SkipCountdownButton", "", 30,
                 UITheme.Background, UITheme.TextColor, ToggleSkipStartCountdown);
-            UIFactory.Place((RectTransform)skipBtn.transform, 0.82f, 0.20f, 0.28f, 0.30f);
+            UIFactory.Place((RectTransform)skipBtn.transform, 0.82f, 0.105f, 0.28f, 0.19f);
             _dbgSkipLabel = skipBtn.GetComponentInChildren<Text>();
         }
 
-        private void CreateDebugStepButton(RectTransform parent, string name, string label, float cx, int delta)
+        private void CreateDebugStepButton(RectTransform parent, string name, string label, float cx, float cy, int delta)
         {
             var btn = UIFactory.TextButton(parent, name, label, 30,
                 UITheme.Background, UITheme.TextColor, () =>
@@ -340,7 +426,35 @@ namespace EscapeNine.Runtime.UI
                     player.Save(); // Swift: onChange で saveData()
                     RefreshDangerZone();
                 });
-            UIFactory.Place((RectTransform)btn.transform, cx, 0.60f, 0.10f, 0.28f);
+            UIFactory.Place((RectTransform)btn.transform, cx, cy, 0.10f, 0.19f);
+        }
+
+        /// <summary>BPM オーバーライド ±10 (Swift: Slider 0...300 step10 の簡略版)。0 = フロア曲線に従う。</summary>
+        private void CreateBpmStepButton(RectTransform parent, string name, string label, float cx, float cy, float delta)
+        {
+            var btn = UIFactory.TextButton(parent, name, label, 30,
+                UITheme.Background, UITheme.TextColor, () =>
+                {
+                    var player = App.I.Player;
+                    player.DebugBPMOverride = Mathf.Clamp(player.DebugBPMOverride + delta, 0f, 300f);
+                    player.Save();
+                    RefreshDangerZone();
+                });
+            UIFactory.Place((RectTransform)btn.transform, cx, cy, 0.12f, 0.19f);
+        }
+
+        /// <summary>ターンカウントダウンビート数 ±1 (Swift: Stepper value 1...10)。</summary>
+        private void CreateTurnCountdownStepButton(RectTransform parent, string name, string label, float cx, float cy, int delta)
+        {
+            var btn = UIFactory.TextButton(parent, name, label, 30,
+                UITheme.Background, UITheme.TextColor, () =>
+                {
+                    var player = App.I.Player;
+                    player.DebugTurnCountdownBeats = Mathf.Clamp(player.DebugTurnCountdownBeats + delta, 1, 10);
+                    player.Save();
+                    RefreshDangerZone();
+                });
+            UIFactory.Place((RectTransform)btn.transform, cx, cy, 0.12f, 0.19f);
         }
 
         /// <summary>
@@ -413,6 +527,14 @@ namespace EscapeNine.Runtime.UI
         {
             var player = App.I.Player;
             if (_dbgFloorValueLabel != null) _dbgFloorValueLabel.text = player.DebugStartFloor.ToString();
+            // Swift: debugBPMOverride == 0 ? "自動" : "\(Int(debugBPMOverride)) BPM"
+            if (_dbgBpmValueLabel != null)
+            {
+                _dbgBpmValueLabel.text = player.DebugBPMOverride <= 0f
+                    ? "自動"
+                    : Mathf.RoundToInt(player.DebugBPMOverride) + " BPM";
+            }
+            if (_dbgTurnCountdownValueLabel != null) _dbgTurnCountdownValueLabel.text = player.DebugTurnCountdownBeats.ToString();
             if (_dbgAiLabel != null) _dbgAiLabel.text = "AI: " + player.SelectedAILevel.RawValue();
             if (_dbgUnlockLabel != null) _dbgUnlockLabel.text = "全解放: " + (player.DebugUnlockAllCharacters ? "ON" : "OFF");
             if (_dbgSkipLabel != null) _dbgSkipLabel.text = "CD省略: " + (player.DebugSkipStartCountdown ? "ON" : "OFF");

@@ -17,6 +17,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using EscapeNine.Core;
 
@@ -79,11 +80,17 @@ namespace EscapeNine.Runtime
 
         // MARK: - 内部状態
         private Phase _phase = Phase.Idle;
-        private int _startCountdownRemaining;                       // ゲーム開始カウントダウン残り
+        private Phase _phaseBeforePause;                             // Pause 前のフェーズ (Playing/StartCountdown) を Resume で復元
+        private int _startCountdownRemaining;                        // ゲーム開始カウントダウン残り (Pause 中も保持)
+        private double _startCountdownBpm;                           // GO! 到達時に Conductor.ChangeBPM へ渡す BPM (Swift: startBGM(bpm:))
+        private Coroutine _startCountdownCoroutine;                  // 実時間 1.0s 間隔の開始カウントダウン (Swift: gameStartCountdownTimer)
+        private bool _resultPersisted;                              // このランのスコア送信/自己ベスト更新が済んだか (二重送信防止)
         private int _turnBeats = GameConfig.TurnCountdownBeats;     // 1 ターンの拍数 (デバッグで可変)
         private float _runStartRealtime;                            // Swift: gameStartTime
         private float _floorStartRealtime;                          // Swift: floorStartTime (Phase 3 の計装用)
         private const float GameOverOverlaySeconds = 1.5f;          // Swift: asyncAfter(.now() + 1.5)
+        private const float GameStartGoDisplaySeconds = 0.5f;       // Swift: asyncAfter(.now() + 0.5) — GO! 表示 & 入力ブロック猶予
+        private const string UnlockedAchievementsKey = "unlockedAchievements"; // Swift: AchievementManager.achievementsKey
 
         /// <summary>
         /// App の Awake から呼ぶ依存注入。Conductor.OnBeat の購読もここで 1 回だけ行う。
@@ -142,7 +149,9 @@ namespace EscapeNine.Runtime
             NearMissDistance = 0;
             LastTimingGrade = null;
             IsFloorClearPending = false;
+            IsInvisible = false; // 前ランの透明化表示フラグを持ち越さない
             TurnCountdown = _turnBeats;
+            _resultPersisted = false; // 新しいランのスコア送信/自己ベスト更新をまた許可する
 
             // TODO(Phase 3): DailyChallengeService.pendingChallenge の適用 (Swift: startGame 内)。
             //                GameSession.DailyChallengeMode / ApplyDailyChallengeConditions は Core に移植済み。
@@ -167,7 +176,8 @@ namespace EscapeNine.Runtime
         /// </summary>
         public void RequestMove(int position)
         {
-            if (_phase != Phase.Playing) return;                 // Swift: guard !isGameStartCountdownActive 等
+            if (_phase != Phase.Playing) return;
+            if (IsGameStartCountdownActive) return;               // Swift: selectMove の guard (GameViewModel.swift:577)。GO! 後 0.5 秒は入力を無視
             if (Session == null || Session.Status != GameStatus.Playing) return;
 
             TimingGrade grade = _conductor.TimingGradeNow();
@@ -232,6 +242,7 @@ namespace EscapeNine.Runtime
             if (_player != null)
             {
                 if (_player.DebugBPMOverride > 0) bpm = _player.DebugBPMOverride;
+                _turnBeats = Mathf.Clamp(_player.DebugTurnCountdownBeats, 1, 10); // Swift: nextFloor() 内の setTurnCountdownBeats 相当 (階層跨ぎでも再適用、GameViewModel.swift:782-784)
                 skipCountdown = _player.DebugSkipStartCountdown;
             }
 #endif
@@ -242,12 +253,25 @@ namespace EscapeNine.Runtime
             OnStateChanged?.Invoke();
         }
 
+        /// <summary>
+        /// 一時停止。Swift: pauseGame() (GameViewModel.swift:967-971) はガード無しで常時呼べるが、
+        /// Unity 版は状態機械の都合上 Playing / StartCountdown 中のみ許可する。
+        /// FloorClear / GameOverDelay 中のポーズは複雑さに対して価値が低いため未対応 (現状維持)。
+        /// </summary>
         public void PauseGame()
         {
-            if (_phase != Phase.Playing) return;
+            if (_phase != Phase.Playing && _phase != Phase.StartCountdown) return;
+
+            if (_phase == Phase.StartCountdown && _startCountdownCoroutine != null)
+            {
+                StopCoroutine(_startCountdownCoroutine);
+                _startCountdownCoroutine = null;
+            }
+
+            _phaseBeforePause = _phase;
             Session.Status = GameStatus.Paused; // Swift: gameStatus = .paused
             _phase = Phase.Paused;
-            _conductor.StopSong(); // Conductor に pause API が無いため停止 (差分は Resume 側コメント)
+            _conductor.StopSong(); // Conductor に pause API が無いため停止 (StartCountdown 中は元々未起動)
             _audio.PauseBgm();     // Swift: pauseBGMMusic()
             OnStateChanged?.Invoke();
         }
@@ -256,13 +280,25 @@ namespace EscapeNine.Runtime
         {
             if (_phase != Phase.Paused) return;
             Session.Status = GameStatus.Playing;
-            _phase = Phase.Playing;
             _audio.ResumeBgm();
-            // 差分: Swift は BeatEngine を途中位相から再開するが、Conductor は再スタートのみ
-            //       サポートするため拍サイクルを仕切り直し、ターンカウントダウンも満タンに戻す
-            //       (プレイヤー有利側に倒す)。
-            _conductor.StartSong();
-            TurnCountdown = _turnBeats;
+
+            if (_phaseBeforePause == Phase.StartCountdown)
+            {
+                // 開始カウントダウンの途中で一時停止していた場合は残りカウントから再開する
+                // (Conductor は StartCountdown 中は未起動のため StartSong 不要)。
+                _phase = Phase.StartCountdown;
+                _startCountdownCoroutine = StartCoroutine(RunStartCountdown());
+            }
+            else
+            {
+                _phase = Phase.Playing;
+                // 差分: Swift は BeatEngine を途中位相から再開する (BeatEngine.swift:144-153。
+                //       pause()/resume() は turnCountdown に触れない) が、Conductor は再スタートのみ
+                //       サポートするため拍サイクル (位相) はリセットされる。ただし TurnCountdown
+                //       (残りターン締切) 自体は保持する — ポーズ連打で締切を無限に引き延ばせる穴を
+                //       防ぐため、満タンには戻さない。
+                _conductor.StartSong();
+            }
             OnStateChanged?.Invoke();
         }
 
@@ -273,6 +309,7 @@ namespace EscapeNine.Runtime
         public void QuitToHome()
         {
             StopAllCoroutines();
+            _startCountdownCoroutine = null;
             _phase = Phase.Idle;
             IsGameStartCountdownActive = false;
             IsFloorClearPending = false;
@@ -291,19 +328,78 @@ namespace EscapeNine.Runtime
 
         /// <summary>
         /// ゲーム開始 / 階層開始カウントダウンを開始する。
-        /// 差分: Swift は独立 Timer (1 秒固定間隔) だが、Unity 版は Conductor.OnBeat 駆動
-        ///       (指示仕様)。カウントダウンから音楽と拍が完全に同期する代わりに、
-        ///       1 tick の長さが 60/BPM 秒になる (高階層ほど短い)。
+        /// Swift (GameViewModel.swift:363-400): 独立 Timer で実時間 1.0 秒固定間隔。BPM に連動しない。
+        /// Conductor (拍クロック) は GO! に到達するまで起動しない (Swift が BGM を completion 後に
+        /// 鳴らし始めるのと同じ順序、RunStartCountdown 参照)。
         /// </summary>
         private void BeginStartCountdown(double bpm, bool skipCountdown)
         {
-            _startCountdownRemaining = skipCountdown ? 0 : GameConfig.GameStartCountdownBeats;
-            IsGameStartCountdownActive = !skipCountdown;
-            _phase = Phase.StartCountdown;
+            if (_startCountdownCoroutine != null)
+            {
+                StopCoroutine(_startCountdownCoroutine);
+                _startCountdownCoroutine = null;
+            }
+
+            _startCountdownBpm = bpm;
             TurnCountdown = _turnBeats; // Swift: resetTurnCountdown()
 
-            // ChangeBPM は StartSong を内包 → dspTime クロックが新 BPM で走り出す
-            _conductor.ChangeBPM(bpm);
+            if (skipCountdown)
+            {
+                // Swift: startGameStartCountdown の #if DEBUG 早期 return (completion() を同期的に呼ぶ)
+                IsGameStartCountdownActive = false;
+                _phase = Phase.Playing;
+                _conductor.ChangeBPM(bpm);
+                OnGameStarted?.Invoke();
+                return;
+            }
+
+            _startCountdownRemaining = GameConfig.GameStartCountdownBeats;
+            IsGameStartCountdownActive = true;
+            _phase = Phase.StartCountdown;
+            _startCountdownCoroutine = StartCoroutine(RunStartCountdown());
+        }
+
+        /// <summary>
+        /// 実時間 1.0 秒固定間隔のカウントダウン本体。Swift: Timer.scheduledTimer(withTimeInterval: 1.0, ...)。
+        /// Pause 中に停止された場合、Resume で残りカウント (_startCountdownRemaining) からそのまま
+        /// 再起動される (BeginStartCountdown を経由しない、PauseGame/ResumeGame 参照)。
+        /// </summary>
+        private IEnumerator RunStartCountdown()
+        {
+            while (_startCountdownRemaining > 0)
+            {
+                OnCountdownTick?.Invoke(_startCountdownRemaining); // 3, 2, 1 の表示 (Swift: gameStartCountdown)
+                yield return new WaitForSeconds(1f);
+                _startCountdownRemaining--;
+            }
+
+            // GO! → プレイ開始。拍クロックはここで初めて起動する (Swift: completion() 内の startBGM(bpm:))。
+            OnCountdownTick?.Invoke(0);
+            _phase = Phase.Playing;
+            TurnCountdown = _turnBeats;
+            _conductor.ChangeBPM(_startCountdownBpm);
+            OnGameStarted?.Invoke();
+            _startCountdownCoroutine = null;
+
+            // Swift: GO! 表示を 0.5 秒後に消す。その間 isGameStartCountdownActive は true のままで
+            // selectMove (RequestMove) をブロックする (GameViewModel.swift:392-396, 577)。
+            StartCoroutine(ClearGameStartCountdownAfterDelay());
+            OnStateChanged?.Invoke();
+        }
+
+        private IEnumerator ClearGameStartCountdownAfterDelay()
+        {
+            yield return new WaitForSeconds(GameStartGoDisplaySeconds);
+            IsGameStartCountdownActive = false;
+            OnStateChanged?.Invoke();
+        }
+
+        /// <summary>透明化の視覚フラグを invisibilityDuration 後に解除 (Swift: asyncAfter 相当)。</summary>
+        private IEnumerator ClearInvisibleAfterDelay()
+        {
+            yield return new WaitForSeconds((float)GameConfig.InvisibilityDuration);
+            IsInvisible = false;
+            OnStateChanged?.Invoke();
         }
 
         // MARK: - Beat Handling (Swift: BeatEngine.onBeat → onTurnDeadline)
@@ -312,25 +408,6 @@ namespace EscapeNine.Runtime
         {
             switch (_phase)
             {
-                case Phase.StartCountdown:
-                    if (_startCountdownRemaining > 0)
-                    {
-                        // 3, 2, 1 の表示 (Swift: gameStartCountdown)
-                        OnCountdownTick?.Invoke(_startCountdownRemaining);
-                        _startCountdownRemaining--;
-                    }
-                    else
-                    {
-                        // GO! → プレイ開始。「GO 表示を 0.5 秒後に消す」のは UI 側の責務。
-                        OnCountdownTick?.Invoke(0);
-                        IsGameStartCountdownActive = false;
-                        _phase = Phase.Playing;
-                        TurnCountdown = _turnBeats;
-                        OnGameStarted?.Invoke();
-                        OnStateChanged?.Invoke();
-                    }
-                    break;
-
                 case Phase.Playing:
                     // Swift: onBeat() — turnCountdown を減らし、0 でアクセント音 + 締切処理
                     TurnCountdown--;
@@ -344,23 +421,42 @@ namespace EscapeNine.Runtime
                     break;
 
                 default:
-                    // Idle / Paused / FloorClear / GameOverDelay / Finished 中の拍は無視
+                    // Idle / StartCountdown / Paused / FloorClear / GameOverDelay / Finished 中の拍は無視。
+                    // StartCountdown は Conductor 未起動 (BeginStartCountdown 参照) のためそもそも発火しないが、
+                    // 専用コルーチン (RunStartCountdown) が実時間 1.0 秒間隔で処理するため二重に受けない。
                     // (Swift では pauseBGM でメトロノーム自体を止めていたのと等価)
                     break;
             }
         }
 
+        /// <summary>
+        /// 透明化スキルが「衝突を吸収した直後」だけ true になる視覚フラグ。
+        /// Swift: GameViewModel.isInvisible (衝突吸収時に ON → invisibilityDuration 後に OFF)。
+        /// Core は吸収を TurnResult.Continued に畳むため、SkillUsageCount の増分で検知する。
+        /// GameScreen のスキルボタン ON バッジが参照する。
+        /// </summary>
+        public bool IsInvisible { get; private set; }
+
         /// <summary>締切拍のターン解決。ルールは GameSession.ResolveTurn が全て担う。</summary>
         private void ResolveTurnNow()
         {
+            int previousPlayerPosition = Session.PlayerPosition;
+            int skillUsesBefore = Session.SkillUsageCount;
             var result = Session.ResolveTurn();
+
+            // 透明化の衝突吸収検知: 透明化キャラで Continued かつスキル消費が増えた = 吸収発生
+            // (Swift: GameViewModel.swift:261-267 の isInvisible=true → asyncAfter(invisibilityDuration) で false)
+            if (result == TurnResult.Continued
+                && Session.Skill.Type == SkillType.Invisible
+                && Session.SkillUsageCount > skillUsesBefore)
+            {
+                IsInvisible = true;
+                StartCoroutine(ClearInvisibleAfterDelay());
+            }
 
             switch (result)
             {
                 case TurnResult.Continued:
-                    // 差分: Swift は移動確定直後 (衝突判定前) に move 音を鳴らすため、
-                    //       衝突死の場合も move 音が鳴る。Session が解決を一括で行う都合上、
-                    //       Unity 版は「生存したターンのみ」move 音を鳴らす。
                     _audio.PlaySfx("move");
                     TurnCountdown = _turnBeats; // Swift: onBeat 側の turnCountdown リセット相当
                     OnTurnResolved?.Invoke(result);
@@ -377,6 +473,16 @@ namespace EscapeNine.Runtime
                     break;
 
                 case TurnResult.Defeated:
+                    // Swift (GameViewModel.swift:252) は位置更新直後・衝突判定前に move 音を鳴らすため、
+                    // 移動自体は成立した上での衝突死でも move 音が鳴る。無効手/消失マス/時間切れによる
+                    // 敗北は移動が成立していない (PlayerPosition 未更新) ため move 音は鳴らさない。
+                    // GameSession.ResolveTurn は理由を DefeatReason だけでは区別できないため、
+                    // PlayerPosition の変化有無で「移動成立後の衝突死」かどうかを判定する
+                    // (GetAvailableMoves は現在地を候補から除外するため、移動成立時は必ず位置が変わる)。
+                    if (Session.PlayerPosition != previousPlayerPosition)
+                    {
+                        _audio.PlaySfx("move");
+                    }
                     OnTurnResolved?.Invoke(result);
                     HandleDefeat(Session.LastDefeatReason ?? DefeatReason.CaughtByEnemy);
                     break;
@@ -393,6 +499,11 @@ namespace EscapeNine.Runtime
         /// </summary>
         private void HandleDefeat(DefeatReason reason)
         {
+            // PLAUSIBLE fix: スコア送信/自己ベスト更新は 1.5 秒のオーバーレイ演出を待たずに即時実行する。
+            // 演出中に画面遷移やアプリ終了があっても記録が消えないようにするため
+            // (演出・BGM 切替等の「見た目」だけを FinalizeDefeatAfterDelay 側に残す)。
+            PersistRunResult();
+
             _phase = Phase.GameOverDelay;
             OnGameOver?.Invoke(reason);
             StartCoroutine(FinalizeDefeatAfterDelay());
@@ -404,7 +515,25 @@ namespace EscapeNine.Runtime
             EndGame(won: false);
         }
 
-        /// <summary>ラン終了処理。Swift: endGame(result:) と同順 (計測確定 → 音 → 永続化)。</summary>
+        /// <summary>
+        /// スコア送信 (RankingStore) + 自己ベスト更新 (PlayerState) の永続化のみを行う。
+        /// Swift: endGame(result:) の該当箇所 (RankingService.submitScore + updateHighestFloor)。
+        /// 敗北は HandleDefeat から即時に呼ばれ、勝利は EndGame から直接呼ばれる。
+        /// 1 ラン 1 回のみ実行 (二重送信防止、_resultPersisted は StartNewRun でリセット)。
+        /// </summary>
+        private void PersistRunResult()
+        {
+            if (_resultPersisted) return;
+            _resultPersisted = true;
+
+            int floor = Session.CurrentFloor;
+            string characterId = Session.CurrentCharacter.Type.RawValue();
+            _ranking.SubmitScore(floor, characterId);
+            _player.UpdateHighestFloor(floor);
+            // TODO(Phase 3): GameCenterService.submitScore / FirebaseService.submitScore 相当。
+        }
+
+        /// <summary>ラン終了処理。Swift: endGame(result:) と同順 (計測確定 → 音 → 永続化 → 実績)。</summary>
         private void EndGame(bool won)
         {
             // 1) 計測の確定 (Swift: elapsedSeconds / nearMissDistance)
@@ -431,19 +560,38 @@ namespace EscapeNine.Runtime
 
             // TODO(Phase 3): デイリーチャレンジ完了記録 (Swift: DailyChallengeService.markCompleted)。
 
-            // 4) スコア送信 + 自己ベスト更新 (Swift: RankingService.submitScore + updateHighestFloor)
-            int floor = Session.CurrentFloor;
-            string characterId = Session.CurrentCharacter.Type.RawValue();
-            _ranking.SubmitScore(floor, characterId);
-            _player.UpdateHighestFloor(floor);
-            // TODO(Phase 3): GameCenterService.submitScore / FirebaseService.submitScore 相当。
+            // 4) スコア送信 + 自己ベスト更新 (敗北は HandleDefeat で即時実行済み。
+            //    PersistRunResult 内の _resultPersisted ガードにより二重送信はしない)
+            PersistRunResult();
 
-            // TODO(Phase 3): 実績チェック (Core の AchievementChecker.CheckAchievements は移植済み。
-            //                解除状態の永続化ストアと通知 UI を実装したら勝利時にここで呼ぶ)。
+            // 5) 実績チェック（勝利時のみ）。Swift: GameViewModel.swift:954-964 (AchievementManager.checkAchievements)。
+            //    ポップアップ UI / 効果音は Phase 2.5 で実装予定のため、ここでは解除の記録 (PlayerPrefs) のみ行う。
+            if (won)
+            {
+                bool skillUsed = Session.SkillUsageCount > 0;
+                double currentBPM = Floor.CalculateBPM(Session.CurrentFloor);
+                var unlocked = AchievementChecker.CheckAchievements(Session.CurrentFloor, skillUsed, currentBPM, gameWon: true);
+                PersistUnlockedAchievements(unlocked);
+            }
 
-            // 5) 通知 — 勝利時は OnGameOver を発火しない (Swift 同様、UI は Status == Win を見て
+            // 6) 通知 — 勝利時は OnGameOver を発火しない (Swift 同様、UI は Status == Win を見て
             //    リザルトへ遷移する)。敗北時の OnGameOver は HandleDefeat で発火済み。
             OnStateChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// 実績解除の記録のみを PlayerPrefs へ永続化する (Swift: AchievementManager.unlock/saveAchievements の
+        /// 最小結線)。解除済み実績との和集合をとって保存するため、二度目以降の呼び出しでも既存の解除は失われない。
+        /// ポップアップ通知・効果音は Phase 2.5 で実装予定のため未実装。
+        /// </summary>
+        private void PersistUnlockedAchievements(HashSet<Achievement> achievements)
+        {
+            string existingRaw = PlayerPrefs.GetString(UnlockedAchievementsKey, "");
+            var merged = new HashSet<string>(existingRaw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
+            foreach (var a in achievements) merged.Add(a.ToString());
+
+            PlayerPrefs.SetString(UnlockedAchievementsKey, string.Join(",", merged));
+            PlayerPrefs.Save();
         }
     }
 }
