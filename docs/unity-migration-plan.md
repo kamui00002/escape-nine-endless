@@ -193,9 +193,15 @@ Phase 0: ビート同期プロトタイプ (1-2週)  ←★最重要
 ```
 Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 → Phase 4 juice (Tier 2) → Phase 6a Steam体験版 (Tier 1-2) ★前倒し
+→ Phase 4.5 ビジュアル大型アップグレード (Tier 2) ★2026-07-04 追加
 → Phase 5 ローグライク (Tier 2) → Phase 3 収益化 (Tier 1) ★後ろへ
 → Phase 6b Android → Phase 7 リリース
 ```
+
+> **Phase 4.5（2026-07-04 追加）**: オーナー評価「Swift 版の方が見た目が良い」への回答。
+> URP + TextMeshPro + 盤面のワールド空間化（HD-2D）+ ビート同期ポストプロセス + ゾーン別テーマ。
+> 設計文書: `docs/unity-phase4-5-visual-upgrade-design.md`（オーナーレビュー待ち）。
+> Phase 5 より先に実施推奨（宣伝素材が先に育つ + Phase 5 の新 UI を新描画基盤で作れる）。
 
 **順序変更の理由**:
 - **Phase 3（収益化再統合）を後ろへ**: 実プレイヤー約2名の現状で IAP/広告の結線は価値が低い。人が入ってから結線しても遅くない。
