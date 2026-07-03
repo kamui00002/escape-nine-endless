@@ -78,6 +78,10 @@ namespace EscapeNine.Runtime.UI
             Button btn = rt.gameObject.AddComponent<Button>();
             btn.targetGraphic = img;
             btn.transition = Selectable.Transition.ColorTint; // 押下で標準の暗転フィードバック
+            // キーボードナビ/Submit を無効化: クリックで選択状態になったボタンが Enter の
+            // uGUI Submit を受けると、KeyboardInput の Enter 処理と同一フレームで二重発火する
+            // (レビュー C2)。キーボード操作は KeyboardInput が一元的に担うため Navigation は不要。
+            btn.navigation = new Navigation { mode = Navigation.Mode.None };
             if (onClick != null)
             {
                 btn.onClick.AddListener(() => onClick());

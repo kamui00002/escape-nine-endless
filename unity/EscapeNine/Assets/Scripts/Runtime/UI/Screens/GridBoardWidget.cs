@@ -266,6 +266,23 @@ namespace EscapeNine.Runtime.UI
             FxKit.ShakeRect(this, (RectTransform)transform, amplitude, duration);
         }
 
+        /// <summary>
+        /// FxKit 演出 (PunchScale/Flash/ShakeRect) の中断残留を基準値へ戻す (レビュー G2)。
+        /// 画面の SetActive(false) でコルーチンが後始末前に打ち切られると scale/色/位置が
+        /// 中間値のまま残るため、GameScreen.ResetTransientUI から再表示のたびに呼ばれる。
+        /// </summary>
+        public void ResetFxState()
+        {
+            // Shake 中断の位置残留。UIFactory.Place 直後の基準 anchoredPosition は (0,0)
+            ((RectTransform)transform).anchoredPosition = Vector2.zero;
+            // 移動ホップ (PunchScale) 中断の scale 残留
+            if (_playerRt != null) _playerRt.localScale = Vector3.one;
+            if (_enemyRt != null) _enemyRt.localScale = Vector3.one;
+            // FlashPlayer 中断の色残留。SpriteImage の基準色は white
+            if (_playerImage != null) _playerImage.color = Color.white;
+            if (_enemyImage != null) _enemyImage.color = Color.white;
+        }
+
         private static void Apply(RectTransform rt, Vector2 center)
         {
             UIFactory.Place(rt, center.x, center.y, SpriteSize, SpriteSize);

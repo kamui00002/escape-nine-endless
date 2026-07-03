@@ -153,7 +153,7 @@ namespace EscapeNine.Runtime
             TurnCountdown = _turnBeats;
             _resultPersisted = false; // 新しいランのスコア送信/自己ベスト更新をまた許可する
 
-            // TODO(Phase 3): DailyChallengeService.pendingChallenge の適用 (Swift: startGame 内)。
+            // TODO(Phase 2.5): DailyChallengeService.pendingChallenge の適用 (Swift: startGame 内)。
             //                GameSession.DailyChallengeMode / ApplyDailyChallengeConditions は Core に移植済み。
 
             // --- 音 → 状態 → 通知 の順 (Swift: startGame と同順) ---
@@ -558,7 +558,7 @@ namespace EscapeNine.Runtime
                 _audio.PlayResultBgm(won: false);
             }
 
-            // TODO(Phase 3): デイリーチャレンジ完了記録 (Swift: DailyChallengeService.markCompleted)。
+            // TODO(Phase 2.5): デイリーチャレンジ完了記録 (Swift: DailyChallengeService.markCompleted)。
 
             // 4) スコア送信 + 自己ベスト更新 (敗北は HandleDefeat で即時実行済み。
             //    PersistRunResult 内の _resultPersisted ガードにより二重送信はしない)

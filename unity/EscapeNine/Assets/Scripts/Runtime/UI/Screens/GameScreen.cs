@@ -32,7 +32,7 @@ namespace EscapeNine.Runtime.UI
         // ---- 表示タイマー定数 (Swift: DispatchQueue.asyncAfter の秒数) ----
         private const float GoDisplaySeconds = 0.5f;    // GO! 表示 (GameController コメント指定)
         private const float BossWarningSeconds = 2.0f;  // ボス出現警告
-        private const float SkillResetSeconds = 2.0f;   // スキル回復通知
+        private const float SkillResetSeconds = 3.0f;   // スキル回復通知 (Swift: GameViewModel.swift:747-749 の Task.sleep(3秒) と一致)
         private const float GradeDisplaySeconds = 0.8f; // タイミング判定 (JUST/GOOD/MISS)
 
         // ---- 担当A juice (Phase 4): 衝突演出の色 ----
@@ -93,6 +93,7 @@ namespace EscapeNine.Runtime.UI
 
         private GameObject _countdownOverlay;
         private Image _countdownBg;
+        private Color _countdownBgBaseColor; // Flash 中断残留の復帰用基準色 (レビュー G2)
         private Text _countdownLabel;
 
         private GameObject _gameOverOverlay;
@@ -149,7 +150,7 @@ namespace EscapeNine.Runtime.UI
 
         public override void BuildUI()
         {
-            if (_built) return; // App.Awake + Router.Register の二重呼び出し対策
+            if (_built) return; // Router.Register が 1 回だけ呼ぶ (再入防御。呼び出し元は ScreenRouter.Register のみ)
             _built = true;
 
             // 画面ルートを親いっぱいに固定 (シーン側の配置ミスに影響されない防御。HomeScreen と同じ)
@@ -417,6 +418,7 @@ namespace EscapeNine.Runtime.UI
             var overlay = UIFactory.Panel(transform, "CountdownOverlay", new Color(0f, 0f, 0f, 0.7f));
             _countdownOverlay = overlay.gameObject;
             _countdownBg = overlay.GetComponent<Image>();
+            _countdownBgBaseColor = _countdownBg.color;
 
             _countdownLabel = UIFactory.Label(overlay, "CountLabel", "3", 280, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -963,6 +965,16 @@ namespace EscapeNine.Runtime.UI
             if (_gameOverOverlay != null) _gameOverOverlay.SetActive(false);
             if (_bossOverlay != null) _bossOverlay.SetActive(false);
             if (_comboRow != null) _comboRow.SetActive(false);
+
+            // 担当A juice の中断残留対策 (レビュー G2): SetActive(false) で FxKit コルーチンが
+            // 後始末前に打ち切られると scale/色/位置が中間値のまま残留し、PunchScale/Flash は
+            // 「開始時の現在値」を基準に取るため自己修復しない。floorClearOverlay と同様に
+            // 全ての演出対象を基準値へ強制復帰する。
+            if (_board != null) _board.ResetFxState();
+            if (_countdownLabel != null) _countdownLabel.transform.localScale = Vector3.one;
+            if (_countdownBg != null) _countdownBg.color = _countdownBgBaseColor;
+            if (_comboLabel != null) _comboLabel.transform.localScale = Vector3.one;
+            if (_floorClearNextLabel != null) _floorClearNextLabel.transform.localScale = Vector3.one;
         }
 
         // MARK: - 再描画

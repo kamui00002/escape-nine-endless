@@ -75,7 +75,7 @@ namespace EscapeNine.Runtime.UI
 
         public override void BuildUI()
         {
-            if (_built) return; // App.Awake + Router.Register の二重呼び出し対策
+            if (_built) return; // Router.Register が 1 回だけ呼ぶ (再入防御。呼び出し元は ScreenRouter.Register のみ)
             _built = true;
 
             // 画面ルートを親いっぱいに固定 (シーン側の配置ミスに影響されないための防御)

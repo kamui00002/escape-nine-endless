@@ -239,6 +239,14 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - 残タスク（人間ゲート/環境）: Steamworks 連携（Steam アカウント/AppID 必要）/ Windows ビルド（Unity Hub で Windows Build Support モジュール追加が必要、現状 mac/iOS/Android のみ）/ Steam ストアページ・体験版設定
 - 既知の軽微課題: キーボード移動時に JUST/GOOD 表示バナーが出ない（内部状態は正常）/ デスクトップでチュートリアル説明文がカード枠を僅かにはみ出す
 
+### ✅ /review-full 実施（2026-07-03） — 4段並列レビュー + 妥当性フィルタ
+
+- 対象: main..HEAD（Phase 2/4/6a、67ファイル +12,342行）。4レビュアー計 13 件 → validity-judge で **keep 7 / reject 6**
+- **修正済み (fix-now 5件)**: SkillResetSeconds 2.0→3.0 秒（Swift 一致）/ FxKit 演出中断の状態残留対策（GridBoardWidget.ResetFxState + ResetTransientUI 横展開）/ uGUI Submit と KeyboardInput の Enter 二重発火防止（Button navigation=None）/ TODO ラベル Phase 3→2.5 統一 / BuildUI ガードの誤コメント修正（5画面）。修正後 EditMode **80/80 green**
+- **defer（クリーンアップパス）**: トースト実装の4画面複製→ToastWidget 化 / BuildUI ガード+ルートストレッチの ScreenBase 集約
+- **defer（製品判断・要オーナー確認）**: ⚠️ **階層到達実績 (Floor10/25/50/75) が敗北時にチェックされず実質解除不能** — Swift 正本由来の潜在バグで、**配信中の iOS 版でも発生している**。修正は Swift/Unity 両側同時 + FirstWin 実績への gameWon ゲート追加が必要（単純に「常に呼ぶ」と敗北で「初勝利」が解除される新バグになる）。Phase 2.5 実績 UI 作業と併せて判断
+- 検証済みのシロ: UITheme 15色・バランス定数・Product ID・Swift 行番号引用コメントは全数照合で正本一致
+
 ### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
 
 - **Core コンパイル + 全 60 テスト green**（`unity/verify/Core.Tests`, C# 9 固定）→ ゲート①のリスクは大幅低減
