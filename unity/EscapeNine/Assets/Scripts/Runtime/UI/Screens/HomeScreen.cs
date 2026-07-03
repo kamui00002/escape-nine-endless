@@ -278,6 +278,15 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildHighestFloorSection(RectTransform parent)
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // DEBUG ビルドでは下部の DangerZone (高さ 0.20) が Swift 準拠位置の数字を覆う
+            // (2026-07-04 レイアウト監査で 51px の重なり)。設定ボタンとの隙間には
+            // 見出し40px+数字96px の2行が入らないため、DEBUG では1行表示に畳む。
+            _floorNumberLabel = UIFactory.Label(parent, "FloorNumberLabel", "最高到達階層: 0", 44,
+                UITheme.Available, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)_floorNumberLabel.transform, 0.5f, 0.235f, 0.8f, 0.04f);
+#else
+            // リリース: Swift 準拠の2行表示 (見出し + 大きな数字)
             var caption = UIFactory.Label(parent, "FloorCaptionLabel", "最高到達階層", 40,
                 UITheme.WithAlpha(UITheme.TextColor, 0.7f));
             UIFactory.Place((RectTransform)caption.transform, 0.5f, 0.238f, 0.6f, 0.025f);
@@ -286,6 +295,7 @@ namespace EscapeNine.Runtime.UI
             _floorNumberLabel = UIFactory.Label(parent, "FloorNumberLabel", "0", 96, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)_floorNumberLabel.transform, 0.5f, 0.19f, 0.6f, 0.05f);
+#endif
         }
 
         // MARK: - Toast (デイリーチャレンジ等、未実装遷移のタップへの簡易応答。ShopScreen と同じ方式)
@@ -332,7 +342,11 @@ namespace EscapeNine.Runtime.UI
 
             if (_floorNumberLabel != null)
             {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                _floorNumberLabel.text = "最高到達階層: " + player.HighestFloor; // DEBUG は1行表示 (BuildHighestFloorSection 参照)
+#else
                 _floorNumberLabel.text = player.HighestFloor.ToString();
+#endif
             }
 
             // 選択キャラ (スプライト名 = CharacterType.RawValue() = Resources/Sprites のファイル名)

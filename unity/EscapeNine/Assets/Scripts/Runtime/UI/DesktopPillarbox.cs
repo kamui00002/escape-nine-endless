@@ -21,8 +21,9 @@ namespace EscapeNine.Runtime.UI
     [RequireComponent(typeof(RectTransform))]
     public sealed class DesktopPillarbox : MonoBehaviour
     {
-        /// <summary>参照解像度と同じ縦長アスペクト (MainSceneBuilder.ReferenceResolution 1170x2532 と対)。</summary>
-        private const float TargetAspect = 1170f / 2532f; // width / height
+        /// <summary>参照解像度 (MainSceneBuilder.ReferenceResolution 1170x2532 と対)。</summary>
+        private const float ReferenceWidth = 1170f;
+        private const float ReferenceHeight = 2532f;
 
         /// <summary>UITheme.Background を一段暗くする乗算係数 (色相/彩度は保持、明度のみ落とす)。</summary>
         private const float BackdropDarkenFactor = 0.55f;
@@ -103,25 +104,27 @@ namespace EscapeNine.Runtime.UI
 
         private void Apply()
         {
-            float screenAspect = (float)Screen.width / Screen.height;
+            // --- 均一スケール方式 (v2) ---
+            // 旧実装はアンカー拘束のみで、①設計比率より細い窓を素通し ②CanvasScaler の
+            // スケール係数が「窓全体」基準のためカラム幅と食い違う、の 2 点により
+            // 細長い窓で文字が余計に折り返して重なる崩れが起きた (2026-07-04 オーナー実機報告)。
+            // v2 では contentRoot を常に参照解像度 1170x2532 の固定サイズで組み、
+            // 窓に収まる等倍率 (min) で localScale 縮放する。これによりどんな窓サイズ/比率でも
+            // レイアウトは Editor 検証済みの iPhone 比率と完全相似形になる (文字折り返し不変)。
+            Canvas canvas = GetComponentInParent<Canvas>();
+            float scaleFactor = (canvas != null && canvas.scaleFactor > 0f) ? canvas.scaleFactor : 1f;
 
-            if (screenAspect <= TargetAspect)
-            {
-                // 縦長 (またはターゲットと同等): 画面自体が既に縦長カラム相当なのでフル表示。
-                _contentRoot.anchorMin = Vector2.zero;
-                _contentRoot.anchorMax = Vector2.one;
-            }
-            else
-            {
-                // 横長: 高さ100%・幅 = 高さ×(1170/2532) の中央カラムへ拘束。
-                float widthRatio = TargetAspect / screenAspect; // < 1
-                float halfWidth = widthRatio * 0.5f;
-                _contentRoot.anchorMin = new Vector2(0.5f - halfWidth, 0f);
-                _contentRoot.anchorMax = new Vector2(0.5f + halfWidth, 1f);
-            }
+            // 窓の実ピクセルを Canvas 単位系へ変換してから、参照解像度に対する収まり倍率を取る
+            float availW = Screen.width / scaleFactor;
+            float availH = Screen.height / scaleFactor;
+            float fit = Mathf.Min(availW / ReferenceWidth, availH / ReferenceHeight);
 
-            _contentRoot.offsetMin = Vector2.zero;
-            _contentRoot.offsetMax = Vector2.zero;
+            _contentRoot.anchorMin = new Vector2(0.5f, 0.5f);
+            _contentRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            _contentRoot.pivot = new Vector2(0.5f, 0.5f);
+            _contentRoot.sizeDelta = new Vector2(ReferenceWidth, ReferenceHeight);
+            _contentRoot.anchoredPosition = Vector2.zero;
+            _contentRoot.localScale = new Vector3(fit, fit, 1f);
         }
     }
 }

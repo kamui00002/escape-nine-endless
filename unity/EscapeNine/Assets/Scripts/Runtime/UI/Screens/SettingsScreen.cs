@@ -32,7 +32,7 @@ namespace EscapeNine.Runtime.UI
 
         // スクロールコンテンツの総高さ = ビューポートの何倍か。
         // カード合計 1.63 (FxCard 0.14 追加後) + 間隔 0.175 = 1.805 を収める (全カード比率の合計と連動して調整すること)。
-        private const float ContentHeightRatio = 1.87f;
+        private const float ContentHeightRatio = 1.91f; // FxCard 0.14→0.18 拡大に連動 (+0.04)
 
         /// <summary>カード間の縦間隔 (ビューポート高さ比)。Swift: VStack(spacing: 24) 相当。</summary>
         private const float SectionGap = 0.025f;
@@ -219,12 +219,14 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildFxCard()
         {
-            var card = AddCard("FxCard", "演出設定", 0.14f);
+            // 高さ 0.14 だとタイトルと説明の実文字高が 10px 重なる (2026-07-04 レイアウト監査で検出)
+            // → 0.18 へ拡大 (ContentHeightRatio も連動 +0.04)。行位置も中央寄りに調整。
+            var card = AddCard("FxCard", "演出設定", 0.18f);
 
             BuildToggleRow(card, "ReduceMotion",
                 "視覚効果を減らす",
                 "パンチ・シェイク・破片・ビート脈動などの演出を抑えます",
-                0.40f, ToggleReduceMotion, out _reduceMotionBg, out _reduceMotionLabel);
+                0.46f, ToggleReduceMotion, out _reduceMotionBg, out _reduceMotionLabel);
         }
 
         // MARK: - Card 3: サウンド設定 (Swift: soundSection)
@@ -267,13 +269,14 @@ namespace EscapeNine.Runtime.UI
 
             var appName = UIFactory.Label(card, "AppName", "Escape Nine: Endless", 38,
                 UITheme.GoldText, TextAnchor.MiddleLeft);
-            UIFactory.Place((RectTransform)appName.transform, 0.5f, 0.80f, 0.88f, 0.10f);
+            // 0.80 だと CardTitle と 9px 重なる (2026-07-04 レイアウト監査で検出) → 0.76 へ
+            UIFactory.Place((RectTransform)appName.transform, 0.5f, 0.76f, 0.88f, 0.10f);
 
             // Swift は "バージョン 1.0.0" 固定文字列だった。Unity では Application.version
             // (PlayerSettings の bundleVersion) を表示して二重管理をなくす。
             var version = UIFactory.Label(card, "VersionLabel", "バージョン " + Application.version, 30,
                 UITheme.WithAlpha(UITheme.TextColor, 0.7f), TextAnchor.MiddleLeft);
-            UIFactory.Place((RectTransform)version.transform, 0.5f, 0.71f, 0.88f, 0.08f);
+            UIFactory.Place((RectTransform)version.transform, 0.5f, 0.675f, 0.88f, 0.08f); // AppName 0.76 化に連動
 
             var desc = UIFactory.Label(card, "DescLabel",
                 "リズムに合わせてダンジョンを攻略する\nエンドレスチャレンジゲーム", 30,
