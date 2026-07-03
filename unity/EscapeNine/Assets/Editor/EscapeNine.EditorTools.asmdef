@@ -3,7 +3,8 @@
     "rootNamespace": "EscapeNine.EditorTools",
     "references": [
         "EscapeNine.Core",
-        "EscapeNine.Runtime"
+        "EscapeNine.Runtime",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"

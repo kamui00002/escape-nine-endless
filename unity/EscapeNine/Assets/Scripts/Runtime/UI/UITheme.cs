@@ -1,0 +1,142 @@
+// UITheme.cs
+// Swift 正本: Utilities/Constants.swift の `enum GameColors`(全15色) と Utilities/Fonts.swift。
+// 「明るい冒険ファンタジー系カラーパレット」を Unity 側の唯一のテーマ定義として移植する。
+// 色値の複製を防ぐため、UI コードは必ず本クラス経由で色・フォントを取得すること。
+
+using UnityEngine;
+
+namespace EscapeNine.Runtime.UI
+{
+    /// <summary>
+    /// アプリ全体のカラーパレットとフォントの供給元。
+    /// Swift 版 GameColors の hex 文字列をそのまま保持し、ColorUtility でパースする
+    /// (RGB 値をハードコードすると Swift 正本との突き合わせが困難になるため)。
+    /// </summary>
+    public static class UITheme
+    {
+        // ---- GameColors 移植 (Constants.swift 148-165行) ----
+
+        /// <summary>main #f4a460 サンディブラウン (明るい冒険の色)</summary>
+        public static readonly Color Main = Hex("#f4a460");
+
+        /// <summary>accent #daa520 ゴールデンロッド (明るいゴールド)</summary>
+        public static readonly Color Accent = Hex("#daa520");
+
+        /// <summary>background #2c1810 明るい茶色のダンジョン</summary>
+        public static readonly Color Background = Hex("#2c1810");
+
+        /// <summary>backgroundSecondary #3d2817 少し明るい茶色</summary>
+        public static readonly Color BackgroundSecondary = Hex("#3d2817");
+
+        /// <summary>text #f5deb3 ベージュ (羊皮紙の色)</summary>
+        public static readonly Color TextColor = Hex("#f5deb3");
+
+        /// <summary>textSecondary #ffd700 明るいゴールドテキスト。Swift の textSecondary に対応。</summary>
+        public static readonly Color GoldText = Hex("#ffd700");
+
+        /// <summary>warning #ff6347 トマトレッド (危険)</summary>
+        public static readonly Color Warning = Hex("#ff6347");
+
+        /// <summary>success #90ee90 ライトグリーン (成功)</summary>
+        public static readonly Color Success = Hex("#90ee90");
+
+        /// <summary>player #98fb98 ペールグリーン (勇者マスのハイライト)</summary>
+        public static readonly Color Player = Hex("#98fb98");
+
+        /// <summary>enemy #ff6347 トマトレッド (敵マスのハイライト)</summary>
+        public static readonly Color Enemy = Hex("#ff6347");
+
+        /// <summary>grid #4a3728 明るいグリッドの色</summary>
+        public static readonly Color Grid = Hex("#4a3728");
+
+        /// <summary>gridBorder #daa520 ゴールドの枠</summary>
+        public static readonly Color GridBorder = Hex("#daa520");
+
+        /// <summary>available #ffd700 ゴールド (移動可能マス)</summary>
+        public static readonly Color Available = Hex("#ffd700");
+
+        /// <summary>fog #3d2817 霧マスの色 (特殊ルール: 霧)</summary>
+        public static readonly Color Fog = Hex("#3d2817");
+
+        /// <summary>disappeared #1a1a1a 消失マスの色 (特殊ルール: マス消失)</summary>
+        public static readonly Color Disappeared = Hex("#1a1a1a");
+
+        // ---- フォント ----
+
+        private static Font _font;
+
+        /// <summary>
+        /// 日本語表示可能な動的フォント。
+        /// TMP Essentials 未導入のため legacy Text 用の OS フォントを使う。
+        /// iOS 実機では Hiragino 系、Android では Noto/Roboto 系が拾える想定。
+        /// 全滅時は Unity 内蔵 LegacyRuntime.ttf (Liberation Sans = 日本語グリフ無し) に
+        /// フォールバックするが、その場合は日本語が豆腐になるため警告を出す。
+        /// </summary>
+        public static Font Font
+        {
+            get
+            {
+                if (_font == null) _font = ResolveFont();
+                return _font;
+            }
+        }
+
+        /// <summary>色のアルファだけ差し替えるユーティリティ。Swift の .opacity(a) 相当。</summary>
+        public static Color WithAlpha(Color c, float a)
+        {
+            return new Color(c.r, c.g, c.b, a);
+        }
+
+        // ---- 内部実装 ----
+
+        /// <summary>
+        /// OS フォントを優先順で解決する。
+        /// インストール済み一覧が取得できる環境では一覧照合してから生成する
+        /// (CreateDynamicFontFromOSFont は存在しないフォント名でも非 null を返す
+        /// プラットフォームがあり、その場合グリフが描画されないため)。
+        /// </summary>
+        private static Font ResolveFont()
+        {
+            // 日本語グリフを持つフォントを優先。Roboto は最終手段 (英数のみ)。
+            string[] candidates =
+            {
+                "Hiragino Sans",
+                "Hiragino Kaku Gothic ProN",
+                "Noto Sans CJK JP",
+                "Roboto",
+            };
+
+            string[] installed = Font.GetOSInstalledFontNames();
+            bool hasList = installed != null && installed.Length > 0;
+
+            foreach (string name in candidates)
+            {
+                if (hasList && !Contains(installed, name)) continue;
+
+                // サイズは動的フォントなので任意 (Text 側の fontSize が優先される)。
+                Font created = Font.CreateDynamicFontFromOSFont(name, 32);
+                if (created != null) return created;
+            }
+
+            Debug.LogWarning("[UITheme] OS フォントが見つからないため LegacyRuntime.ttf にフォールバック (日本語が表示できない可能性)");
+            return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+
+        private static bool Contains(string[] list, string name)
+        {
+            for (int i = 0; i < list.Length; i++)
+            {
+                if (list[i] == name) return true;
+            }
+            return false;
+        }
+
+        /// <summary>hex 文字列 → Color。パース失敗はマゼンタで即座に視認できるようにする。</summary>
+        private static Color Hex(string hex)
+        {
+            if (ColorUtility.TryParseHtmlString(hex, out Color c)) return c;
+            Debug.LogError($"[UITheme] 不正な hex 色: {hex}");
+            return Color.magenta;
+        }
+    }
+}

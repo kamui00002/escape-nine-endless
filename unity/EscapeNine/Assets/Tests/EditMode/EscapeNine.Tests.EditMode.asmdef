@@ -3,6 +3,7 @@
     "rootNamespace": "EscapeNine.Tests.EditMode",
     "references": [
         "EscapeNine.Core",
+        "EscapeNine.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

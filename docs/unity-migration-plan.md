@@ -208,6 +208,15 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - Phase 0 シーン（Conductor + Phase0Harness + bgm_early）が Editor・**iOS 実機**で動作
 - **リズム精度: オーナー実機判定で GO** → 本移行を正式に続行。次は MCP 設定 → Phase 2 (UI) へ
 
+### ✅ Phase 2 完了（2026-07-03） — UI/UX 再構築
+
+- **uGUI + 単一シーン画面切替**で 8 画面を実装（Home/Game/Result/Ranking/Shop/CharacterSelect/Settings/Tutorial）。UI は全てコードで自己構築（`.unity` に UI を焼かない Phase0SceneBuilder 流儀）
+- 新規 C#: UI 基盤（UITheme/UIFactory/ScreenRouter/SafeAreaFitter）+ 結線層（App/GameController=GameViewModel移植/PlayerState=PlayerViewModel移植/AudioDirector=AudioManager移植/RankingStore）+ 画面13ファイル + MainSceneBuilder/PixelArtImportSettings
+- アセット移送: スプライト9・SFX9・BGM6 を `Assets/Resources/` へ（Point filter/PPU64/SFX=DecompressOnLoad 自動適用）
+- **検証済み**: コンパイル green / EditMode テスト **80/80 green**（既存60+新規20）/ PlayMode スモーク＝起動→チュートリアル自動表示→Home→開始カウントダウン→floor1 を5ターン逃げ切りクリア→階層クリア演出→floor2→敗北（敵に捕まった）→Result（NEW RECORD・敗因表示・ニアミス表示）→リトライ、を Editor 上でオートパイロット実証。時間切れ敗北も別ランで実証
+- 環境注意: `~/EscapeNineUnity/Packages/manifest.json` に `com.unity.ugui: 2.0.0` が必要（bootstrap 素マニフェストに無い。PackageBootstrap の自動追記スクリプトも同梱）
+- 意図的な先送り: IAP/広告/Firebase/GameCenter/ネイティブ共有＝Phase 3、アニメ・パーティクル・scale演出・カスタムフォント＝Phase 4、デイリーチャレンジ画面＝Phase 2.5、**iOS 実機での見た目・SafeArea 確認は未実施**（次の実機ビルド時に確認）
+
 ### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
 
 - **Core コンパイル + 全 60 テスト green**（`unity/verify/Core.Tests`, C# 9 固定）→ ゲート①のリスクは大幅低減

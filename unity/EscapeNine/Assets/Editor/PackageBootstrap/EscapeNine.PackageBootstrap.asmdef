@@ -1,0 +1,16 @@
+{
+    "name": "EscapeNine.PackageBootstrap",
+    "rootNamespace": "EscapeNine.PackageBootstrap",
+    "references": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

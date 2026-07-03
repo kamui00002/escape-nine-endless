@@ -2,7 +2,8 @@
     "name": "EscapeNine.Runtime",
     "rootNamespace": "EscapeNine.Runtime",
     "references": [
-        "EscapeNine.Core"
+        "EscapeNine.Core",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
