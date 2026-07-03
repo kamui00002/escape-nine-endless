@@ -9,7 +9,10 @@
 //   Unity -batchmode -quit -projectPath <PROJECT> \
 //         -executeMethod EscapeNine.EditorTools.BuildScripts.BuildMac -logFile -
 //
-// PlayerSettings は本スクリプトからは一切変更しない (現行設定のままビルドする)。
+// デスクトップ用 PlayerSettings (ウィンドウモード等) はビルド前に本スクリプトが毎回適用する。
+// ProjectSettings.asset は repo 管理外 (bootstrap で再生成され得る) のため、
+// リポジトリ内のここを設定の正本にする — Unity 新規プロジェクトの既定は
+// FullScreenWindow 起動で閉じるボタンが無く、アプリを終了できない (2026-07-04 オーナー報告)。
 
 #if UNITY_EDITOR
 using System;
@@ -25,9 +28,27 @@ namespace EscapeNine.EditorTools
         private const string ScenePath = "Assets/Scenes/Main.unity";
         private const string ResultMarkerFileName = "build-mac-result.txt";
 
+        /// <summary>
+        /// デスクトップ(スタンドアロン)専用の PlayerSettings。iOS/Android には影響しない。
+        /// ウィンドウ表示 + リサイズ可 (閉じる/最小化ボタンが付く)。初期窓は参照解像度
+        /// 1170x2532 の 1/2.5 縮小 (縦長 468x1013) — DesktopPillarbox v2 が任意サイズへ
+        /// 相似形で追従するため、画面に収まらない環境では macOS のクランプに任せてよい。
+        /// </summary>
+        private static void ApplyDesktopPlayerSettings()
+        {
+            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            PlayerSettings.defaultIsNativeResolution = false;
+            PlayerSettings.defaultScreenWidth = 468;
+            PlayerSettings.defaultScreenHeight = 1013;
+            PlayerSettings.resizableWindow = true;
+            PlayerSettings.allowFullscreenSwitch = true;
+        }
+
         [MenuItem("EscapeNine/Build macOS")]
         public static void BuildMac()
         {
+            ApplyDesktopPlayerSettings();
+
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string resultMarkerPath = Path.Combine(projectRoot, ResultMarkerFileName);
 
