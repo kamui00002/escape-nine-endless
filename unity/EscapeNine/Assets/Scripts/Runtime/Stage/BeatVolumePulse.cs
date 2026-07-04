@@ -41,7 +41,12 @@ namespace EscapeNine.Runtime.Stage
         {
             if (_postFx == null || _postFx.Bloom == null || _postFx.Vignette == null) return;
 
-            float targetBloom = StagePostFx.BloomIntensityBase;
+            // Wave 5: 品質ティアの Bloom 強度倍率 (StagePostFx.ApplyQuality が設定)。本メソッドが
+            // 毎フレーム BloomIntensityBase から書き直すため、倍率は基準値の方へ掛けて反映する
+            // (ApplyQuality が intensity へ直接書き込んでも本メソッドに上書きされてしまうため)。
+            float bloomBase = StagePostFx.BloomIntensityBase * _postFx.BloomIntensityScale;
+
+            float targetBloom = bloomBase;
             float targetVignette = StagePostFx.VignetteIntensityBase;
 
             // BeatPulse.cs と同じ代用ガード (Conductor に IsPlaying 相当が無いため)。
@@ -54,7 +59,7 @@ namespace EscapeNine.Runtime.Stage
                 float pulse = (float)(1.0 - frac);
                 pulse *= pulse; // BeatPulse.cs と同一の減衰カーブ (拍の頭で最大→急減衰)
 
-                targetBloom = StagePostFx.BloomIntensityBase * (1f + bloomPulseFactor * pulse);
+                targetBloom = bloomBase * (1f + bloomPulseFactor * pulse);
                 targetVignette = StagePostFx.VignetteIntensityBase * (1f + vignettePulseFactor * pulse);
 
                 _bloomCurrent = targetBloom;

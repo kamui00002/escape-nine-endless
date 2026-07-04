@@ -1,8 +1,8 @@
 // StageInput.cs
-// Wave 2: BoardStage (3D 盤面) のタップ入力。GridBoardWidget.cs の Button ベースの
-// タップ受けをワールド空間向けに置き換える — Camera.ScreenPointToRay +
-// Physics.Raycast でタイルの BoxCollider (TileHitTarget) を拾い、
-// BoardStage.HandleCellTap(position) を呼ぶ (GridBoardWidget.HandleCellTap と
+// Wave 2: BoardStage (3D 盤面) のタップ入力。旧 uGUI 盤面 GridBoardWidget.cs
+// (W5 で削除済み) の Button ベースのタップ受けをワールド空間向けに置き換える —
+// Camera.ScreenPointToRay + Physics.Raycast でタイルの BoxCollider (TileHitTarget) を拾い、
+// BoardStage.HandleCellTap(position) を呼ぶ (旧 GridBoardWidget.HandleCellTap と
 // 同一の鬼マス優先判定に委譲する)。
 //
 // EventSystem.current.IsPointerOverGameObject() (タッチは fingerId 版) が true の場合は

@@ -16,6 +16,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using EscapeNine.Core;
+using EscapeNine.Runtime.Stage; // StageQualityTier (Phase 4.5 W5: 演出品質セグメント)
 
 namespace EscapeNine.Runtime.UI
 {
@@ -33,7 +34,7 @@ namespace EscapeNine.Runtime.UI
 
         // スクロールコンテンツの総高さ = ビューポートの何倍か。
         // カード合計 1.63 (FxCard 0.14 追加後) + 間隔 0.175 = 1.805 を収める (全カード比率の合計と連動して調整すること)。
-        private const float ContentHeightRatio = 1.91f; // FxCard 0.14→0.18 拡大に連動 (+0.04)
+        private const float ContentHeightRatio = 2.03f; // FxCard 0.18→0.30 拡大に連動 (+0.12。W5 演出品質セグメント追加)
 
         /// <summary>カード間の縦間隔 (ビューポート高さ比)。Swift: VStack(spacing: 24) 相当。</summary>
         private const float SectionGap = 0.025f;
@@ -73,6 +74,16 @@ namespace EscapeNine.Runtime.UI
         }
 
         private AiSegment[] _aiSegments;
+
+        /// <summary>演出品質のセグメントボタン 1 個分 (Phase 4.5 W5。AiSegment と同じ参照セット様式)。</summary>
+        private struct QualitySegment
+        {
+            public StageQualityTier Tier;
+            public Image Bg;
+            public TextMeshProUGUI Label;
+        }
+
+        private QualitySegment[] _qualitySegments;
 
         public override void BuildUI()
         {
@@ -221,13 +232,44 @@ namespace EscapeNine.Runtime.UI
         private void BuildFxCard()
         {
             // 高さ 0.14 だとタイトルと説明の実文字高が 10px 重なる (2026-07-04 レイアウト監査で検出)
-            // → 0.18 へ拡大 (ContentHeightRatio も連動 +0.04)。行位置も中央寄りに調整。
-            var card = AddCard("FxCard", "演出設定", 0.18f);
+            // → 0.18 へ拡大。さらに W5 の演出品質セグメント追加で 0.30 へ拡大
+            // (ContentHeightRatio も連動 +0.12)。行間は W1 の重なり監査ルール (両軸 8px 超で NG)
+            // を意識し、トグル行・区切り線・品質行の間に余白を確保した配分にしている。
+            var card = AddCard("FxCard", "演出設定", 0.30f);
 
             BuildToggleRow(card, "ReduceMotion",
                 "視覚効果を減らす",
                 "パンチ・シェイク・破片・ビート脈動などの演出を抑えます",
-                0.46f, ToggleReduceMotion, out _reduceMotionBg, out _reduceMotionLabel);
+                0.70f, ToggleReduceMotion, out _reduceMotionBg, out _reduceMotionLabel);
+
+            CreateDivider(card, 0.44f);
+
+            // 演出品質 (Phase 4.5 W5)。AI 難易度セグメントと同じ UI 様式 (BuildAiSegment 参照)。
+            // 高=Bloomフル+パーティクル40 / 中=Bloom0.6倍+24 / 低=Bloomオフ+0 (適用表は StageQuality.cs)。
+            // 反映は次のゲーム画面表示から (GameScreen.OnShow が StageQuality.Apply を呼ぶ)。
+            var caption = UIFactory.Label(card, "QualityCaption", "演出品質", 36,
+                UITheme.GoldText, TextAnchor.MiddleLeft);
+            UIFactory.Place((RectTransform)caption.transform, 0.30f, 0.31f, 0.52f, 0.10f);
+
+            _qualitySegments = new QualitySegment[3];
+            _qualitySegments[0] = BuildQualitySegment(card, "QualityHigh", "高", StageQualityTier.High, 0.21f);
+            _qualitySegments[1] = BuildQualitySegment(card, "QualityMedium", "中", StageQualityTier.Medium, 0.50f);
+            _qualitySegments[2] = BuildQualitySegment(card, "QualityLow", "低", StageQualityTier.Low, 0.79f);
+        }
+
+        /// <summary>演出品質のセグメントボタン (BuildAiSegment と同一の見た目・配置様式)。</summary>
+        private QualitySegment BuildQualitySegment(RectTransform card, string name, string label,
+            StageQualityTier tier, float cx)
+        {
+            var btn = UIFactory.TextButton(card, name, label, 34,
+                UITheme.Background, UITheme.TextColor, () => SelectQualityTier(tier));
+            UIFactory.Place((RectTransform)btn.transform, cx, 0.12f, 0.26f, 0.14f);
+            return new QualitySegment
+            {
+                Tier = tier,
+                Bg = btn.GetComponent<Image>(),
+                Label = btn.GetComponentInChildren<TextMeshProUGUI>()
+            };
         }
 
         // MARK: - Card 3: サウンド設定 (Swift: soundSection)
@@ -400,6 +442,16 @@ namespace EscapeNine.Runtime.UI
             RefreshDynamic();
         }
 
+        /// <summary>演出品質の選択 (Phase 4.5 W5)。舞台への適用は次の GameScreen.OnShow で行われる。</summary>
+        private void SelectQualityTier(StageQualityTier tier)
+        {
+            App.I.Audio.PlaySfx("button_tap");
+            var player = App.I.Player;
+            player.StageQualityTier = tier;
+            player.Save();
+            RefreshDynamic();
+        }
+
         /// <summary>
         /// BGM スライダー変更。AudioDirector のプロパティ経由で「再生音量への即時反映 + 永続化」
         /// が一括で行われる (契約: get/set → PlayerState 永続化)。
@@ -439,6 +491,22 @@ namespace EscapeNine.Runtime.UI
                 foreach (var seg in _aiSegments)
                 {
                     bool selected = seg.Level == player.SelectedAILevel;
+                    if (seg.Bg != null) seg.Bg.color = selected ? UITheme.Available : UITheme.Background;
+                    if (seg.Label != null)
+                    {
+                        seg.Label.color = selected
+                            ? UITheme.Background
+                            : UITheme.WithAlpha(UITheme.TextColor, 0.85f);
+                    }
+                }
+            }
+
+            // 演出品質セグメント (Phase 4.5 W5。AI 難易度セグメントと同じ選択色ルール)
+            if (_qualitySegments != null)
+            {
+                foreach (var seg in _qualitySegments)
+                {
+                    bool selected = seg.Tier == player.StageQualityTier;
                     if (seg.Bg != null) seg.Bg.color = selected ? UITheme.Available : UITheme.Background;
                     if (seg.Label != null)
                     {

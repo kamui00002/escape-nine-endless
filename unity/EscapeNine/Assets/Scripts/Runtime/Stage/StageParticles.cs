@@ -58,6 +58,21 @@ namespace EscapeNine.Runtime.Stage
             renderer.material = new Material(shader != null ? shader : Shader.Find("Standard"));
         }
 
+        /// <summary>
+        /// Wave 5: 品質ティアによる上限粒子数の適用 (StageQuality.Apply から呼ばれる)。
+        /// 0 を指定すると emission モジュール自体を無効化し (Low ティア: 「パーティクル 0」を
+        /// maxParticles=0 のクランプだけに頼らず確実にする)、SetZone() が後から
+        /// rateOverTime を再設定しても emission.enabled は変えないため無効のまま維持される。
+        /// </summary>
+        public void ApplyQuality(int maxParticles)
+        {
+            int clamped = Mathf.Max(0, maxParticles);
+            var main = _system.main;
+            main.maxParticles = clamped;
+            var emission = _system.emission;
+            emission.enabled = clamped > 0;
+        }
+
         /// <summary>ゾーンのパーティクル種別を切り替える (BoardStage: ゾーン変化時のみ呼ぶ)。</summary>
         public void SetZone(ZoneParticleKind kind)
         {

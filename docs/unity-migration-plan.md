@@ -200,7 +200,7 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 
 > **Phase 4.5（2026-07-04 追加）**: オーナー評価「Swift 版の方が見た目が良い」への回答。
 > URP + TextMeshPro + 盤面のワールド空間化（HD-2D）+ ビート同期ポストプロセス + ゾーン別テーマ。
-> 設計文書: `docs/unity-phase4-5-visual-upgrade-design.md`（オーナーレビュー待ち）。
+> 設計文書: `docs/unity-phase4-5-visual-upgrade-design.md`（オーナー承認済み 2026-07-04、同 §9）。
 > Phase 5 より先に実施推奨（宣伝素材が先に育つ + Phase 5 の新 UI を新描画基盤で作れる）。
 
 **順序変更の理由**:
@@ -261,6 +261,18 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - **潜在バグ防御 1 件**: デイリー→プレゲーム→「戻る」で PendingChallenge が残留し次の通常ランに誤適用される穴をガード（Swift 側にも同型の潜在動作あり、Unity は安全側）
 - **検証済み**: コンパイル green / EditMode 80/80 / Main.unity 再生成（10 画面）/ PlayMode でデイリー画面（本日条件の LCG 生成表示）・実績画面（9 種一覧）の描画確認・例外ゼロ
 - 未実装のまま: ChallengeCondition.CharacterLock は Swift/Core とも no-op（View 側ロック）を踏襲 / ネイティブ alert はトーストで代替
+
+### ✅ Phase 4.5 コード完了（2026-07-04） — ビジュアル大型アップグレード（HD-2D 化）
+
+設計文書 `docs/unity-phase4-5-visual-upgrade-design.md` の W0〜W5 を実装。Core（`EscapeNine.Core`, `noEngineReferences: true`）とゲームルールには一切触れていない。
+
+- **W0 URP 移行**: `com.unity.render-pipelines.universal` 導入。URP Asset / Universal Renderer は実行時・エディタスクリプトで生成し `.asset` を repo に増やさない規約を維持
+- **W1 TextMeshPro 化**: 日本語フォント DotGothic16 同梱（D3）+ `UIFactory.Label/TextButton` を TMP 生成へ全面差し替え。重なり監査を恒久エディタツール化（`Editor/OverlapAudit.cs`、TMP preferredHeight 対応 + 実効可視性フィルタ + 証拠つき排他ペア除外）し全画面 CLEAN
+- **W2 BoardStage（盤面のワールド空間化）**: 3D タイル 9 枚（`TileView`）+ ドット絵ビルボードポーン（`PawnView`）+ Physics.Raycast 入力（`StageInput`）。表示はカメラ→RenderTexture→RawImage 方式（`StageRenderView`、BoardAnchor が uGUI レイアウトに追従）。描画契約は `IBoardView` に集約し GameScreen は具象型に依存しない
+- **W3 ポストプロセス + カメラワーク**: URP Volume（Bloom/Vignette/ColorAdjustments、実行時生成 `StagePostFx`）+ `BeatVolumePulse`（`Conductor.SongPositionBeats` = dspTime 駆動の拍同期脈動。Time.time 不使用）+ 自作 `CameraRig`（衝突インパルス / 階層クリア回り込み / 高階層圧迫ズーム）。DoF は D7 決定により全ティア・全プラットフォームでオフ
+- **W4 ゾーン別テーマ**: `ZoneThemes` 静的テーブル（赤鬼=溶岩 / 青鬼=氷洞 / 骸骨=紫闇 / ドラゴン=劫火）+ `StageLights`（霧時は環境光を落としプレイヤー追従ポイントライトのみ）+ `StageParticles`（ゾーン別アンビエント）+ 消失マスの崩落アニメ。**情報パリティ維持**: 可視性判定は従来どおり Core の `IsCellVisible`/`IsCellDisappeared` に一元化されたまま、演出は結果への化粧に限定
+- **W5 品質ティア + 旧盤面削除**: `StageQuality`（High/Medium/Low。High=Bloom フル+パーティクル40+HDR RT / Medium=Bloom 0.6 倍+24+HDR / Low=Bloom オフ+0+LDR RT。既定はデスクトップ High / モバイル Medium）+ 設定画面「演出設定」カードに演出品質セグメント（`PlayerState` の `stageQualityTier` キーに永続化、反映は次のゲーム画面表示から）。旧 uGUI 盤面（GridBoardWidget / GridBoardWidgetAdapter / GridCellWidget）を削除し BoardStage へ一本化（D4、R7 の二重保守解消）。`CellVisual` は `Stage/CellVisual.cs` へ移設
+- **⚠️ 残る人間ゲート（未通過）**: iOS 実機での Phase 0 リズム精度ハーネス再実行 + オーナー体感 GO/NO-GO、および §5 性能予算（60fps 張り付き / GPU ≤12ms / ドローコール ≤60）の実機実測。これを通過して初めて設計文書 §10 の完了条件（DoD）が全て満たされる
 
 ### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
 

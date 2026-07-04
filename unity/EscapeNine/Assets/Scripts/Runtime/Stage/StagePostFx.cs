@@ -6,9 +6,10 @@
 // 基準値は public const にまとめ、BeatVolumePulse がここからの倍率で脈動させ、
 // Wave 4 の ZoneThemes がゾーン別に上書きできるようにする (本 Wave では上書き経路は未実装)。
 //
-// Depth of Field は今回は追加しない (D7: モバイル全面オフ)。デスクトップ専用の追加は
-// Wave 5 の品質ティアで検討する — ここが「居場所」(profile.Add<DepthOfField>(true) を
-// 品質ティア判定の下で足す形になる想定)。
+// Depth of Field は追加しない (D7: モバイル全面オフ)。Wave 5 の品質ティア (StageQuality.cs) で
+// デスクトップ専用追加を検討した結果、性能予算の降格順序 (§5: DoF → Chromatic Aberration →
+// パーティクル密度 → Bloom 解像度) の先頭に位置し、最後まで残す BeatVolumePulse の脈動と
+// 優先順位が逆であるため、ティア分岐を作らず全ティア共通で常時オフのまま据え置く結論とした。
 
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -30,6 +31,25 @@ namespace EscapeNine.Runtime.Stage
         public ColorAdjustments ColorAdjustments { get; private set; }
         public VolumeProfile Profile { get; private set; }
         public Volume Volume { get; private set; }
+
+        /// <summary>
+        /// Wave 5: 品質ティアによる Bloom 強度倍率 (StageQuality.Apply が設定。既定 1 = 無倍率)。
+        /// BeatVolumePulse.Update() が毎フレーム Bloom.intensity を BloomIntensityBase から
+        /// 再計算するため、ApplyQuality() が intensity へ直接書き込んでも次フレームで上書き
+        /// されてしまう。そのためこのスケール値を経由し、BeatVolumePulse 側の計算式に
+        /// 掛け合わせてもらう方式にする (Bloom.active の方は BeatVolumePulse が触らないため
+        /// ApplyQuality() の直接設定がそのまま有効であり続ける)。
+        /// </summary>
+        public float BloomIntensityScale { get; private set; } = 1f;
+
+        /// <summary>
+        /// Wave 5: 品質ティアを適用する (StageQuality.Apply から呼ばれる)。
+        /// </summary>
+        public void ApplyQuality(bool bloomEnabled, float bloomIntensityScale)
+        {
+            BloomIntensityScale = bloomIntensityScale;
+            if (Bloom != null) Bloom.active = bloomEnabled;
+        }
 
         /// <summary>
         /// parent の子として Volume 一式を生成する (design: 「Create(Transform)は不要なら static Create()」

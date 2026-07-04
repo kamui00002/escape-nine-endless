@@ -25,11 +25,38 @@ namespace EscapeNine.Runtime.Stage
         private RenderTexture _rt;
         private readonly Vector3[] _corners = new Vector3[4];
 
+        /// <summary>
+        /// Wave 5: 品質ティアの RT フォーマット (StageQuality.SetFormat が設定)。既定は
+        /// HDR (Bloom の閾値超え発光を保持する従来値、W3 導入時のコメント参照)。
+        /// </summary>
+        private RenderTextureFormat _format = RenderTextureFormat.DefaultHDR;
+
         public void Configure(RectTransform anchor, RawImage rawImage, Camera camera)
         {
             _anchor = anchor;
             _rawImage = rawImage;
             _camera = camera;
+        }
+
+        /// <summary>
+        /// Wave 5: RT フォーマットを切り替える (StageQuality.Apply から呼ばれる)。同一サイズでも
+        /// フォーマット変更時は RT を確実に再生成させるため、変更があれば即座に解放する
+        /// (次の Apply() が _rt==null を見て新フォーマットで作り直す)。解放前にカメラ/RawImage を
+        /// 切り離す手順は OnDisable と同一 (カメラのターゲットに設定されたままの Release は
+        /// Unity が警告を出すため)。
+        /// </summary>
+        public void SetFormat(RenderTextureFormat format)
+        {
+            if (_format == format) return;
+            _format = format;
+
+            if (_camera != null && _camera.targetTexture == _rt) _camera.targetTexture = null;
+            if (_rawImage != null)
+            {
+                _rawImage.texture = null;
+                _rawImage.enabled = false; // 再結線まで白矩形を出さない (次の Apply() が再有効化する)
+            }
+            ReleaseRt();
         }
 
         private void LateUpdate()
@@ -56,7 +83,10 @@ namespace EscapeNine.Runtime.Stage
                 // HDR 化 (Wave 3): LDR (0-1 clamp) の RT だと Bloom の閾値超え発光が
                 // クランプで潰れて滲みが出ない。DefaultHDR で 1.0 超の輝度を保持したまま
                 // RT へ描画し、Volume の Bloom がそれを拾えるようにする。
-                _rt = new RenderTexture(w, h, 24, RenderTextureFormat.DefaultHDR) { name = "BoardStageRT" };
+                // Wave 5: Low ティアは SetFormat() 経由で _format が LDR (Default) に切り替わる
+                // (Bloom 自体が Low では無効化されるため HDR を維持する意味が無く、
+                // メモリ/帯域節約のため LDR へ落とす)。
+                _rt = new RenderTexture(w, h, 24, _format) { name = "BoardStageRT" };
                 _camera.targetTexture = _rt;
                 _camera.rect = new Rect(0f, 0f, 1f, 1f); // 旧方式が設定した部分 rect を打ち消す
                 _rawImage.texture = _rt;

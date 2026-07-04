@@ -35,12 +35,13 @@
 // 「その画面状態で実際に見えるもの」だけを重なり判定の対象にする。採用した可視性判定機構は
 // コードベースを網羅的に調査して実際に使われている 2 つだけ (使っていない機構は追加しない):
 //   (1) GameObject.activeInHierarchy — 既存の GetComponentsInChildren<TMP_Text>(false) が担う。
-//   (2) TMP_Text.color.a (アルファ) — GridCellWidget の FogMark/XMark 用に新規追加 (AlphaVisibilityThreshold)。
-//       この 2 ラベルは常に SetActive(true) のまま、見た目の出現/消失を alpha フェードだけで表現する
-//       設計 (GridCellWidget.cs ApplyBlend() 参照) のため、activeInHierarchy だけでは判定できない。
+//   (2) TMP_Text.color.a (アルファ) — 旧 uGUI 盤面 GridCellWidget の FogMark/XMark 用に導入
+//       (AlphaVisibilityThreshold)。この 2 ラベルは常に SetActive(true) のまま alpha フェード
+//       だけで出現/消失を表現する設計だった。旧 uGUI 盤面は Phase 4.5 W5 で削除済み
+//       (3D 盤面 TileView のマークはワールド空間 TMP で ScreenBase 配下に無いため本監査対象外)
+//       だが、alpha フェード式の uGUI 要素が今後追加された場合の汎用安全網としてフィルタは保持する。
 // なお TMP_Text.enabled のトグルや CanvasGroup による全消し (alpha=0) は本コードベースには
-// 存在しない (grep 済み。GridCellWidget 自身の CanvasGroup は disabled 時の 0.5 減光専用で
-// 「消す」用途では使われていない) ため、判定機構には含めない。
+// 存在しない (grep 済み) ため、判定機構には含めない。
 //
 // 一方、ScreenRouter.Register() は全画面を BuildUI() 直後に gameObject.SetActive(false) で
 // 待機させ (ScreenRouter.cs:85)、Show() は SetActive(true) → OnShow(payload) を同一フレームで
@@ -73,10 +74,11 @@ namespace EscapeNine.EditorTools
 
         /// <summary>
         /// この値以下の TMP_Text.color.a は「実質見えていない」として重なり判定の対象から除外する。
-        /// GridCellWidget の FogMark/XMark (常時 SetActive(true)、alpha フェードだけで出現/消失する)
-        /// のための閾値。0 ではなくわずかに正の値にしているのは、フェード中の「ごく僅かに残った
-        /// alpha」まで拾って偽陽性を出さないため (完全な 0 を要求すると浮動小数の丸め誤差で
-        /// 拾い漏れる恐れがある)。
+        /// 元は旧 uGUI 盤面 GridCellWidget の FogMark/XMark (常時 SetActive(true)、alpha フェード
+        /// だけで出現/消失) のための閾値 (旧 uGUI 盤面は W5 で削除済み。汎用安全網として保持 —
+        /// 詳細はファイル冒頭コメント参照)。0 ではなくわずかに正の値にしているのは、フェード中の
+        /// 「ごく僅かに残った alpha」まで拾って偽陽性を出さないため (完全な 0 を要求すると
+        /// 浮動小数の丸め誤差で拾い漏れる恐れがある)。
         /// </summary>
         private const float AlphaVisibilityThreshold = 0.02f;
 
@@ -253,8 +255,8 @@ namespace EscapeNine.EditorTools
             foreach (TMP_Text label in labels)
             {
                 // 実効可視性フィルタ (2): color.a ≈ 0 は「実際には見えない」として除外する。
-                // GridCellWidget の FogMark/XMark はこれに該当 (常時 SetActive(true) のまま
-                // ApplyBlend() が alpha だけで出現/消失を表現する設計。詳細は本ファイル冒頭コメント参照)。
+                // 元は旧 uGUI 盤面 GridCellWidget の FogMark/XMark のための機構 (W5 で削除済み、
+                // 汎用安全網として保持。詳細は本ファイル冒頭コメント参照)。
                 if (label.color.a <= AlphaVisibilityThreshold)
                 {
                     alphaHidden++;

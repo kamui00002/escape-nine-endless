@@ -1,23 +1,23 @@
 // TileView.cs
-// Wave 2 (3D BoardStage): GridCellWidget.cs (uGUI 版セル) のワールド空間版。
+// Wave 2 (3D BoardStage): 旧 uGUI 盤面セル GridCellWidget.cs のワールド空間版。
+// (旧 uGUI 盤面 GridBoardWidget/GridCellWidget は W5 で削除済み (D4)。
+//  以下の GridCellWidget への言及は移植元 = Swift GridCellView.swift 相当の記録)
 // 1 マス = Cube プリミティブ (scale (1, 0.18, 1))。上面色でセル状態を表現し、
 // 霧/消失/選択のマークはタイル直上に浮かべた世界空間 TMP (TextMeshPro 3D) で表す。
 //
-// 情報パリティ: 受け取る CellVisual は GridCellWidget.cs (namespace EscapeNine.Runtime.UI)
-// で定義済みの構造体をそのまま再利用する (新規に複製しない)。BoardStage.Render() は
-// GridBoardWidget.Render() と全く同じ手順 (GameSession.IsCellVisible / IsCellDisappeared /
-// GetAvailableMoves / PendingPlayerMove) で CellVisual を組み立てるため、可視性の
-// 判定ロジックは GameSession に一元化されたまま変わらない。
+// 情報パリティ: 受け取る CellVisual (Stage/CellVisual.cs。W5 で旧 GridCellWidget.cs から
+// 移設) の組み立ては BoardStage.Render() が GameSession.IsCellVisible / IsCellDisappeared /
+// GetAvailableMoves / PendingPlayerMove を参照して行うため、可視性の判定ロジックは
+// GameSession に一元化されたまま変わらない。
 //
-// 色のブレンド定数 (FogFillColor 等) は GridCellWidget.ApplyBlend() と同一の値を
-// 意図的に複製している (GridCellWidget.cs 側は変更禁止のため、値を共有プロパティとして
-// 公開させることができない)。値を変える場合は両ファイルを併せて確認すること。
+// 色のブレンド定数 (FogFillColor 等) は旧 GridCellWidget.ApplyBlend() の値を引き継いだもの。
+// W5 の uGUI 盤面削除により、現在はここが唯一の定義 (Wave 2 時点の意図的複製は解消済み)。
 //
 // マテリアルは URP Lit ("Universal Render Pipeline/Lit") を使い、色替えは
 // MaterialPropertyBlock 経由 (SRP Batcher が個体別マテリアルインスタンスでも
 // 同一シェーダー・同一プロパティレイアウトならバッチ対象にできるため)。
 //
-// GridCellWidget との意図的な差分:
+// 旧 GridCellWidget との意図的な差分:
 //   - 霧マークの文字は「霧」ではなく「?」にしている (このタスクの設計指定に従う)。
 //     情報としては「視界が制限されている」ことを示す点で等価。
 //   - 枠線 (border) の 4 本描画は省略し、状態色を単色ブレンドのみで表現する
@@ -34,7 +34,7 @@
 
 using UnityEngine;
 using TMPro;
-using EscapeNine.Runtime.UI; // CellVisual を再利用
+using EscapeNine.Runtime.UI; // UITheme (色パレット / FontAsset)
 using EscapeNine.Runtime.UI.Fx; // FxKit.MotionEnabled (Reduce Motion)
 
 namespace EscapeNine.Runtime.Stage
@@ -49,7 +49,7 @@ namespace EscapeNine.Runtime.Stage
     }
 
     /// <summary>
-    /// 盤面 1 マスのワールド表現。GridCellWidget 同様 MonoBehaviour ではない素のクラス
+    /// 盤面 1 マスのワールド表現。旧 GridCellWidget 同様 MonoBehaviour ではない素のクラス
     /// (毎フレーム処理は BoardStage.Update() から Tick(deltaTime) を呼んでもらう)。
     /// </summary>
     public sealed class TileView
@@ -74,10 +74,10 @@ namespace EscapeNine.Runtime.Stage
         /// <summary>消失の崩落アニメ所要秒 (design 指定: 0.5s)。霧フェード (SpecialFadeDuration) とは別軸。</summary>
         private const float CollapseDuration = 0.5f;
 
-        /// <summary>霧フェード所要秒 (GridCellWidget.SpecialFadeDuration と同一)。</summary>
+        /// <summary>霧フェード所要秒 (旧 GridCellWidget.SpecialFadeDuration と同一値)。</summary>
         private const float SpecialFadeDuration = 0.28f;
 
-        // GridCellWidget.ApplyBlend() と同一の事前計算色 (意図的複製。理由はファイル冒頭コメント参照)。
+        // 旧 GridCellWidget.ApplyBlend() から引き継いだ事前計算色 (ファイル冒頭コメント参照)。
         private static readonly Color FogFillColor = Color.Lerp(UITheme.Background, UITheme.Fog, 0.4f);
         private static readonly Color DisappearedFillColor = UITheme.Disappeared;
         private const float FogMarkAlpha = 0.6f;   // 3D は文字が小さく見えるため 2D 版 (0.15) より強めに視認性確保
@@ -86,7 +86,7 @@ namespace EscapeNine.Runtime.Stage
         /// <summary>
         /// 通常マスの基調色ゾーンティント (Wave 4)。BoardStage がゾーン変化時に書き換える
         /// static フィールド (GameSession/CellVisual を経由しないゾーン専用の見た目情報のため、
-        /// CellVisual 構造体 (GridCellWidget.cs、変更禁止) を拡張せずここに持たせる)。
+        /// CellVisual 構造体 (Stage/CellVisual.cs) を拡張せずここに持たせる)。
         /// 既定値は UITheme.Grid (旧来と同じ見た目) で、BoardStage が未初期化でも安全。
         /// </summary>
         public static Color ZoneGridTint = UITheme.Grid;
@@ -181,7 +181,7 @@ namespace EscapeNine.Runtime.Stage
             return tmp;
         }
 
-        /// <summary>状態を見た目に反映する。GridCellWidget.Render() と同一の優先順位ロジック。</summary>
+        /// <summary>状態を見た目に反映する。旧 GridCellWidget.Render() (Swift: GridCellView.body) と同一の優先順位ロジック。</summary>
         public void Render(CellVisual v)
         {
             if (v.IsPlayer) _normalFillColor = Color.Lerp(UITheme.Background, UITheme.Player, 0.30f);

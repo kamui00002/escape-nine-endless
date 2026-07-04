@@ -1,18 +1,16 @@
 // IBoardView.cs
 // Wave 2 (3D BoardStage 導入) で GameScreen が盤面ウィジェットを一枚岩の型として
-// 扱うための共通契約。GridBoardWidget.cs (Wave 1 uGUI 盤面) と BoardStage.cs
-// (Wave 2 3D 盤面) の両方をこの契約の実装として扱うことで、GameScreen 側の
-// 呼び出し箇所 (Render/SnapNextRender/FlashPlayer/BurstAtPlayer/Shake/ResetFxState/
-// イベント購読) を GameScreen.BuildBoard() の UseWorldBoard 分岐 1 箇所に閉じ込め、
-// それ以外の呼び出し箇所は新旧どちらの経路でも無改造で動く。
+// 扱うための共通契約 (Render/SnapNextRender/FlashPlayer/BurstAtPlayer/Shake/
+// ResetFxState/イベント購読)。
 //
-// GridBoardWidget.cs は W4 ゲート通過までの比較対象として温存する方針のため直接
-// この interface を implements できない (変更禁止)。GridBoardWidgetAdapter.cs が
-// 委譲実装を提供する。
+// Wave 2〜4 の間は旧 uGUI 盤面 (GridBoardWidget + GridBoardWidgetAdapter) と
+// BoardStage の 2 実装を切り替え可能にする役割だったが、W4 ゲート通過に伴い
+// 旧 uGUI 盤面は W5 で削除 (D4)。現在の実装は BoardStage のみで、この契約は
+// GameScreen が盤面の具象型に依存しないための境界として維持する。
 //
-// デフォルト引数値は GridBoardWidget.cs の公開メソッドと完全に一致させること —
-// 呼び出し側の変数の静的型がこの interface になるため、呼び出し箇所で省略された
-// 引数はここの宣言値が採用される (実装クラス側のデフォルト値は無視される)。
+// デフォルト引数値の注意 — 呼び出し側の変数の静的型がこの interface になるため、
+// 呼び出し箇所で省略された引数はここの宣言値が採用される (実装クラス側の
+// デフォルト値は無視される)。値は旧 GridBoardWidget の公開メソッドから引き継いだもの。
 
 using System;
 using UnityEngine;

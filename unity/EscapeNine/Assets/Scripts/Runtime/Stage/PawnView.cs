@@ -1,6 +1,7 @@
 // PawnView.cs
 // Wave 2 (3D BoardStage): プレイヤー / 鬼のワールド表現。
-// GridBoardWidget.cs のオーバーレイ Image (Player/EnemySprite) に相当するが、
+// 旧 uGUI 盤面 GridBoardWidget.cs (W5 で削除済み。以下の言及は移植元の記録) の
+// オーバーレイ Image (Player/EnemySprite) に相当するが、
 // ワールド空間ではセルの子ではなく SpriteRenderer によるビルボードとして表現する
 // (design 指定: 毎 LateUpdate でカメラ方向へ Y 軸のみ回転)。
 //
@@ -21,7 +22,7 @@ namespace EscapeNine.Runtime.Stage
         /// <summary>タイル上面からの浮遊高さ (World 単位)。</summary>
         public const float HoverHeight = 0.6f;
 
-        // GridBoardWidget.MoveHopPunch/MoveHopDuration と同一値 (意図的複製)。
+        // 旧 GridBoardWidget.MoveHopPunch/MoveHopDuration から引き継いだ値 (W5 の削除後はここが唯一の定義)。
         private const float MoveHopPunch = 0.18f;
         private const float MoveHopDuration = 0.18f;
 

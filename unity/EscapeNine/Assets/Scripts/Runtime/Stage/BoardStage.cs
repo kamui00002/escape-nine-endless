@@ -1,16 +1,16 @@
 // BoardStage.cs
-// Wave 2: GridBoardWidget.cs (uGUI 盤面) のワールド空間版。ワールド原点に 3x3 タイルを
-// 配置し、GameScreen からは IBoardView 経由で GridBoardWidget と同じ手順
+// Wave 2: 旧 uGUI 盤面 GridBoardWidget.cs のワールド空間版 (旧 uGUI 盤面は W5 で削除済み
+// (D4)。以下の GridBoardWidget への言及は移植元 = Swift GridBoardView.swift 相当の記録)。
+// ワールド原点に 3x3 タイルを配置し、GameScreen からは IBoardView 経由の描画契約
 // (Render/SnapNextRender/FlashPlayer/BurstAtPlayer/Shake/ResetFxState + OnCellTapped/
-// OnEnemyTapped) で操作される。GridBoardWidget.cs は変更禁止のため、契約は
-// IBoardView.cs 側で吸収する。
+// OnEnemyTapped) で操作される。現在は本クラスが IBoardView の唯一の実装。
 //
-// 情報パリティ: Render() の CellVisual 組み立ては GridBoardWidget.Render() と
+// 情報パリティ: Render() の CellVisual 組み立ては旧 GridBoardWidget.Render() と
 // 1 行単位で同一の手順 (GameSession.PlayerPosition/EnemyPosition/GetAvailableMoves/
 // PendingPlayerMove/IsCellVisible/IsCellDisappeared を参照)。可視性判定ロジックの
 // 実体は GameSession (Core) に一元化されたままで、本クラスは結果を化粧するだけ。
 //
-// GridBoardWidget との意図的な差分:
+// 旧 GridBoardWidget との意図的な差分:
 //   - 移動スライド補間・移動ホップ・霧/消失フェードの秒数/イージングは全て同一値を維持。
 //   - Shake は画面 XY ではなくワールド接地面 (X, Z) 上の振動に置き換える
 //     (盤面がワールド空間の水平面上にあるため)。振幅は px→World 換算 (12px ≒ 0.06)。
@@ -22,7 +22,6 @@ using System;
 using System.Collections;
 using UnityEngine;
 using EscapeNine.Core;
-using EscapeNine.Runtime.UI;
 using EscapeNine.Runtime.UI.Fx;
 
 namespace EscapeNine.Runtime.Stage
@@ -42,7 +41,7 @@ namespace EscapeNine.Runtime.Stage
         /// <summary>px → World 単位換算係数 (design 指定: 12px ≒ 0.06 World 単位)。</summary>
         private const float PxToWorld = 0.06f / 12f;
 
-        private const float MoveDuration = 0.1f; // GridBoardWidget.MoveDuration と同一
+        private const float MoveDuration = 0.1f; // 旧 GridBoardWidget.MoveDuration と同一値
 
         private readonly TileView[] _tiles = new TileView[GameConfig.GridSize + 1]; // 1-indexed
         private PawnView _player;
@@ -62,6 +61,9 @@ namespace EscapeNine.Runtime.Stage
         private StageParticles _stageParticles;
         private StagePostFx _postFx; // 遅延取得 (GameScreen が BoardStage の子として生成するため)
         private int _currentZoneIndex = -1;
+
+        /// <summary>Wave 5: GameScreen が StageQuality.Apply へ渡すための公開アクセサ。</summary>
+        public StageParticles Particles => _stageParticles;
 
         /// <summary>盤面座標 (1..9) → ワールド接地座標 (x, 0, z) 中心。</summary>
         public static Vector3 WorldCenterOf(int position)
