@@ -76,7 +76,16 @@ namespace EscapeNine.Runtime
             GameController game = App.I.Game;
             if (game == null) return;
 
-            if (game.IsRelicDraftPending)
+            if (game.IsRouteChoicePending)
+            {
+                // Phase 5c (docs/unity-phase5-roguelike-design.md §4): 分岐ルート選択提示中は
+                // 1/2 キーのみ選択として扱い、移動キー・ドラフトキーとは排他にする
+                // (1 = 安全なルート / 2 = 深淵のルート)。ルートはドラフトの「前」に提示されるため、
+                // IsRouteChoicePending と IsRelicDraftPending は同時に true にならない。
+                if (Input.GetKeyDown(KeyCode.Alpha1) && _gameScreen != null) _gameScreen.SelectRouteFromKeyboard(0);
+                if (Input.GetKeyDown(KeyCode.Alpha2) && _gameScreen != null) _gameScreen.SelectRouteFromKeyboard(1);
+            }
+            else if (game.IsRelicDraftPending)
             {
                 // Phase 5a (docs/unity-phase5-roguelike-design.md §2.1): レリックドラフト提示中は
                 // 1/2/3/4 キーのみカード選択として扱い、既存の1-9移動キーとは排他にする

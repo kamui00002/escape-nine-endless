@@ -54,6 +54,13 @@ namespace EscapeNine.Runtime.Stage
     /// </summary>
     public sealed class TileView
     {
+        /// <summary>
+        /// Phase 5c ボステレグラフ (docs/unity-phase5-roguelike-design.md §1.5/§5)。
+        /// Foresight = 予告 (青白く明滅) / Intimidation = 進入不可の赤熱。恒久消失 (崩落) とは
+        /// 「存在の有無」で区別する (威圧はタイルが存在したまま赤熱、消失は崩落して消える)。
+        /// </summary>
+        public enum BossTelegraphKind { None, Foresight, Intimidation }
+
         public readonly int Position;
 
         /// <summary>タイル 1 枚分の footprint (中心間隔と同じにすると隙間なく並ぶ)。</summary>
@@ -107,6 +114,16 @@ namespace EscapeNine.Runtime.Stage
         private float _disappearAlpha;
         private float _disappearTarget;
         private float _disabledDim;
+
+        // ---- Phase 5c ボステレグラフ ----
+        private BossTelegraphKind _telegraph = BossTelegraphKind.None;
+        private float _telegraphPhase; // 明滅の位相 (秒累積)。Tick で進める。
+
+        /// <summary>威圧マスの赤熱色 (消失=崩落と区別するため、赤系だが崩落の暗転色とは別)。</summary>
+        private static readonly Color IntimidationHotColor = new Color(1f, 0.30f, 0.12f);
+
+        /// <summary>先読み予告の青白い発光色 (§5.1②のフォールバック: ボス隣接を青白く明滅)。</summary>
+        private static readonly Color ForesightGlowColor = new Color(0.62f, 0.80f, 1f);
 
         private TileView(int position, Transform fill, Renderer fillRenderer,
             TextMeshPro selectedMark, TextMeshPro fogMark, TextMeshPro xMark)
@@ -202,6 +219,15 @@ namespace EscapeNine.Runtime.Stage
             ApplyBlend();
         }
 
+        /// <summary>
+        /// Phase 5c: ボステレグラフの種別を設定する (BoardStage.Render がボスパターン/威圧ゾーンから決定)。
+        /// 毎 Render 呼ばれ、非該当タイルは None にリセットされる。
+        /// </summary>
+        public void SetBossTelegraph(BossTelegraphKind kind)
+        {
+            _telegraph = kind;
+        }
+
         /// <summary>霧フェード + 消失の崩落アニメの時間進行。BoardStage.Update() から毎フレーム呼ばれる。</summary>
         public void Tick(float deltaTime)
         {
@@ -218,6 +244,12 @@ namespace EscapeNine.Runtime.Stage
                 _disappearAlpha = _disappearTarget; // Reduce Motion: 即時反映 (design 指定)
             }
 
+            // Phase 5c: テレグラフの明滅位相を進める (Reduce Motion 時は明滅せず定常表示にするため進めない)。
+            if (_telegraph != BossTelegraphKind.None && FxKit.MotionEnabled)
+            {
+                _telegraphPhase += deltaTime;
+            }
+
             ApplyBlend();
         }
 
@@ -226,6 +258,20 @@ namespace EscapeNine.Runtime.Stage
             Color fill = Color.Lerp(_normalFillColor, UITheme.Background, _disabledDim);
             fill = Color.Lerp(fill, FogFillColor, _fogAlpha);
             fill = Color.Lerp(fill, DisappearedFillColor, _disappearAlpha);
+
+            // Phase 5c: ボステレグラフの上塗り (消失=崩落の暗転より後に乗せ、赤熱/青白が見えるように)。
+            // Reduce Motion 時 (_telegraphPhase を進めない) は Sin=0 相当の定常強度で表示する。
+            if (_telegraph == BossTelegraphKind.Intimidation)
+            {
+                float pulse = 0.45f + 0.25f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * 4f)) : 1f);
+                fill = Color.Lerp(fill, IntimidationHotColor, pulse);
+            }
+            else if (_telegraph == BossTelegraphKind.Foresight)
+            {
+                float pulse = 0.25f + 0.25f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * 5f)) : 1f);
+                fill = Color.Lerp(fill, ForesightGlowColor, pulse);
+            }
+
             SetFillColor(fill);
 
             _fogMark.color = UITheme.WithAlpha(UITheme.TextColor, FogMarkAlpha * _fogAlpha);

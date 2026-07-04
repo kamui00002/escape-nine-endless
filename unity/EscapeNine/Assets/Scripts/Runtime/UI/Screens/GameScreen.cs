@@ -46,7 +46,9 @@ namespace EscapeNine.Runtime.UI
         // UITheme にレアリティ色の定義が無いため本画面固有で追加する (InvisibleAbsorbColor 等と同じ作法)。
         private static readonly Color RelicRareColor = new Color(0.45f, 0.62f, 1f);      // 青
         private static readonly Color RelicEpicColor = new Color(0.72f, 0.42f, 0.98f);   // 紫
-        private const int RelicDraftMaxCards = 3;
+        // Phase 5b/5c: #18 蒐集家の目で候補が 3→4 に増えるため、カードスロットは最大 4 枚を確保する。
+        // 3 枚時は従来と同じ配置を保ち、4 枚時のみ縦積みの高さ/間隔を詰める (ShowRelicDraft/LayoutRelicCards)。
+        private const int RelicDraftMaxCards = 4;
 
         /// <summary>
         /// プレゲームの AI 難易度選択肢 (Swift: GameView.aiLevelSelector の
@@ -130,6 +132,16 @@ namespace EscapeNine.Runtime.UI
         /// (§6.3 タスク仕様どおり)。両者を区別するため UI 側だけが持つ状態。
         /// </summary>
         private bool _relicDraftScreenOpen;
+
+        // ---- Phase 5c: 分岐ルート選択オーバーレイ (docs/unity-phase5-roguelike-design.md §4/§1.5) ----
+        // レリックドラフトと同じ「画面内オーバーレイ」方式 (Router 遷移せず舞台を表示し続ける)。
+        // フロー: FloorClear「スタート」→ RouteChoice (提示階層のみ) → RelicDraft → Advance。
+        private GameObject _routeChoiceOverlay;
+
+        /// <summary>UI ローカルの「ルート選択オーバーレイを実際に開いたか」フラグ。
+        /// GameController.IsRouteChoicePending は階層クリア確定と同時に true になるため、
+        /// _relicDraftScreenOpen と同様に「スタート」を押すまで実際の表示はしない。</summary>
+        private bool _routeChoiceScreenOpen;
 
         private GameObject _skillResetToast;
 
@@ -226,9 +238,11 @@ namespace EscapeNine.Runtime.UI
             BuildBottom(safe);
 
             // オーバーレイは Swift の ZStack と同じ順で兄弟生成 (後に生成したものが上に描画される):
-            // floorClear < relicDraft < skillReset < startGame(pregame) < paused < countdown < gameOver < bossWarning
-            // (relicDraft は Phase 5a 追加。floorClear のすぐ後 = 階層クリアフローの一部として直後に重なる)
+            // floorClear < routeChoice < relicDraft < skillReset < startGame(pregame) < paused < countdown < gameOver < bossWarning
+            // (relicDraft は Phase 5a 追加、routeChoice は Phase 5c 追加。どちらも floorClear 直後 =
+            //  階層クリアフローの一部として直後に重なる。routeChoice は relicDraft の「前」に提示される)
             BuildFloorClearOverlay();
+            BuildRouteChoiceOverlay();
             BuildRelicDraftOverlay();
             BuildSkillResetToast();
             BuildPregameOverlay();
@@ -423,6 +437,67 @@ namespace EscapeNine.Runtime.UI
         }
 
         /// <summary>
+        /// Phase 5c: 分岐ルート選択 (docs/unity-phase5-roguelike-design.md §4/§1.5)。Swift正本には対応なし。
+        /// 「安全なルート」「深淵のルート」の 2 択カード。深淵側は警告色 (UITheme.Warning) で危険を示す。
+        ///
+        /// §1.5 の「深淵カーソル時に StageLights を赤黒く沈める」照明プレビューは本 UI では縮退して
+        /// 実装していない (カード色のみ)。理由: (1) 本オーバーレイはタップ/1・2キーの二者択一で、
+        /// SwiftUI 的な「カーソルホバー」概念が無く「合わせる」瞬間が存在しない。(2) 設計 §1.5 末尾は
+        /// 「UI 層が BoardStage の内部へ直接触ることは禁止 (イベント経由のみ)」と明記しており、
+        /// GameScreen から StageLights を直接駆動するのは規約違反。よって警告色カードで危険を伝えるに留める
+        /// (真の照明プレビューはイベント境界を足す別課題)。
+        /// </summary>
+        private void BuildRouteChoiceOverlay()
+        {
+            var overlay = UIFactory.Panel(transform, "RouteChoiceOverlay",
+                UITheme.WithAlpha(UITheme.Background, 0.95f));
+            _routeChoiceOverlay = overlay.gameObject;
+
+            var title = UIFactory.Label(overlay, "Title", "進む道を選べ", 56, UITheme.GoldText,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)title.transform, 0.5f, 0.80f, 0.9f, 0.06f);
+
+            BuildRouteCard(overlay, "SafeCard", 0.585f,
+                UITheme.Success, "1  安全なルート", "通常の階層をそのまま進む。堅実に。",
+                () => HandleRouteChosen(RouteChoice.Safe));
+
+            BuildRouteCard(overlay, "AbyssCard", 0.375f,
+                UITheme.Warning, "2  深淵のルート", "敵が賢く・罠も早まるが、報酬に Rare 以上を確定。",
+                () => HandleRouteChosen(RouteChoice.Abyss));
+
+            _routeChoiceOverlay.SetActive(false);
+        }
+
+        /// <summary>ルート選択カード 1 枚を構築する (レリックカードと同じ「枠 + inner ボタン」作法)。</summary>
+        private GameObject BuildRouteCard(RectTransform overlay, string name, float cy,
+            Color accent, string title, string desc, UnityEngine.Events.UnityAction onTap)
+        {
+            var slot = UIFactory.Panel(overlay, name);
+            UIFactory.Place(slot, 0.5f, cy, 0.88f, 0.185f);
+
+            var frame = UIFactory.ColorRect(slot, "Frame", accent);
+            UIFactory.Place((RectTransform)frame.transform, 0.5f, 0.5f, 1f, 1f);
+
+            var inner = UIFactory.Panel(slot, "Inner", UITheme.BackgroundSecondary);
+            UIFactory.Place(inner, 0.5f, 0.5f, 0.965f, 0.90f);
+            var btn = inner.gameObject.AddComponent<Button>();
+            btn.targetGraphic = inner.GetComponent<Image>();
+            btn.transition = Selectable.Transition.ColorTint;
+            btn.navigation = new Navigation { mode = Navigation.Mode.None };
+            btn.onClick.AddListener(onTap);
+
+            var titleLabel = UIFactory.Label(inner, "Title", title, 44, accent,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)titleLabel.transform, 0.5f, 0.66f, 0.92f, 0.34f);
+
+            var descLabel = UIFactory.Label(inner, "Desc", desc, 28,
+                UITheme.WithAlpha(UITheme.TextColor, 0.85f));
+            UIFactory.Place((RectTransform)descLabel.transform, 0.5f, 0.26f, 0.9f, 0.40f);
+
+            return slot.gameObject;
+        }
+
+        /// <summary>
         /// Phase 5a: レリックドラフト (docs/unity-phase5-roguelike-design.md §2.1/§6.3)。
         /// Swift正本には対応なし。floorClearOverlay の「スタート」タップで表示に切り替わる
         /// (BuildFloorClearOverlay の直下に生成する意図的な兄弟順序。理由は _relicDraftOverlay
@@ -449,12 +524,13 @@ namespace EscapeNine.Runtime.UI
             _relicCardRarityLabels = new TextMeshProUGUI[RelicDraftMaxCards];
             _relicCardDescLabels = new TextMeshProUGUI[RelicDraftMaxCards];
 
-            float[] cardCy = { 0.635f, 0.455f, 0.275f };
+            // 4 枚時 (#18 蒐集家の目) の初期配置で全スロットを生成する。実際の cy/高さは候補数に応じて
+            // ShowRelicDraft → LayoutRelicCards が再設定するため、ここでの値は初期プレースホルダに過ぎない。
             for (int i = 0; i < RelicDraftMaxCards; i++)
             {
                 int index = i; // クロージャ用固定
                 var slot = UIFactory.Panel(overlay, "Card" + i);
-                UIFactory.Place(slot, 0.5f, cardCy[i], 0.88f, 0.155f);
+                UIFactory.Place(slot, 0.5f, 0.66f - 0.16f * i, 0.88f, 0.135f);
                 _relicCardSlots[index] = slot.gameObject;
 
                 // フレーム: レアリティ色の縁取り。§1.5 は「レアリティ別発光 = Bloom 閾値超えの
@@ -719,6 +795,7 @@ namespace EscapeNine.Runtime.UI
             game.OnGameOver -= HandleGameOver;
             game.OnStateChanged -= HandleStateChanged;
             game.OnBossWarning -= HandleBossWarning;
+            game.OnBossPatternChanged -= HandleBossPatternChanged;
         }
 
         private void TrySubscribe()
@@ -733,6 +810,7 @@ namespace EscapeNine.Runtime.UI
             game.OnGameOver += HandleGameOver;
             game.OnStateChanged += HandleStateChanged;
             game.OnBossWarning += HandleBossWarning;
+            game.OnBossPatternChanged += HandleBossPatternChanged; // Phase 5c: ボスパターン切替のカメラ演出
             _subscribed = true;
         }
 
@@ -843,6 +921,7 @@ namespace EscapeNine.Runtime.UI
             if (result == TurnResult.FloorCleared)
             {
                 _relicDraftScreenOpen = false; // 新しい階層クリアサイクルは必ずFloorClear表示から始まる
+                _routeChoiceScreenOpen = false; // Phase 5c: 同上 (ルート選択も FloorClear から始まる)
                 ShowFloorClear(); // 「スタート」で AdvanceToNextFloor (自動遷移しないのが正本仕様)
             }
             else if (result == TurnResult.Continued)
@@ -885,6 +964,8 @@ namespace EscapeNine.Runtime.UI
             _floorClearOverlay.SetActive(false);
             _relicDraftOverlay.SetActive(false); // Phase 5a: 進行済みなら念のため閉じておく (防御的)
             _relicDraftScreenOpen = false;
+            _routeChoiceOverlay.SetActive(false); // Phase 5c: 同上
+            _routeChoiceScreenOpen = false;
             _board.SnapNextRender(); // 新階層のランダム配置をスライドさせない
 
             // スキル回復通知 (Swift: showSkillReset)。判定式は GameController のコメント指定どおり。
@@ -923,6 +1004,19 @@ namespace EscapeNine.Runtime.UI
         {
             if (!isActiveAndEnabled) return;
             ShowBossWarning();
+        }
+
+        /// <summary>
+        /// Phase 5c: ボスパターンが切り替わったターンのカメラ演出 (§1.5/§5.2)。タイルの
+        /// 予告/赤熱表示自体は BoardStage.Render が毎拍 session から再計算するため、ここでは
+        /// 「パターンが変わった手応え」だけを担う。威圧 (最も危険) への切替は少し強めの軽い衝撃、
+        /// それ以外は控えめ。CameraRig 不在時は無演出で継続する (劣化許容)。
+        /// </summary>
+        private void HandleBossPatternChanged(BossPattern pattern)
+        {
+            if (!isActiveAndEnabled) return;
+            if (_cameraRig == null) return;
+            _cameraRig.Impulse(pattern == BossPattern.Intimidation ? 0.05f : 0.03f);
         }
 
         // MARK: - ユーザー操作
@@ -1025,6 +1119,16 @@ namespace EscapeNine.Runtime.UI
             App.I.Audio.PlaySfx("button_tap"); // Swift: GameButton 内蔵の buttonTap
             var game = App.I.Game;
 
+            // Phase 5c: ルート選択提示中 (§4: 階層クリア確定と同時に pending) なら、まずルート選択へ。
+            // 順序 FloorClear → RouteChoice → RelicDraft → Advance を UI 側でも保つ。
+            if (game.IsRouteChoicePending)
+            {
+                _routeChoiceScreenOpen = true;
+                _floorClearOverlay.SetActive(false);
+                ShowRouteChoice();
+                return;
+            }
+
             // Phase 5a: ドラフト提示中 (§2.1: 階層クリア確定と同時に候補生成済み) ならまだ
             // AdvanceToNextFloor を呼ばず、ドラフトオーバーレイへ切り替える (§6.3 のタスク仕様:
             // 「フロアクリアオーバーレイのスタート押下時にドラフトオーバーレイを表示」)。
@@ -1037,6 +1141,47 @@ namespace EscapeNine.Runtime.UI
             }
 
             game.AdvanceToNextFloor();
+        }
+
+        /// <summary>
+        /// Phase 5c: ルート選択の確定 (§4)。GameController.ChooseRoute → ルート選択オーバーレイを閉じ、
+        /// 深淵ルート報酬で生成され得るドラフトがあればドラフト画面へ、無ければ次階層へ進める。
+        /// カードタップ / 1・2 キー共通のハンドラ。
+        /// </summary>
+        private void HandleRouteChosen(RouteChoice choice)
+        {
+            var game = App.I.Game;
+            if (!game.IsRouteChoicePending) return; // 二重タップ等の防御
+
+            App.I.Audio.PlaySfx("button_tap");
+            game.ChooseRoute(choice); // IsRouteChoicePending=false + (Abyss なら) ドラフト候補生成
+
+            _routeChoiceScreenOpen = false;
+            _routeChoiceOverlay.SetActive(false);
+
+            // ルート確定後: ドラフトが提示されたらドラフト画面へ、無ければ次階層へ。
+            if (game.IsRelicDraftPending)
+            {
+                _relicDraftScreenOpen = true;
+                _floorClearOverlay.SetActive(false);
+                ShowRelicDraft();
+            }
+            else
+            {
+                game.AdvanceToNextFloor();
+            }
+        }
+
+        /// <summary>
+        /// Phase 6a (デスクトップ): ルート選択の 1/2 キー (KeyboardInput.cs から呼ばれる、§4)。
+        /// ドラフトの 1/2/3/4 キーとは pending 状態で排他 (KeyboardInput 側で分岐)。
+        /// ルート選択オーバーレイが実際に開いている間 (_routeChoiceScreenOpen) のみ受理する。
+        /// index 0 = 安全 (Safe) / 1 = 深淵 (Abyss)。
+        /// </summary>
+        public void SelectRouteFromKeyboard(int index)
+        {
+            if (!_routeChoiceScreenOpen) return;
+            HandleRouteChosen(index == 0 ? RouteChoice.Safe : RouteChoice.Abyss);
         }
 
         /// <summary>
@@ -1174,6 +1319,20 @@ namespace EscapeNine.Runtime.UI
         }
 
         /// <summary>
+        /// Phase 5c: ルート選択オーバーレイの表示 (§4/§1.5)。RefreshAll から毎回呼ばれても安全な冪等実装
+        /// (カードは静的テキストのため内容更新は不要、SlideIn 演出だけ立ち上がりエッジで実行)。
+        /// </summary>
+        private void ShowRouteChoice()
+        {
+            bool wasActive = _routeChoiceOverlay.activeSelf;
+            _routeChoiceOverlay.SetActive(true);
+            if (!wasActive)
+            {
+                FxKit.SlideIn(this, (RectTransform)_routeChoiceOverlay.transform, new Vector2(0f, -100f));
+            }
+        }
+
+        /// <summary>
         /// Phase 5a: レリックドラフトオーバーレイの表示 (§2.1/§6.3)。RefreshAll から毎回呼ばれても
         /// 安全な冪等実装 (カード内容は候補配列から都度再構築、SlideIn 演出だけ立ち上がりエッジで実行)。
         /// </summary>
@@ -1181,6 +1340,8 @@ namespace EscapeNine.Runtime.UI
         {
             var game = App.I.Game;
             var candidates = game.CurrentDraftCandidates;
+
+            LayoutRelicCards(candidates.Count); // Phase 5c: 3 枚 / 4 枚で縦積みの高さ・間隔を切り替える
 
             for (int i = 0; i < RelicDraftMaxCards; i++)
             {
@@ -1210,6 +1371,26 @@ namespace EscapeNine.Runtime.UI
             if (!wasActive)
             {
                 FxKit.SlideIn(this, (RectTransform)_relicDraftOverlay.transform, new Vector2(0f, -100f));
+            }
+        }
+
+        /// <summary>
+        /// Phase 5c: 候補数に応じて縦積みカードの中心 cy と高さを設定する (8px 重なり監査ルール意識)。
+        /// 3 枚以下は従来の 3 カード配置 (0.635/0.455/0.275, 高さ 0.155) を維持し、4 枚 (#18 蒐集家の目) の
+        /// ときだけ高さ 0.135・間隔 0.16 に詰める (中心間隔 0.16×2532px ≒ 405px、カード高 342px → 隙間 ~63px)。
+        /// </summary>
+        private void LayoutRelicCards(int count)
+        {
+            bool four = count >= 4;
+            float cardHeight = four ? 0.135f : 0.155f;
+            // 4 枚: {0.66, 0.50, 0.34, 0.18} / 3 枚以下: {0.635, 0.455, 0.275, (未使用)}
+            float[] cy = four
+                ? new[] { 0.66f, 0.50f, 0.34f, 0.18f }
+                : new[] { 0.635f, 0.455f, 0.275f, 0.275f };
+
+            for (int i = 0; i < RelicDraftMaxCards; i++)
+            {
+                UIFactory.Place((RectTransform)_relicCardSlots[i].transform, 0.5f, cy[i], 0.88f, cardHeight);
             }
         }
 
@@ -1319,6 +1500,7 @@ namespace EscapeNine.Runtime.UI
             _prevShieldActive = false;
             _lastComboCount = 0;
             _relicDraftScreenOpen = false; // Phase 5a: 前ランの「ドラフト画面を開いた」状態を持ち越さない
+            _routeChoiceScreenOpen = false; // Phase 5c: 同上 (ルート選択画面)
 
             if (_floorClearOverlay != null)
             {
@@ -1331,6 +1513,11 @@ namespace EscapeNine.Runtime.UI
             {
                 _relicDraftOverlay.SetActive(false);
                 ((RectTransform)_relicDraftOverlay.transform).anchoredPosition = Vector2.zero;
+            }
+            if (_routeChoiceOverlay != null)
+            {
+                _routeChoiceOverlay.SetActive(false);
+                ((RectTransform)_routeChoiceOverlay.transform).anchoredPosition = Vector2.zero;
             }
             if (_skillResetToast != null) _skillResetToast.SetActive(false);
             if (_pregameOverlay != null) _pregameOverlay.SetActive(false);
@@ -1369,6 +1556,7 @@ namespace EscapeNine.Runtime.UI
                 _pausedOverlay.SetActive(false);
                 _floorClearOverlay.SetActive(false);
                 _relicDraftOverlay.SetActive(false);
+                _routeChoiceOverlay.SetActive(false);
                 _relicCountLabel.gameObject.SetActive(false);
                 _board.Render(null, true, null, null);
                 return;
@@ -1397,24 +1585,33 @@ namespace EscapeNine.Runtime.UI
             _pauseButtonLabel.text = session.Status == GameStatus.Paused ? "再開" : "一時停止";
             _pausedOverlay.SetActive(session.Status == GameStatus.Paused);
 
-            // Phase 5a: FloorClear / RelicDraft の2オーバーレイの表示権はここで一元管理する。
-            // IsRelicDraftPending は階層クリア確定と同時に true になる (§2.1) が、UI 上は
-            // 「スタート」を押す (_relicDraftScreenOpen=true) までドラフト画面を出さない —
-            // よって両方 true の間は「まだ FloorClear を見せている」と判定して FloorClear を出す。
-            if (game.IsRelicDraftPending && _relicDraftScreenOpen)
+            // Phase 5a/5c: FloorClear / RouteChoice / RelicDraft の 3 オーバーレイの表示権はここで一元管理する。
+            // IsRouteChoicePending / IsRelicDraftPending は階層クリア確定と同時に true になり得るが、UI 上は
+            // 「スタート」を押す (_routeChoiceScreenOpen / _relicDraftScreenOpen=true) まで各画面を出さない —
+            // よって pending でも screenOpen でない間は「まだ FloorClear を見せている」と判定して FloorClear を出す。
+            if (game.IsRouteChoicePending && _routeChoiceScreenOpen)
             {
                 _floorClearOverlay.SetActive(false);
+                _relicDraftOverlay.SetActive(false);
+                ShowRouteChoice();
+            }
+            else if (game.IsRelicDraftPending && _relicDraftScreenOpen)
+            {
+                _floorClearOverlay.SetActive(false);
+                _routeChoiceOverlay.SetActive(false);
                 ShowRelicDraft();
             }
-            else if (game.IsFloorClearPending && !_relicDraftScreenOpen)
+            else if (game.IsFloorClearPending && !_relicDraftScreenOpen && !_routeChoiceScreenOpen)
             {
                 ShowFloorClear();
                 _relicDraftOverlay.SetActive(false);
+                _routeChoiceOverlay.SetActive(false);
             }
             else
             {
                 _floorClearOverlay.SetActive(false);
                 _relicDraftOverlay.SetActive(false);
+                _routeChoiceOverlay.SetActive(false);
             }
 
             // 所持レリック簡易カウンタ (§6.3。一覧表示へのタップ導線は Phase 5b 送り)

@@ -85,6 +85,41 @@ namespace EscapeNine.Runtime
         /// <summary>ChooseRelic でレリックが確定した (Swift正本には対応なし)。</summary>
         public event System.Action OnRelicChosen;
 
+        // ---- Phase 5c: 分岐ルート (docs/unity-phase5-roguelike-design.md §4/§6.3) ----
+        // Swift正本には存在しない (Unity固有の追加機能)。順序: FloorCleared → RouteChoice →
+        // RelicDraft(5a既存) → Advance。RouteChoice が pending の間は RelicDraft/Advance をブロックする
+        // (IsRelicDraftPending ゲートの手前に挿入)。
+
+        /// <summary>分岐ルート選択の開始階層 (§4「頻度」: 初心者配慮で Floor 6 以降から提示)。</summary>
+        private const int RouteChoiceStartFloor = 6;
+
+        /// <summary>深淵ルート選択時の残光ボーナス (§4「深淵の報酬側」。少額の [要検証] 仮値)。</summary>
+        private const int AbyssGlowBonus = 15;
+
+        /// <summary>分岐ルート選択提示中か。デイリーチャレンジ中は公平性のため常に false (§4)。
+        /// IsRelicDraftPending と同じ「ゲート」設計思想: true の間は AdvanceToNextFloor を無視する。</summary>
+        public bool IsRouteChoicePending { get; private set; }
+
+        /// <summary>次の AdvanceToNextFloor で NextFloor(choice) に渡すルート選択 (この階層限定)。
+        /// AdvanceToNextFloor が消費した後は Safe に戻す (Core 側も「1階層限定」で自動クリアする)。</summary>
+        private RouteChoice _pendingRouteChoice = RouteChoice.Safe;
+
+        /// <summary>階層クリア確定と同時に分岐ルート選択が提示された (Swift正本には対応なし)。</summary>
+        public event System.Action OnRouteChoiceOffered;
+
+        /// <summary>ChooseRoute でルートが確定した (Swift正本には対応なし)。</summary>
+        public event System.Action OnRouteChosen;
+
+        // ---- Phase 5c: ボスパターン・テレグラフ (§1.5/§5) ----
+
+        /// <summary>ボス階でパターンが変わったターンに発火する (§5.2: UI が次パターンをテレグラフ表示)。
+        /// ボス階進入時 (最初のパターン) と、ボス階内で 2 ターンごとに切り替わった時に発火する。</summary>
+        public event System.Action<BossPattern> OnBossPatternChanged;
+
+        // ボスパターン変化検知用のスナップショット (floor が変われば強制再通知)。
+        private BossPattern? _lastBroadcastBossPattern;
+        private int _lastBroadcastBossFloor = -1;
+
         /// <summary>直近の移動タイミング判定。Swift: lastTimingGrade (表示の 0.8 秒消去は UI 側)</summary>
         public TimingGrade? LastTimingGrade { get; private set; }
 
@@ -225,6 +260,13 @@ namespace EscapeNine.Runtime
             _ownedRelicIds.Clear();
             CurrentDraftCandidates = Array.Empty<RelicDefinition>();
             IsRelicDraftPending = false;
+
+            // Phase 5c: 分岐ルート/ボスパターンの状態も完全にラン限りで持ち越さない。
+            IsRouteChoicePending = false;
+            _pendingRouteChoice = RouteChoice.Safe;
+            _lastBroadcastBossPattern = null;
+            _lastBroadcastBossFloor = -1;
+
             TurnCountdown = _turnBeats;
             _resultPersisted = false; // 新しいランのスコア送信/自己ベスト更新をまた許可する
             LastUnlockedAchievements = Array.Empty<Achievement>(); // 前ランのポップアップ対象を持ち越さない
@@ -313,18 +355,139 @@ namespace EscapeNine.Runtime
         }
 
         /// <summary>
+        /// Phase 5c: 分岐ルート選択を確定する (§4)。Swift正本には対応なし。
+        /// 選択は「次の AdvanceToNextFloor が NextFloor(choice) へ渡す」ことで、その1階層限定で
+        /// 実効AIレベル+特殊ルールの前倒しに反映される (Core: RouteFloorOverride)。
+        /// 深淵ルートは残光ボーナス付与 + 直後のドラフトに Rare 以上を1枠確定で含める (§4「深淵の報酬側」)。
+        /// UI (RouteChoiceScreen 相当のオーバーレイ) の 1/2 キー・カードタップの両方から呼ばれる。
+        /// </summary>
+        public void ChooseRoute(RouteChoice choice)
+        {
+            if (!IsRouteChoicePending) return;
+
+            _pendingRouteChoice = choice;
+            IsRouteChoicePending = false;
+
+            if (choice == RouteChoice.Abyss)
+            {
+                // 残光ボーナス (§4)。_player は Configure で注入済みだが防御的に null 条件で呼ぶ。
+                _player?.AddMetaCurrency(AbyssGlowBonus);
+            }
+
+            // ルート確定後に初めてドラフト候補を生成する (Abyss の Rare+ 確定枠を反映するため、
+            // FloorCleared 時点ではなくここまで遅延させている)。
+            OfferRelicDraft(guaranteeRarePlus: choice == RouteChoice.Abyss);
+
+            OnRouteChosen?.Invoke();
+            OnStateChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Phase 5a/5c: 階層クリア確定後のレリックドラフト候補を生成し、条件を満たせば提示状態にする。
+        /// RouteChoice を提示しない階層 (Floor&lt;6/デイリー) では FloorCleared から直接、提示する階層では
+        /// ChooseRoute から呼ばれる (§6.3 の順序)。デイリー中の無効化・DraftInterval/上限判定・
+        /// #18 蒐集家の目の候補数+1 は既存 (Phase 5a/5b) と同一ロジック。
+        /// </summary>
+        /// <param name="guaranteeRarePlus">深淵ルート報酬 (§4): 候補に Rare 以上が1枠も無ければ差し替える。</param>
+        private void OfferRelicDraft(bool guaranteeRarePlus)
+        {
+            if (Session.DailyChallengeMode) return; // 二重防御 (呼び出し側でも判定済み)
+            if (!RelicConfig.ShouldOfferDraft(Session.CurrentFloor, _ownedRelicIds.Count)) return;
+
+            int draftCount = Session.Relics.DraftCandidateBonusFloorsRemaining > 0 ? 4 : 3;
+            var candidates = _relicDraftService.DraftCandidates(
+                _ownedRelicIds,
+                Session.CurrentCharacter.Type,
+                count: draftCount,
+                selectedAI: Session.SelectedAILevel,
+                floor: Session.CurrentFloor);
+            if (Session.Relics.DraftCandidateBonusFloorsRemaining > 0)
+            {
+                Session.Relics.DraftCandidateBonusFloorsRemaining--;
+            }
+
+            if (guaranteeRarePlus && candidates.Count > 0)
+            {
+                EnsureRarePlusSlot(candidates);
+            }
+
+            if (candidates.Count > 0)
+            {
+                CurrentDraftCandidates = candidates;
+                IsRelicDraftPending = true;
+                OnRelicDraftOffered?.Invoke();
+            }
+            // candidates.Count == 0 (プール完全枯渇) はドラフト非提示のまま次階層へ進む。
+        }
+
+        /// <summary>
+        /// 深淵ルート報酬 (§4): 候補に Rare 以上が1枠も無ければ、RelicCatalog から未所持・未提示の
+        /// Rare 以上を引いて最低レアリティのスロットへ差し替える。RelicDraftService に Rare+ 確定オプションが
+        /// 無いため Runtime 側で実装する (Core は非改変)。差し替え候補が無ければ何もしない (正直な縮退)。
+        /// §2.2 原則5 (魔法使いは HardAICounter を絶対に見せない) はここでも尊重する。
+        /// </summary>
+        private void EnsureRarePlusSlot(List<RelicDefinition> candidates)
+        {
+            foreach (var c in candidates)
+            {
+                if (c.Rarity >= RelicRarity.Rare) return; // 既に Rare+ を含む
+            }
+
+            var ownedCounts = new Dictionary<string, int>();
+            foreach (var id in _ownedRelicIds)
+            {
+                ownedCounts[id] = ownedCounts.TryGetValue(id, out var c) ? c + 1 : 1;
+            }
+
+            var pool = new List<RelicDefinition>();
+            foreach (var def in RelicCatalog.All)
+            {
+                if (def.Rarity < RelicRarity.Rare) continue;
+                int owned = ownedCounts.TryGetValue(def.Id, out var oc) ? oc : 0;
+                if (owned >= def.StackLimit) continue;
+
+                bool alreadyOffered = false;
+                foreach (var c in candidates)
+                {
+                    if (c.Id == def.Id) { alreadyOffered = true; break; }
+                }
+                if (alreadyOffered) continue;
+
+                // §2.2 原則5: 魔法使いは HardAICounter レリックをドラフト対象外にする明示ルール。
+                if (Session.CurrentCharacter.Type == CharacterType.Wizard
+                    && (def.Tags & RelicTag.HardAICounter) != 0) continue;
+
+                pool.Add(def);
+            }
+            if (pool.Count == 0) return; // 差し替えられる Rare+ が尽きている場合は諦める
+
+            var replacement = pool[UnityEngine.Random.Range(0, pool.Count)];
+            int replaceIdx = 0;
+            for (int i = 1; i < candidates.Count; i++)
+            {
+                if (candidates[i].Rarity < candidates[replaceIdx].Rarity) replaceIdx = i;
+            }
+            candidates[replaceIdx] = replacement;
+        }
+
+        /// <summary>
         /// 階層クリア画面の「スタート」ボタンから呼ぶ (Swift: GameView の floorClearOverlay →
         /// viewModel.nextFloor()。自動遷移ではなくユーザー操作起点なのが正本仕様)。
         /// </summary>
         public void AdvanceToNextFloor()
         {
             if (!IsFloorClearPending) return;
-            // Phase 5a: レリック選択が済むまで次階層へ進ませない (§6.3 の順序:
-            // FloorCleared → RelicDraft → AdvanceToNextFloor 解禁)。
+            // Phase 5c: ルート選択が済むまで次階層へ進ませない (§6.3 の順序:
+            // FloorCleared → RouteChoice → RelicDraft → AdvanceToNextFloor 解禁)。
+            // RelicDraft ゲートの手前に挿入する。
+            if (IsRouteChoicePending) return;
+            // Phase 5a: レリック選択が済むまで次階層へ進ませない。
             if (IsRelicDraftPending) return;
             IsFloorClearPending = false;
 
-            var advance = Session.NextFloor();
+            // Phase 5c: 選んだルートを「その1階層限定」で Core へ渡す。既定 Safe なら従来挙動。
+            var advance = Session.NextFloor(_pendingRouteChoice);
+            _pendingRouteChoice = RouteChoice.Safe; // 消費したら次回に持ち越さない (Core も同様に自動クリア)
             if (advance == FloorAdvanceResult.GameWon)
             {
                 // Swift 同様、currentFloor=101 のまま endGame(.win) (スコアも 101 で送信される仕様を踏襲)
@@ -419,6 +582,11 @@ namespace EscapeNine.Runtime
             _phase = Phase.Idle;
             IsGameStartCountdownActive = false;
             IsFloorClearPending = false;
+            // Phase 5c: 分岐ルート/ボスパターンの pending・スナップショットもホーム帰還時にリセット。
+            IsRouteChoicePending = false;
+            _pendingRouteChoice = RouteChoice.Safe;
+            _lastBroadcastBossPattern = null;
+            _lastBroadcastBossFloor = -1;
             LastTimingGrade = null;
             TurnCountdown = _turnBeats;
 
@@ -456,6 +624,7 @@ namespace EscapeNine.Runtime
                 _phase = Phase.Playing;
                 _conductor.ChangeBPM(bpm);
                 OnGameStarted?.Invoke();
+                RaiseBossPatternIfChanged(); // Phase 5c: ボス階なら最初のパターンをテレグラフ通知
                 return;
             }
 
@@ -485,6 +654,7 @@ namespace EscapeNine.Runtime
             TurnCountdown = EffectiveTurnBeats; // Phase 5b #16 刻の猶予
             _conductor.ChangeBPM(_startCountdownBpm);
             OnGameStarted?.Invoke();
+            RaiseBossPatternIfChanged(); // Phase 5c: ボス階なら最初のパターンをテレグラフ通知
             _startCountdownCoroutine = null;
 
             // Swift: GO! 表示を 0.5 秒後に消す。その間 isGameStartCountdownActive は true のままで
@@ -566,6 +736,9 @@ namespace EscapeNine.Runtime
                     _audio.PlaySfx("move");
                     TurnCountdown = EffectiveTurnBeats; // Swift: onBeat 側の turnCountdown リセット相当 + Phase 5b #16 刻の猶予
                     OnTurnResolved?.Invoke(result);
+                    // Phase 5c: ボス階内で 2 ターンごとにパターンが切り替わる (Core が _bossPatternTurnCounter を
+                    // ResolveTurn 内で加算済み)。切り替わったターンに次パターンをテレグラフ通知する (§5.2)。
+                    RaiseBossPatternIfChanged();
                     break;
 
                 case TurnResult.FloorCleared:
@@ -573,42 +746,24 @@ namespace EscapeNine.Runtime
                     _phase = Phase.FloorClear; // 以後の拍は無視 (Swift: pauseBGM でメトロノーム停止)
                     IsFloorClearPending = true;
 
-                    // Phase 5a: 階層クリア確定と同時にレリックドラフト候補を生成する
-                    // (docs/unity-phase5-roguelike-design.md §2.1)。デイリーチャレンジ中は
-                    // 同一日替わりシードに挑む全プレイヤー間の公平性を優先し無効化する (§8)。
+                    // Phase 5c: 順序 FloorCleared → RouteChoice → RelicDraft → Advance (§6.3)。
+                    // 分岐ルート提示条件を満たす階層 (Floor 6 以降・非デイリー) では、まず RouteChoice を
+                    // pending にし、ドラフト候補生成は ChooseRoute まで遅延させる (深淵ルートの Rare+ 確定枠を
+                    // 反映するため)。条件を満たさない階層 (Floor<6/デイリー) は従来どおり即ドラフト提示。
                     //
-                    // Phase 5c: RelicConfig.ShouldOfferDraft (DraftInterval / MaxRelicsPerRun) で
-                    // 「そもそも今回ドラフトを提示するか」を先に判定する (BALANCE_REPORT_PHASE5.md 案A/B)。
-                    // #18 蒐集家の目の残り階層カウント (DraftCandidateBonusFloorsRemaining) は、
-                    // この判定を通過して実際にドラフトを検討する回 (=提示された回) にのみ消費する。
-                    // 「N階層分」ではなく「次のドラフト提示N回分」の意味に変わる点は既知の仕様変更
-                    // ([要検証] BALANCE_REPORT_PHASE5.md 参照。DraftInterval > 1 の間は提示されない
-                    // 階層で無為に減らないほうが自然という判断)。
-                    if (!Session.DailyChallengeMode
-                        && RelicConfig.ShouldOfferDraft(Session.CurrentFloor, _ownedRelicIds.Count))
+                    // デイリーチャレンジ中は分岐ルート/ドラフトとも無効化する (§4/§8: 同一日替わりシードに
+                    // 挑む全プレイヤー間の公平性を優先)。
+                    if (ShouldOfferRouteChoice())
                     {
-                        // Phase 5b: §2.2 の弱点タグ重み付け (character/selectedAI/floor) を渡す。
-                        // #18 蒐集家の目 (DraftCandidateBonusFloorsRemaining) 所持中は候補数を3→4に
-                        // 増やし、この1回のドラフト提示ぶんだけ残り階層数を消費する。
-                        int draftCount = Session.Relics.DraftCandidateBonusFloorsRemaining > 0 ? 4 : 3;
-                        var candidates = _relicDraftService.DraftCandidates(
-                            _ownedRelicIds,
-                            Session.CurrentCharacter.Type,
-                            count: draftCount,
-                            selectedAI: Session.SelectedAILevel,
-                            floor: Session.CurrentFloor);
-                        if (Session.Relics.DraftCandidateBonusFloorsRemaining > 0)
-                        {
-                            Session.Relics.DraftCandidateBonusFloorsRemaining--;
-                        }
-                        if (candidates.Count > 0)
-                        {
-                            CurrentDraftCandidates = candidates;
-                            IsRelicDraftPending = true;
-                            OnRelicDraftOffered?.Invoke();
-                        }
-                        // candidates.Count == 0 (プール完全枯渇) の場合はドラフト非提示のまま
-                        // (§2.1 のメタ通貨フォールバックは本タスクのスコープ外、§9未決事項)。
+                        _pendingRouteChoice = RouteChoice.Safe; // 選択されるまでの既定
+                        IsRouteChoicePending = true;
+                        OnRouteChoiceOffered?.Invoke();
+                    }
+                    else
+                    {
+                        _pendingRouteChoice = RouteChoice.Safe;
+                        // Floor<6/デイリーではルート選択がないため確定 Rare+ 枠なし (guaranteeRarePlus=false)。
+                        OfferRelicDraft(guaranteeRarePlus: false);
                     }
 
                     _audio.PlaySfx("floor_clear"); // Swift: playSoundEffect(.floorClear)
@@ -632,6 +787,37 @@ namespace EscapeNine.Runtime
                     HandleDefeat(Session.LastDefeatReason ?? DefeatReason.CaughtByEnemy);
                     break;
             }
+        }
+
+        /// <summary>Phase 5c: 分岐ルート選択を提示すべき階層か (§4)。
+        /// デイリーチャレンジ中は公平性のため常に false、Floor 6 以降でのみ提示する。</summary>
+        private bool ShouldOfferRouteChoice()
+        {
+            return !Session.DailyChallengeMode
+                && Session.CurrentFloor >= RouteChoiceStartFloor;
+        }
+
+        /// <summary>
+        /// Phase 5c: ボス階でパターンが変わったら OnBossPatternChanged を発火する (§5.2)。
+        /// ボス階進入時の最初のパターン (Pursuit) も 1 回通知する (floor が変われば強制再通知)。
+        /// 非ボス階ではスナップショットをリセットするだけで発火しない。
+        /// </summary>
+        private void RaiseBossPatternIfChanged()
+        {
+            if (Session == null || !Session.IsBossFloor)
+            {
+                _lastBroadcastBossPattern = null;
+                _lastBroadcastBossFloor = -1;
+                return;
+            }
+
+            BossPattern current = Session.CurrentBossPattern;
+            if (_lastBroadcastBossFloor == Session.CurrentFloor
+                && _lastBroadcastBossPattern == current) return;
+
+            _lastBroadcastBossPattern = current;
+            _lastBroadcastBossFloor = Session.CurrentFloor;
+            OnBossPatternChanged?.Invoke(current);
         }
 
         // MARK: - Game Over / End Game

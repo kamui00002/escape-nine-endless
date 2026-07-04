@@ -114,6 +114,7 @@ namespace EscapeNine.Runtime.Stage
             }
 
             ApplyZoneAndFog(session);
+            ApplyBossTelegraph(session); // Phase 5c: ボスパターンのテレグラフ (タイル Render 前に確定させる)
 
             _enemyPosition = session.EnemyPosition;
             var available = session.GetAvailableMoves();
@@ -143,6 +144,49 @@ namespace EscapeNine.Runtime.Stage
             SetPawnTarget(ref _enemyFrom, ref _enemyTo, ref _enemyT, _enemy, WorldCenterOf(session.EnemyPosition));
 
             _snapNext = false;
+        }
+
+        /// <summary>
+        /// Phase 5c: ボス階のパターンに応じてタイルへテレグラフ (予告/赤熱) を設定する (§1.5/§5)。
+        /// - Intimidation: TemporaryBossZone のマスを赤熱 (進入不可の予告)。
+        /// - Foresight: GameSession に「予測先マス」を出す公開手段が無いため、正直な縮退として
+        ///   ボス (敵) 隣接マスを青白く明滅させるに留める (§5.1② 設計注記どおり)。
+        /// - Pursuit: テレグラフなし。
+        /// 情報パリティ (§2 絶対制約): 霧で見えないマスにはテレグラフを出さない (敵位置の間接漏洩防止)。
+        /// </summary>
+        private void ApplyBossTelegraph(GameSession session)
+        {
+            for (int pos = 1; pos <= GameConfig.GridSize; pos++)
+            {
+                _tiles[pos].SetBossTelegraph(TileView.BossTelegraphKind.None);
+            }
+
+            if (!session.IsBossFloor) return;
+
+            switch (session.CurrentBossPattern)
+            {
+                case BossPattern.Intimidation:
+                    foreach (int p in session.TemporaryBossZone)
+                    {
+                        if (p >= 1 && p <= GameConfig.GridSize && session.IsCellVisible(p))
+                        {
+                            _tiles[p].SetBossTelegraph(TileView.BossTelegraphKind.Intimidation);
+                        }
+                    }
+                    break;
+
+                case BossPattern.Foresight:
+                    foreach (int p in GameEngine.GetAvailableMoves(session.EnemyPosition))
+                    {
+                        if (p >= 1 && p <= GameConfig.GridSize && session.IsCellVisible(p))
+                        {
+                            _tiles[p].SetBossTelegraph(TileView.BossTelegraphKind.Foresight);
+                        }
+                    }
+                    break;
+
+                // Pursuit: テレグラフなし
+            }
         }
 
         private void RenderEmpty()
