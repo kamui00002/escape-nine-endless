@@ -115,6 +115,48 @@ namespace EscapeNine.Core
             return predictedMove;
         }
 
+        // MARK: - Boss patterns (Phase 5c, Swift正本には存在しない)
+        // docs/unity-phase5-roguelike-design.md §5.1・§5.3。既存 CalculateNextMove は変更しない (原則1)。
+
+        /// <summary>
+        /// ボス階専用の移動計算。パターンごとにアルゴリズムを切り替える (§5.1)。
+        /// 呼び出し元 (GameSession.ResolveTurn) は、ボス階では effective (Floor.GetEffectiveAILevel)
+        /// を経由するこの既存 CalculateNextMove ではなく、必ずこちらを経由する (§5.3)。
+        /// </summary>
+        /// <param name="turnIndexInFloor">ボス階内の経過ターン数 (0始まり)。①②③いずれの移動計算自体も
+        /// この値に依存しないが、③威圧パターンの対象マス選定 (CalculateIntimidationZone) と揃えるため
+        /// シグネチャに含める。</param>
+        public int CalculateBossMove(int enemyPosition, int playerPosition, BossPattern pattern, int turnIndexInFloor)
+        {
+            if (pattern == BossPattern.Foresight)
+            {
+                // §5.1②: HardAI (PredictPlayerMove を使った決定論的先読み) をそのまま流用。
+                return HardAI(enemyPosition, playerPosition);
+            }
+
+            // §5.1①・③: 移動アルゴリズムは既存 BossAI (追跡95%/ランダム5%) を両パターン共通で流用する。
+            // ③威圧は「移動を止めて隣接マスを警告する」のではなく「追跡を続けたまま隣接マスにも威圧を
+            // 上乗せする」加算的な効果として実装した — §5.2 が③をFloor40+で解禁する理由を「既存の
+            // 難易度ランプ哲学と整合させる」と明記しているため、移動を止める実装だと最新解禁パターンの
+            // ターンがむしろ休憩ターンになり、意図しているはずのランプが逆転してしまう。
+            // どのマスを1ターン進入不可にするかは CalculateIntimidationZone / GameSession.TemporaryBossZone
+            // が別途・独立に決定する。
+            return BossAI(enemyPosition, playerPosition);
+        }
+
+        /// <summary>
+        /// ③威圧パターン: 敵の隣接マス (上下左右) のうち、1ターンだけ進入不可にする対象を
+        /// 決定論的に選ぶ (turnIndexInFloor による周期選択、乱数を消費しない)。
+        /// ヘッドレスsim/テストで決定論的に検証できる (Tier1、§5.3)。隣接マスが存在しない場合は null。
+        /// </summary>
+        public int? CalculateIntimidationZone(int enemyPosition, int turnIndexInFloor)
+        {
+            var adjacent = GameEngine.GetAvailableMoves(enemyPosition);
+            if (adjacent.Count == 0) return null;
+            int index = ((turnIndexInFloor % adjacent.Count) + adjacent.Count) % adjacent.Count;
+            return adjacent[index];
+        }
+
         // MARK: - Helpers
 
         /// <summary>プレイヤーから最も離れる移動先 (マンハッタン距離最大)。Swift: getMoveAwayFromPlayer</summary>

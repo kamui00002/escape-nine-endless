@@ -68,6 +68,42 @@ namespace EscapeNine.Core
         /// 階層開始時に Relics.DisappearForgivenessPerFloor へ再チャージされる (§2.4)。</summary>
         private int _disappearForgivenessRemainingThisFloor;
 
+        // --- Phase 5c 分岐ルート (Unity固有拡張、Swift正本には存在しない) ---
+        // docs/unity-phase5-roguelike-design.md §4・§6.1。「1階層限定」のオーバーライドとして保持し、
+        // 次の NextFloor(RouteChoice) 呼び出しで自動的に (既定Safeへ、または新しい選択へ) 差し替わる。
+        private RouteFloorOverride _routeOverride = RouteFloorOverride.Safe;
+
+        /// <summary>直近の NextFloor(RouteChoice) で選ばれたルート (この階層限定)。既定 Safe。</summary>
+        public RouteChoice CurrentRouteChoice => _routeOverride.Choice;
+
+        // --- Phase 5c ボスパターン (Unity固有拡張、Swift正本には存在しない) ---
+        // docs/unity-phase5-roguelike-design.md §5・§6.1。ボス階 (10の倍数) に入ってからの経過ターン数。
+        // StartGame/NextFloor で 0 にリセットし、ResolveTurn の末尾で1ずつ加算する。
+        private int _bossPatternTurnCounter;
+
+        /// <summary>現在のボスパターン (§5.2のローテーション)。ボス階以外では意味を持たないため
+        /// 便宜上 Pursuit を返す (ResolveTurn 側は IsBossFloor で参照有無そのものを分岐しているため、
+        /// 非ボス階でのこの既定値が実際の挙動に影響することはない)。</summary>
+        public BossPattern CurrentBossPattern => IsBossFloor
+            ? BossPatternRotation.PatternForTurn(_bossPatternTurnCounter, CurrentFloor)
+            : BossPattern.Pursuit;
+
+        /// <summary>③威圧パターンが有効なターンにのみ、進入禁止となる隣接マスの集合 (それ以外は空集合)。
+        /// DisappearedCells とは独立 (§5.3)。EnemyPosition/_bossPatternTurnCounter に基づく計算プロパティ
+        /// のため、ResolveTurn 呼び出し前 (GetAvailableMoves での除外・UIのテレグラフ表示) でも参照できる。</summary>
+        public HashSet<int> TemporaryBossZone
+        {
+            get
+            {
+                if (CurrentBossPattern == BossPattern.Intimidation)
+                {
+                    int? zone = _ai.CalculateIntimidationZone(EnemyPosition, _bossPatternTurnCounter);
+                    if (zone.HasValue) return new HashSet<int> { zone.Value };
+                }
+                return new HashSet<int>();
+            }
+        }
+
         public GameSession(Character character, AILevel selectedAILevel = AILevel.Easy, AIEngine ai = null, IRandomSource rng = null)
         {
             CurrentCharacter = character;
@@ -141,6 +177,9 @@ namespace EscapeNine.Core
             ComboCount = 0;
             // #11 影の抜け道 (5aカタログ外だがフックとして実装)。Relics.None なら常に0のため実質no-op。
             _disappearForgivenessRemainingThisFloor = Relics.DisappearForgivenessPerFloor;
+            // Phase 5c: ゲーム開始 (Floor1固定 or デバッグ開始階層) にはルート選択の余地がないため常にSafe。
+            _routeOverride = RouteFloorOverride.Safe;
+            _bossPatternTurnCounter = 0;
 
             // 配置 (Swift: 1..9 の distinct。消失計算は配置後なので player/enemy は消えない)
             // #10 護りの起点: enemyPos が明示指定されていない場合のみ、Relics.MinStartDistance を
@@ -173,11 +212,18 @@ namespace EscapeNine.Core
             UpdateDisappearedCells();
         }
 
-        /// <summary>次階層へ。Swift: nextFloor() のロジック部分。100階層踏破で GameWon。</summary>
-        public FloorAdvanceResult NextFloor()
+        /// <summary>次階層へ。Swift: nextFloor() のロジック部分。100階層踏破で GameWon。
+        /// Phase 5c (§4): choice=Abyss のとき、この1階層限定で実効AIレベル+1段(Hard据え置き)と
+        /// 特殊ルール1段階前倒しの両方を適用する (CurrentRouteChoice / 各derivedプロパティ経由で反映)。
+        /// DailyChallengeMode 中は choice に関わらず常に Safe 扱い (公平性のため、レリックドラフトと同じ扱い)。
+        /// 選択は「1階層限定」で、次の NextFloor 呼び出し時に (既定Safeへ、または新しい選択へ) 自動的に
+        /// 差し替わる。既定引数のため既存呼び出し元 session.NextFloor() は無改修で動作する。</summary>
+        public FloorAdvanceResult NextFloor(RouteChoice choice = RouteChoice.Safe)
         {
             CurrentFloor += 1;
             TurnCount = 0;
+            _routeOverride = DailyChallengeMode ? RouteFloorOverride.Safe : RouteFloorOverride.For(choice);
+            _bossPatternTurnCounter = 0;
 
             // 10階層ごとにスキル使用回数をリセット (Swift と同条件: floor % interval == 1)
             if (CurrentFloor % GameConfig.SkillResetInterval == 1)
@@ -200,7 +246,7 @@ namespace EscapeNine.Core
                 return FloorAdvanceResult.GameWon;
             }
 
-            CurrentSpecialRule = Floor.GetSpecialRule(CurrentFloor);
+            CurrentSpecialRule = _routeOverride.ApplyToSpecialRule(Floor.GetSpecialRule(CurrentFloor));
             UpdateDisappearedCells();
 
             // 配置 (消失マスを避ける)
@@ -290,6 +336,13 @@ namespace EscapeNine.Core
                 }
             }
 
+            // Phase 5c ③威圧パターン: TemporaryBossZone は DisappearedCells と独立した一時集合のため、
+            // 消失マス救済系レリック (#11 影の抜け道 等) の対象にしない (§5.3の意図的な仕様決定)。
+            if (TemporaryBossZone.Contains(next))
+            {
+                return Defeat(DefeatReason.CaughtByEnemy);
+            }
+
             // 同時移動: 敵の次位置を「プレイヤー移動前」の位置を目標に計算
             int previousPlayer = PlayerPosition;
             int previousEnemy = EnemyPosition;
@@ -299,9 +352,17 @@ namespace EscapeNine.Core
             {
                 EnemyStoppedTurns -= 1; // 拘束中は移動しない
             }
+            else if (IsBossFloor)
+            {
+                // Phase 5c §5.3: ボス階は effective (Floor.GetEffectiveAILevel) を経由せず
+                // CalculateBossMove を経由する。そのため #9 幻惑の粉 / #2 残像のヴェール
+                // (どちらも下の effective の書き換えが前提) はボス階では自然に no-op になる
+                // (意図的な仕様決定。ボスの読み合いをレリックで無力化させない)。
+                nextEnemy = _ai.CalculateBossMove(EnemyPosition, PlayerPosition, CurrentBossPattern, _bossPatternTurnCounter);
+            }
             else
             {
-                AILevel effective = Floor.GetEffectiveAILevel(CurrentFloor, SelectedAILevel);
+                AILevel effective = _routeOverride.ApplyToEffectiveAILevel(Floor.GetEffectiveAILevel(CurrentFloor, SelectedAILevel));
 
                 // #2 残像のヴェール: 斜め移動を消費したターンは、敵の移動をEasy相当に強制する。
                 // #9 幻惑の粉 (5aカタログ外だがフックとして実装): 実効AIがHardのときのみNormalへ格下げ
@@ -362,6 +423,7 @@ namespace EscapeNine.Core
             }
 
             TurnCount++;
+            _bossPatternTurnCounter++; // Phase 5c: ボス階以外でも加算するが、非ボス階では未参照のため無害
             if (TurnCount >= MaxTurns) return TurnResult.FloorCleared;
             return TurnResult.Continued;
         }
@@ -435,8 +497,10 @@ namespace EscapeNine.Core
                 moves.AddRange(GetDiagonalMoves(PlayerPosition));
             }
 
+            // Phase 5c: ③威圧パターンの一時ゾーンも消失マスと同様に選択不可にする (§5.3)。
+            var bossZone = TemporaryBossZone;
             return new HashSet<int>(moves)
-                .Where(p => !DisappearedCells.Contains(p) && p != PlayerPosition)
+                .Where(p => !DisappearedCells.Contains(p) && !bossZone.Contains(p) && p != PlayerPosition)
                 .ToList();
         }
 
@@ -475,6 +539,7 @@ namespace EscapeNine.Core
             var available = GetAvailableMoves();
             if (!available.Contains(position)) return false;
             if (DisappearedCells.Contains(position)) return false;
+            if (TemporaryBossZone.Contains(position)) return false; // Phase 5c ③威圧パターン (§5.3)
 
             PendingPlayerMove = position;
             if (grade == TimingGrade.Just || grade == TimingGrade.Good)
