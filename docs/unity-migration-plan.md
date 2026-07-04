@@ -274,6 +274,19 @@ Phase 0 (Tier 0-1) → Phase 1 検証 (Tier 0) → Phase 2 UI (Tier 2)
 - **W5 品質ティア + 旧盤面削除**: `StageQuality`（High/Medium/Low。High=Bloom フル+パーティクル40+HDR RT / Medium=Bloom 0.6 倍+24+HDR / Low=Bloom オフ+0+LDR RT。既定はデスクトップ High / モバイル Medium）+ 設定画面「演出設定」カードに演出品質セグメント（`PlayerState` の `stageQualityTier` キーに永続化、反映は次のゲーム画面表示から）。旧 uGUI 盤面（GridBoardWidget / GridBoardWidgetAdapter / GridCellWidget）を削除し BoardStage へ一本化（D4、R7 の二重保守解消）。`CellVisual` は `Stage/CellVisual.cs` へ移設
 - **⚠️ 残る人間ゲート（未通過）**: iOS 実機での Phase 0 リズム精度ハーネス再実行 + オーナー体感 GO/NO-GO、および §5 性能予算（60fps 張り付き / GPU ≤12ms / ドローコール ≤60）の実機実測。これを通過して初めて設計文書 §10 の完了条件（DoD）が全て満たされる
 
+### ✅ Phase 5 コード完了（2026-07-04） — ローグライク深化
+
+設計文書 `docs/unity-phase5-roguelike-design.md`（v2）の 5a〜5c を実装。**設計原則「レリック未装備・Safe ルートで挙動不変」を回帰ガードテストで担保**し、既存のゲームルール（Swift 1:1 パリティ）を壊していない。
+
+- **5a レリック機構（Core8種 + ドラフト UI）**: `RelicEffects`（加算オーバーレイ）/ `RelicDefinition` / `RelicCatalog` / `RelicDraftService`。`GameSession` へ 13 フック追加（全て `Relics=None` 既定で従来コードパスと厳密一致）。階層クリア時に 3 択ドラフトオーバーレイ（レアリティ色、1/2/3 キー対応）
+- **5b レリック18種 + 重み付け + メタ通貨 + バランス実測**: カタログ 18 種へ拡充 + §2.2 弱点タグ重み付け（魔法使い×HardAICounter は完全除外）。残光（メタ通貨）付与。**シミュレーション 15構成×1000ラン×7組を実走**し `unity/verify/BALANCE_REPORT_PHASE5.md` に記録 → 「毎階層×18種では長命キャラが取得集合を飽和させ重みが順序しか変えられない」構造問題を実証。裁定として `RelicConfig`（DraftInterval=1 / MaxRelicsPerRun=4）を導入し勝率超過を決着。基準 c（魔法使い格差）はレリック以前のキャラ性能差（Swift 正本由来）を含むため「レリックが格差を広げないこと（38.8→39.7）」をもって合格と再定義
+- **5c 分岐ルート + ボスパターン + 遺物庫**:
+  - **分岐ルート**: FloorCleared → RouteChoice → RelicDraft → Advance の順序を強制。Floor6 以降・非デイリーで「安全 / 深淵」2 択。深淵は 1 階層限定で AI+1 段＆特殊ルール前倒し、代わりにレリックドラフトへ Rare+ 確定枠 + 残光ボーナス
+  - **ボスパターン3種**: Pursuit / Foresight / Intimidation を 2 ターンごとにローテーション（Floor40+ で威圧解禁）。威圧マスの赤熱・先読みの明滅テレグラフ（`IsCellVisible` ゲートで情報パリティ維持）
+  - **遺物庫（残光ショップ）+ スターターパーク**: Common/Uncommon レリックを残光で解放し 1 つをラン開始時装備に。これが 5b 実測の指した弱キャラ救済の実体
+- **検証**: Unity EditMode **166/166 green**（Core 回帰ガード含む）/ headless 146/146 / 実プレイで分岐 2 択・Rare+ 確定・ボスローテーション・威圧赤熱・遺物庫の解放→装備→ラン適用を実測。macOS ビルド Succeeded
+- **⚠️ [要検証]（オーナー調整待ち）**: 分岐ルートの提示頻度（現状 Floor6+ の毎クリア）/ 深淵の残光ボーナス +15 / スターターパーク解放コスト（Common50・Uncommon120）/ 残光付与式。いずれも定数化済みでコード変更なしにチューニング可能
+
 ### 前段検証の結果（2026-07-01, リモート環境の .NET 8 で実行済み）
 
 - **Core コンパイル + 全 60 テスト green**（`unity/verify/Core.Tests`, C# 9 固定）→ ゲート①のリスクは大幅低減
