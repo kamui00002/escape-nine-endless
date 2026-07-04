@@ -117,7 +117,7 @@ namespace EscapeNine.Runtime.Stage
 
         // ---- Phase 5c ボステレグラフ ----
         private BossTelegraphKind _telegraph = BossTelegraphKind.None;
-        private float _telegraphPhase; // 明滅の位相 (秒累積)。Tick で進める。
+        private float _telegraphPhase; // 明滅の位相 (拍単位。Conductor.SongPositionBeats を Tick で受ける)。
 
         /// <summary>威圧マスの赤熱色 (消失=崩落と区別するため、赤系だが崩落の暗転色とは別)。</summary>
         private static readonly Color IntimidationHotColor = new Color(1f, 0.30f, 0.12f);
@@ -229,7 +229,7 @@ namespace EscapeNine.Runtime.Stage
         }
 
         /// <summary>霧フェード + 消失の崩落アニメの時間進行。BoardStage.Update() から毎フレーム呼ばれる。</summary>
-        public void Tick(float deltaTime)
+        public void Tick(float deltaTime, float beatPhase)
         {
             float fogStep = deltaTime / SpecialFadeDuration;
             _fogAlpha = Mathf.MoveTowards(_fogAlpha, _fogTarget, fogStep);
@@ -244,11 +244,10 @@ namespace EscapeNine.Runtime.Stage
                 _disappearAlpha = _disappearTarget; // Reduce Motion: 即時反映 (design 指定)
             }
 
-            // Phase 5c: テレグラフの明滅位相を進める (Reduce Motion 時は明滅せず定常表示にするため進めない)。
-            if (_telegraph != BossTelegraphKind.None && FxKit.MotionEnabled)
-            {
-                _telegraphPhase += deltaTime;
-            }
+            // Phase 5c 修正: テレグラフの明滅位相は拍 (Conductor.SongPositionBeats) を正とする。
+            // 旧実装は deltaTime を秒累積しており拍とズレていた (§1 拍駆動規約違反)。
+            // Reduce Motion 時は明滅せず定常表示にするため位相を固定する。
+            _telegraphPhase = FxKit.MotionEnabled ? beatPhase : 0f;
 
             ApplyBlend();
         }
@@ -260,15 +259,16 @@ namespace EscapeNine.Runtime.Stage
             fill = Color.Lerp(fill, DisappearedFillColor, _disappearAlpha);
 
             // Phase 5c: ボステレグラフの上塗り (消失=崩落の暗転より後に乗せ、赤熱/青白が見えるように)。
-            // Reduce Motion 時 (_telegraphPhase を進めない) は Sin=0 相当の定常強度で表示する。
+            // _telegraphPhase は拍単位 (Conductor.SongPositionBeats)。威圧=1拍に1回、先読み=1拍に2回の
+            // 明滅にすることで曲のビートに吸着させる。Reduce Motion 時 (MotionEnabled==false) は定常強度で表示。
             if (_telegraph == BossTelegraphKind.Intimidation)
             {
-                float pulse = 0.45f + 0.25f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * 4f)) : 1f);
+                float pulse = 0.45f + 0.25f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * Mathf.PI)) : 1f);
                 fill = Color.Lerp(fill, IntimidationHotColor, pulse);
             }
             else if (_telegraph == BossTelegraphKind.Foresight)
             {
-                float pulse = 0.25f + 0.25f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * 5f)) : 1f);
+                float pulse = 0.25f + 0.25f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * Mathf.PI * 2f)) : 1f);
                 fill = Color.Lerp(fill, ForesightGlowColor, pulse);
             }
 
@@ -291,6 +291,18 @@ namespace EscapeNine.Runtime.Stage
             _fillRenderer.GetPropertyBlock(_mpb);
             _mpb.SetColor(BaseColorId, color);
             _fillRenderer.SetPropertyBlock(_mpb);
+        }
+
+        /// <summary>
+        /// 実行時生成したタイル素材 (fill の Material) を破棄する。TileView は MonoBehaviour ではないため
+        /// 親の BoardStage.OnDestroy から呼ぶ (Editor の "leaked material instance" 警告防止、2026-07-04 C6)。
+        /// </summary>
+        public void DestroyMaterials()
+        {
+            if (_fillRenderer != null && _fillRenderer.sharedMaterial != null)
+            {
+                UnityEngine.Object.Destroy(_fillRenderer.sharedMaterial);
+            }
         }
     }
 }

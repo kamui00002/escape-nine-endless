@@ -58,6 +58,16 @@ namespace EscapeNine.Runtime.Stage
             renderer.material = new Material(shader != null ? shader : Shader.Find("Standard"));
         }
 
+        private void OnDestroy()
+        {
+            // 実行時生成した Material を明示破棄する (Editor の leaked material 警告防止、2026-07-04 C7)。
+            if (_system != null)
+            {
+                var r = _system.GetComponent<ParticleSystemRenderer>();
+                if (r != null && r.sharedMaterial != null) Destroy(r.sharedMaterial);
+            }
+        }
+
         /// <summary>
         /// Wave 5: 品質ティアによる上限粒子数の適用 (StageQuality.Apply から呼ばれる)。
         /// 0 を指定すると emission モジュール自体を無効化し (Low ティア: 「パーティクル 0」を

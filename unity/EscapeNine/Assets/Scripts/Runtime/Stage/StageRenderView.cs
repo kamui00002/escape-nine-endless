@@ -50,13 +50,8 @@ namespace EscapeNine.Runtime.Stage
             if (_format == format) return;
             _format = format;
 
-            if (_camera != null && _camera.targetTexture == _rt) _camera.targetTexture = null;
-            if (_rawImage != null)
-            {
-                _rawImage.texture = null;
-                _rawImage.enabled = false; // 再結線まで白矩形を出さない (次の Apply() が再有効化する)
-            }
-            ReleaseRt();
+            if (_rawImage != null) _rawImage.enabled = false; // 再結線まで白矩形を出さない (次の Apply() が再有効化する)
+            ReleaseRt(); // カメラ/RawImage の detach は ReleaseRt が担う
         }
 
         private void LateUpdate()
@@ -97,23 +92,22 @@ namespace EscapeNine.Runtime.Stage
         private void OnDisable()
         {
             // 他画面へ戻る時 (BoardStage ごと SetActive(false)) に必ず通る後始末。
-            if (_camera != null && _camera.targetTexture == _rt) _camera.targetTexture = null;
-            if (_rawImage != null)
-            {
-                _rawImage.texture = null;
-                _rawImage.enabled = false;
-            }
+            // カメラ/RawImage の detach は ReleaseRt が担う。
+            if (_rawImage != null) _rawImage.enabled = false;
             ReleaseRt();
         }
 
         private void ReleaseRt()
         {
-            if (_rt != null)
-            {
-                _rt.Release();
-                Destroy(_rt);
-                _rt = null;
-            }
+            if (_rt == null) return;
+            // カメラ/RawImage のターゲットに設定されたまま Release すると Unity が警告を出すため、
+            // 解放前に必ず切り離す。3経路 (Apply のリサイズ再生成・SetFormat・OnDisable) で共通化し、
+            // リサイズ経路だけ detach 漏れがあった不整合を解消 (2026-07-04 /review-full C5)。
+            if (_camera != null && _camera.targetTexture == _rt) _camera.targetTexture = null;
+            if (_rawImage != null && _rawImage.texture == _rt) _rawImage.texture = null;
+            _rt.Release();
+            Destroy(_rt);
+            _rt = null;
         }
     }
 }

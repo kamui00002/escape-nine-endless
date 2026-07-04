@@ -150,6 +150,7 @@ namespace EscapeNine.Runtime
         private double _startCountdownBpm;                           // GO! 到達時に Conductor.ChangeBPM へ渡す BPM (Swift: startBGM(bpm:))
         private Coroutine _startCountdownCoroutine;                  // 実時間 1.0s 間隔の開始カウントダウン (Swift: gameStartCountdownTimer)
         private bool _resultPersisted;                              // このランのスコア送信/自己ベスト更新が済んだか (二重送信防止)
+        private bool _glowAwarded;                                  // このランの残光付与が済んだか (通貨二重付与防止、EndGame が万一二重呼び出しされた場合の保険)
         private int _turnBeats = GameConfig.TurnCountdownBeats;     // 1 ターンの拍数 (デバッグで可変)
 
         /// <summary>Phase 5b: レリック #16 刻の猶予 (TurnCountdownBonus) を加算した実効ターン拍数 (§2.4)。
@@ -167,6 +168,13 @@ namespace EscapeNine.Runtime
         // (GameController は GameSession 生成時も rng を明示注入していないため、ここでも揃える)。
         private RelicDraftService _relicDraftService;
         private readonly List<string> _ownedRelicIds = new List<string>(); // ラン限りの所持レリックID (§9未決事項1)
+
+        // ドラフト (階層クリア報酬) で取得したレリック数。MaxRelicsPerRun 上限判定はこれを使う。
+        // _ownedRelicIds.Count とは意図的に別管理: スターターパーク (§3.2「ドラフト消費なしで付与」) は
+        // _ownedRelicIds には入るが本カウントには入らないため、上限枠を圧迫しない。
+        // これを混同すると、スターターパーク装備 + 毎階層ドラフトで序盤に上限到達し、
+        // 深淵ルートの Rare+ 確定報酬まで無言で不発になる (2026-07-04 /review-full C3/G1)。
+        private int _draftAcquiredCount;
 
         private float _runStartRealtime;                            // Swift: gameStartTime
         private float _floorStartRealtime;                          // Swift: floorStartTime (Phase 3 の計装用)
@@ -252,6 +260,7 @@ namespace EscapeNine.Runtime
             // (レリックなしランでの動作) に影響はない。
             _relicDraftService = new RelicDraftService();
             _ownedRelicIds.Clear();
+            _draftAcquiredCount = 0;
             CurrentDraftCandidates = Array.Empty<RelicDefinition>();
             IsRelicDraftPending = false;
 
@@ -281,6 +290,7 @@ namespace EscapeNine.Runtime
 
             TurnCountdown = _turnBeats;
             _resultPersisted = false; // 新しいランのスコア送信/自己ベスト更新をまた許可する
+            _glowAwarded = false;     // 新しいランの残光付与をまた許可する
             LastUnlockedAchievements = Array.Empty<Achievement>(); // 前ランのポップアップ対象を持ち越さない
 
             // --- 音 → 状態 → 通知 の順 (Swift: startGame と同順) ---
@@ -363,8 +373,15 @@ namespace EscapeNine.Runtime
         public void TapEnemy()
         {
             if (Session == null || Session.Status != GameStatus.Playing) return;
-            if (Session.Skill.Type != SkillType.Bind) return;
-            if (Session.RemainingSkillUses <= 0) return;
+
+            // 拘束できる経路は2つ: ①エルフの拘束スキル (RemainingSkillUses 消費) か
+            // ②レリック #17 心話の絆 (Relics.PseudoBindCharges 消費、非エルフでも発動)。
+            // GameSession.BindEnemy() は両方を正しく捌く (Bind スキル優先→無ければ PseudoBind) ため、
+            // ここでは「どちらか一方でも撃てる」ときだけ通す (旧実装は非エルフを無条件で弾き、
+            // 心話の絆が Runtime から一切発動できなかった)。
+            bool canNativeBind = Session.Skill.Type == SkillType.Bind && Session.RemainingSkillUses > 0;
+            bool canRelicBind = Session.Relics.PseudoBindCharges > 0;
+            if (!canNativeBind && !canRelicBind) return;
 
             _audio.PlaySfx("skill");
             Session.BindEnemy();
@@ -389,6 +406,7 @@ namespace EscapeNine.Runtime
 
             chosen.Value.ApplyTo(Session.Relics);
             _ownedRelicIds.Add(relicId);
+            _draftAcquiredCount++; // ドラフト取得のみ上限にカウント (スターターパークは含めない)
 
             IsRelicDraftPending = false;
             CurrentDraftCandidates = Array.Empty<RelicDefinition>();
@@ -434,7 +452,8 @@ namespace EscapeNine.Runtime
         private void OfferRelicDraft(bool guaranteeRarePlus)
         {
             if (Session.DailyChallengeMode) return; // 二重防御 (呼び出し側でも判定済み)
-            if (!RelicConfig.ShouldOfferDraft(Session.CurrentFloor, _ownedRelicIds.Count)) return;
+            // 上限判定はドラフト取得数のみ (スターターパークは枠を消費しない §3.2)。
+            if (!RelicConfig.ShouldOfferDraft(Session.CurrentFloor, _draftAcquiredCount)) return;
 
             int draftCount = Session.Relics.DraftCandidateBonusFloorsRemaining > 0 ? 4 : 3;
             var candidates = _relicDraftService.DraftCandidates(
@@ -503,7 +522,8 @@ namespace EscapeNine.Runtime
             }
             if (pool.Count == 0) return; // 差し替えられる Rare+ が尽きている場合は諦める
 
-            var replacement = pool[UnityEngine.Random.Range(0, pool.Count)];
+            // ドラフトと同じ IRandomSource 経由で選ぶ (デイリーのシード再現性を保つ。旧: UnityEngine.Random 直呼び)。
+            var replacement = _relicDraftService.PickOne(pool);
             int replaceIdx = 0;
             for (int i = 1; i < candidates.Count; i++)
             {
@@ -949,8 +969,13 @@ namespace EscapeNine.Runtime
             // Swift正本には対応なし (Unity固有拡張)。消費導線 (MetaShopScreen、§3.2) は Phase 5c で追加済み
             // (PlayerState.TryUnlockRelic / SetStarterPerk)。
             // Session.CurrentFloor は勝利時 101 のまま (PersistRunResult と同じ Swift パリティ踏襲の値)。
-            int glowEarned = MetaProgressionCalculator.CalculateGlow(Session.CurrentFloor, won, dailyChallengeCompletedThisRun);
-            _player.AddMetaCurrency(glowEarned);
+            // スコア送信 (PersistRunResult) と同じく 1 ラン 1 回のみ。通貨のため二重付与を明示ガード。
+            if (!_glowAwarded)
+            {
+                _glowAwarded = true;
+                int glowEarned = MetaProgressionCalculator.CalculateGlow(Session.CurrentFloor, won, dailyChallengeCompletedThisRun);
+                _player.AddMetaCurrency(glowEarned);
+            }
 
             // 5) 実績チェック（勝利時のみ）。Swift: GameViewModel.swift:954-964 (AchievementManager.checkAchievements)。
             //    新規解除は LastUnlockedAchievements に控え、ResultScreen がポップアップ演出を出す (Phase 2.5)。

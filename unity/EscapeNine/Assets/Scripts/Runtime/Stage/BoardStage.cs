@@ -58,6 +58,14 @@ namespace EscapeNine.Runtime.Stage
 
         // ---- Wave 4: ゾーンテーマ統合 ----
         private StageLights _stageLights;
+
+        // Phase 5c 修正: ボステレグラフの明滅は拍 (Conductor.SongPositionBeats = dspTime 由来) で駆動する。
+        // 旧実装は TileView が Time.deltaTime を秒累積して明滅しており、設計 §1「演出は全て Conductor から
+        // 駆動・Time.time 禁止」に反していた (低フレームレート機で音とズレる)。GameScreen が Configure で注入する。
+        private Conductor _conductor;
+
+        /// <summary>拍同期演出 (テレグラフ) 用に Conductor を注入する (GameScreen から)。</summary>
+        public void SetConductor(Conductor conductor) => _conductor = conductor;
         private StageParticles _stageParticles;
         private StagePostFx _postFx; // 遅延取得 (GameScreen が BoardStage の子として生成するため)
         private int _currentZoneIndex = -1;
@@ -305,9 +313,12 @@ namespace EscapeNine.Runtime.Stage
             _stageLights.SetFogLightGroundPosition(playerGround);
 
             float dt = Time.deltaTime;
+            // テレグラフ明滅は拍位相で駆動 (dt は崩落/フォグの MoveTowards 用に別途渡す)。
+            // 未再生時 (SongPositionBeats==0) やポーズ中は位相が進まず定常表示になる。
+            float beatPhase = (float)(_conductor != null ? _conductor.SongPositionBeats : 0.0);
             for (int pos = 1; pos <= GameConfig.GridSize; pos++)
             {
-                _tiles[pos].Tick(dt);
+                _tiles[pos].Tick(dt, beatPhase);
             }
         }
 
@@ -350,6 +361,20 @@ namespace EscapeNine.Runtime.Stage
             t = Mathf.Min(1f, t + Time.deltaTime / MoveDuration);
             float eased = Mathf.SmoothStep(0f, 1f, t);
             pawn.SetGroundPosition(Vector3.Lerp(from, to, eased));
+        }
+
+        private void OnDestroy()
+        {
+            // 実行時生成した Material を明示破棄する (Editor の leaked material 警告防止、2026-07-04 C6/C7)。
+            for (int pos = 1; pos <= GameConfig.GridSize; pos++)
+            {
+                _tiles[pos]?.DestroyMaterials();
+            }
+            if (_burstParticles != null)
+            {
+                var r = _burstParticles.GetComponent<ParticleSystemRenderer>();
+                if (r != null && r.material != null) Destroy(r.material);
+            }
         }
 
         private void EnsureBurstParticles()

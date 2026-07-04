@@ -26,6 +26,16 @@ namespace EscapeNine.Core
         }
 
         /// <summary>
+        /// プールから1つを本サービスの乱数源で選ぶ。深淵ルート報酬 (§4) の Rare+ 確定差し替え等、
+        /// ドラフト外の抽選を Runtime が行う際に、UnityEngine.Random を直接使うとデイリーチャレンジの
+        /// シード再現性が崩れるため、この経路で同じ IRandomSource に統一する。空プールは呼び出し側が弾く想定。
+        /// </summary>
+        public RelicDefinition PickOne(IReadOnlyList<RelicDefinition> pool)
+        {
+            return pool[_rng.NextInt(pool.Count)];
+        }
+
+        /// <summary>
         /// ドラフト候補を生成する (既定3択)。
         /// </summary>
         /// <param name="ownedIds">現在のランで既に所持しているレリックID (スタック分は同じIDが複数回含まれる想定)。</param>

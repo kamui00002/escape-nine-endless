@@ -357,6 +357,7 @@ namespace EscapeNine.Runtime.UI
             rawImage.enabled = false;       // RT 結線まで白矩形を出さない (StageRenderView が有効化)
 
             _boardStage = BoardStage.Create();
+            _boardStage.SetConductor(App.I != null ? App.I.Conductor : null); // Phase 5c 修正: テレグラフ拍同期用
             _boardStage.gameObject.SetActive(false); // OnShow まで無効 (他画面表示中は消す)
 
             // Camera.main が見つからないケース (例: OverlapAudit.cs の Edit モード BuildUI
