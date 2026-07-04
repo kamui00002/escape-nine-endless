@@ -57,6 +57,12 @@ namespace EscapeNine.Runtime.Stage
         private Coroutine _shakeRoutine;
         private ParticleSystem _burstParticles;
 
+        // ---- Wave 4: ゾーンテーマ統合 ----
+        private StageLights _stageLights;
+        private StageParticles _stageParticles;
+        private StagePostFx _postFx; // 遅延取得 (GameScreen が BoardStage の子として生成するため)
+        private int _currentZoneIndex = -1;
+
         /// <summary>盤面座標 (1..9) → ワールド接地座標 (x, 0, z) 中心。</summary>
         public static Vector3 WorldCenterOf(int position)
         {
@@ -83,28 +89,11 @@ namespace EscapeNine.Runtime.Stage
             stage._player = PawnView.Create(go.transform, "PlayerPawn");
             stage._enemy = PawnView.Create(go.transform, "EnemyPawn");
 
-            CreatePlaceholderLight(go.transform);
+            // Wave 4: W2 の暫定 Directional Light (旧 CreatePlaceholderLight) は StageLights へ移管。
+            stage._stageLights = StageLights.Create(go.transform);
+            stage._stageParticles = StageParticles.Create(go.transform);
 
             return stage;
-        }
-
-        /// <summary>
-        /// W2 時点の暫定ライト。design doc の「StageLights (ゾーン別ライト)」は Wave 4 の
-        /// 正式デリバラブル (プロジェクトの Environment Lighting 次第では URP Lit マテリアルが
-        /// 光源ゼロで真っ黒になり得るため、W2 ゲート (色分けされたタイルの目視確認) が成立しない
-        /// リスクを避ける最小限の置き場)。Wave 4 で StageLights に置き換えられる前提の暫定物。
-        /// </summary>
-        private static void CreatePlaceholderLight(Transform parent)
-        {
-            var go = new GameObject("PlaceholderDirectionalLight");
-            go.transform.SetParent(parent, false);
-            go.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-
-            var light = go.AddComponent<Light>();
-            light.type = LightType.Directional;
-            light.color = Color.white;
-            light.intensity = 1.0f;
-            light.shadows = LightShadows.None; // W2 時点はシャドウ演出まで踏み込まない
         }
 
         // ---- IBoardView ----
@@ -121,6 +110,8 @@ namespace EscapeNine.Runtime.Stage
                 RenderEmpty();
                 return;
             }
+
+            ApplyZoneAndFog(session);
 
             _enemyPosition = session.EnemyPosition;
             var available = session.GetAvailableMoves();
@@ -260,11 +251,51 @@ namespace EscapeNine.Runtime.Stage
             Advance(ref _playerFrom, ref _playerTo, ref _playerT, _player);
             Advance(ref _enemyFrom, ref _enemyTo, ref _enemyT, _enemy);
 
+            // Wave 4: 霧のポイントライトをプレイヤーの実際の (スライド補間中の) 接地位置へ
+            // 毎フレーム追従させる (design: 「プレイヤー移動に追従」)。フォグ非活性時は
+            // StageLights.SetFogLightGroundPosition が内部で無効光源チェックにより早期 return する。
+            Vector3 playerGround = _player.transform.localPosition;
+            playerGround.y = 0f;
+            _stageLights.SetFogLightGroundPosition(playerGround);
+
             float dt = Time.deltaTime;
             for (int pos = 1; pos <= GameConfig.GridSize; pos++)
             {
                 _tiles[pos].Tick(dt);
             }
+        }
+
+        /// <summary>
+        /// ゾーン (階層帯) の見た目を一括適用する。ゾーン自体の変更 (主光色/環境光ベース/
+        /// パーティクル種別/カメラ背景/Bloom ティント) はゾーンが実際に変わった時だけ行う
+        /// (design 指定: 「フロア毎に毎回でなくゾーン変化時のみ適用」)。
+        /// 一方、霧の on/off は階層境界 (Fog開始=Floor21 等) がゾーン境界 (25/50/75) と
+        /// 一致しないため、ゾーン変化とは独立に毎 Render 反映する
+        /// (StageLights.SetFog は内部で無変化なら早期 return するため、無駄な RenderSettings
+        /// 書き込みは発生しない)。
+        /// </summary>
+        private void ApplyZoneAndFog(GameSession session)
+        {
+            ZoneTheme theme = ZoneThemes.ForFloor(session.CurrentFloor);
+            bool fogActive = session.CurrentSpecialRule == SpecialRule.Fog
+                || session.CurrentSpecialRule == SpecialRule.FogDisappear;
+
+            if (theme.ZoneIndex != _currentZoneIndex)
+            {
+                _currentZoneIndex = theme.ZoneIndex;
+
+                TileView.ZoneGridTint = theme.TileTint;
+                _stageLights.ApplyZone(theme);
+                _stageParticles.SetZone(theme.Particle);
+                StageCameraDirector.ZoneBackgroundOverride = theme.CameraBackgroundColor;
+
+                // StagePostFx は GameScreen.BuildWorldBoard() が BoardStage の子として生成する
+                // (GameScreen.cs は変更禁止のため、注入ではなくここで遅延取得する。design 指定)。
+                if (_postFx == null) _postFx = GetComponentInChildren<StagePostFx>();
+                if (_postFx != null && _postFx.Bloom != null) _postFx.Bloom.tint.value = theme.BloomTint;
+            }
+
+            _stageLights.SetFog(fogActive);
         }
 
         private static void Advance(ref Vector3 from, ref Vector3 to, ref float t, PawnView pawn)

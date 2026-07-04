@@ -29,6 +29,16 @@ namespace EscapeNine.Runtime.Stage
         /// <summary>俯瞰角 (水平からの見下ろし角度、度)。オーケストレータが 30/35/40 を比較できるよう public static。</summary>
         public static float TiltDegrees = 35f;
 
+        /// <summary>
+        /// Wave 4: ゾーン別カメラ背景色の上書き (BoardStage.ApplyZoneAndFog がゾーン変化時に設定)。
+        /// null の間は従来どおり UITheme.Background を使う (後方互換、既定 null)。
+        /// 本フィールドが必要な理由: このクラスが毎 LateUpdate で Cam.backgroundColor を
+        /// 無条件に上書きするため、他の場所 (BoardStage の Update 等) から一度設定しても
+        /// 同一フレームの LateUpdate で必ず巻き戻ってしまう。ここに「現在のゾーン背景色」を
+        /// 持たせることで、ApplyFraming() が読む値そのものを差し替える。
+        /// </summary>
+        public static Color? ZoneBackgroundOverride;
+
         /// <summary>垂直画角 (度、design 指定)。</summary>
         public const float FieldOfViewDegrees = 30f;
 
@@ -79,7 +89,7 @@ namespace EscapeNine.Runtime.Stage
             Cam.orthographic = false;
             Cam.fieldOfView = FieldOfViewDegrees;
             Cam.clearFlags = CameraClearFlags.SolidColor;
-            Cam.backgroundColor = UITheme.Background;
+            Cam.backgroundColor = ZoneBackgroundOverride ?? UITheme.Background;
 
             float tiltDeg = Mathf.Clamp(TiltDegrees, MinTopAngleDegrees + FieldOfViewDegrees * 0.5f + 0.01f, 89f);
             float tiltRad = tiltDeg * Mathf.Deg2Rad;

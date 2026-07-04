@@ -22,10 +22,20 @@
 //     情報としては「視界が制限されている」ことを示す点で等価。
 //   - 枠線 (border) の 4 本描画は省略し、状態色を単色ブレンドのみで表現する
 //     (このタスクの設計指定が Cube 1 個の「上面色」のみを挙げているため)。
+//
+// Wave 4 追加: 消失マスの「沈み」を「崩落」(下降+傾き+暗転、0.5s) へ強化。
+// 実装は既存の Tick(deltaTime) 駆動の状態遷移 (MoveTowards ベース) を拡張したもので、
+// 文字どおりの C# コルーチンではない — TileView は MonoBehaviour ではなく
+// (ファイル冒頭コメント参照)、既存の霧フェードも同じ Tick 駆動パターンのため、
+// アーキテクチャの一貫性を優先した (BoardStage.Update() が毎フレーム Tick を呼ぶ)。
+// 復活 (消失解除) は _disappearTarget が 0 に戻ることで同じ MoveTowards が
+// 自然に逆再生する。Reduce Motion 時は MoveTowards のステップ計算を飛ばして
+// 即座に目標値へスナップする。
 
 using UnityEngine;
 using TMPro;
 using EscapeNine.Runtime.UI; // CellVisual を再利用
+using EscapeNine.Runtime.UI.Fx; // FxKit.MotionEnabled (Reduce Motion)
 
 namespace EscapeNine.Runtime.Stage
 {
@@ -55,10 +65,16 @@ namespace EscapeNine.Runtime.Stage
         /// <summary>マークを浮かべる高さ (タイル上面 + 0.15、design 指定)。</summary>
         private const float MarkHeightAboveTop = 0.15f;
 
-        /// <summary>消失時に沈み込む最大量 (World 単位)。</summary>
-        private const float MaxSinkOffset = 0.12f;
+        /// <summary>消失時に沈み込む最大量 (World 単位、design 指定: 下降 0.4)。</summary>
+        private const float CollapseSinkOffset = 0.4f;
 
-        /// <summary>霧/消失フェード所要秒 (GridCellWidget.SpecialFadeDuration と同一)。</summary>
+        /// <summary>消失時に傾く最大角度 (度、design 指定: 傾き 8°)。</summary>
+        private const float CollapseTiltDegrees = 8f;
+
+        /// <summary>消失の崩落アニメ所要秒 (design 指定: 0.5s)。霧フェード (SpecialFadeDuration) とは別軸。</summary>
+        private const float CollapseDuration = 0.5f;
+
+        /// <summary>霧フェード所要秒 (GridCellWidget.SpecialFadeDuration と同一)。</summary>
         private const float SpecialFadeDuration = 0.28f;
 
         // GridCellWidget.ApplyBlend() と同一の事前計算色 (意図的複製。理由はファイル冒頭コメント参照)。
@@ -66,6 +82,14 @@ namespace EscapeNine.Runtime.Stage
         private static readonly Color DisappearedFillColor = UITheme.Disappeared;
         private const float FogMarkAlpha = 0.6f;   // 3D は文字が小さく見えるため 2D 版 (0.15) より強めに視認性確保
         private const float XMarkAlpha = 0.85f;    // 同上 (2D 版は 0.3)
+
+        /// <summary>
+        /// 通常マスの基調色ゾーンティント (Wave 4)。BoardStage がゾーン変化時に書き換える
+        /// static フィールド (GameSession/CellVisual を経由しないゾーン専用の見た目情報のため、
+        /// CellVisual 構造体 (GridCellWidget.cs、変更禁止) を拡張せずここに持たせる)。
+        /// 既定値は UITheme.Grid (旧来と同じ見た目) で、BoardStage が未初期化でも安全。
+        /// </summary>
+        public static Color ZoneGridTint = UITheme.Grid;
 
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
@@ -163,7 +187,7 @@ namespace EscapeNine.Runtime.Stage
             if (v.IsPlayer) _normalFillColor = Color.Lerp(UITheme.Background, UITheme.Player, 0.30f);
             else if (v.IsEnemy) _normalFillColor = Color.Lerp(UITheme.Background, UITheme.Enemy, 0.30f);
             else if (v.IsSelected) _normalFillColor = Color.Lerp(UITheme.Background, UITheme.Available, 0.25f);
-            else _normalFillColor = UITheme.Grid;
+            else _normalFillColor = ZoneGridTint;
 
             _disappearTarget = v.IsDisappeared ? 1f : 0f;
             _fogTarget = (!v.IsDisappeared && !v.IsVisible) ? 1f : 0f;
@@ -178,12 +202,22 @@ namespace EscapeNine.Runtime.Stage
             ApplyBlend();
         }
 
-        /// <summary>霧/消失フェードの時間進行 + 消失時の沈み込みアニメ。BoardStage.Update() から毎フレーム呼ばれる。</summary>
+        /// <summary>霧フェード + 消失の崩落アニメの時間進行。BoardStage.Update() から毎フレーム呼ばれる。</summary>
         public void Tick(float deltaTime)
         {
-            float step = deltaTime / SpecialFadeDuration;
-            _fogAlpha = Mathf.MoveTowards(_fogAlpha, _fogTarget, step);
-            _disappearAlpha = Mathf.MoveTowards(_disappearAlpha, _disappearTarget, step);
+            float fogStep = deltaTime / SpecialFadeDuration;
+            _fogAlpha = Mathf.MoveTowards(_fogAlpha, _fogTarget, fogStep);
+
+            if (FxKit.MotionEnabled)
+            {
+                float collapseStep = deltaTime / CollapseDuration;
+                _disappearAlpha = Mathf.MoveTowards(_disappearAlpha, _disappearTarget, collapseStep);
+            }
+            else
+            {
+                _disappearAlpha = _disappearTarget; // Reduce Motion: 即時反映 (design 指定)
+            }
+
             ApplyBlend();
         }
 
@@ -197,9 +231,13 @@ namespace EscapeNine.Runtime.Stage
             _fogMark.color = UITheme.WithAlpha(UITheme.TextColor, FogMarkAlpha * _fogAlpha);
             _xMark.color = UITheme.WithAlpha(UITheme.Warning, XMarkAlpha * _disappearAlpha);
 
-            // 消失マスは沈み込む (design: 「沈み」)。マーク自体の高さは固定 (アルファのみで出現)。
-            float sink = MaxSinkOffset * _disappearAlpha;
+            // 消失マスの崩落 (design: 下降0.4 + 傾き8° + 暗転)。ease-in (二乗) で「崩れ落ちる」
+            // 加速感を出す。暗転は上の DisappearedFillColor ブレンドが担う。復活は _disappearTarget
+            // が 0 に戻ることで Tick() の MoveTowards が自然に逆再生する (design: 「逆再生で戻す」)。
+            float eased = _disappearAlpha * _disappearAlpha;
+            float sink = CollapseSinkOffset * eased;
             _fill.localPosition = new Vector3(0f, TileHeight * 0.5f - sink, 0f);
+            _fill.localRotation = Quaternion.Euler(CollapseTiltDegrees * eased, 0f, 0f);
         }
 
         private void SetFillColor(Color color)
