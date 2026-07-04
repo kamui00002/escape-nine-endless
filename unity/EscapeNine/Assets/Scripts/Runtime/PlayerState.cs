@@ -101,13 +101,17 @@ namespace EscapeNine.Runtime
         public HashSet<string> PurchasedProducts { get; set; } = new HashSet<string>();
 
         // --- Phase 5b: メタ進行 (残光、§3.3) ---
-        // Swift正本には対応なし (Unity固有拡張)。消費導線 (コスメティック購入・レリックプール解放・
-        // スターターパーク装備・MetaShopScreen) は Phase 5c 送り。本フェーズはスキーマと蓄積のみ。
+        // Swift正本には対応なし (Unity固有拡張)。Phase 5c で MetaShopScreen (消費導線: レリック解放
+        // TryUnlockRelic() / スターターパーク装備 SetStarterPerk()) を追加した。コスメティック購入・
+        // レリックプール拡張・6人目キャラは §3.2 の表のうち引き続き未実装 (MetaShopScreen.cs 冒頭コメント参照、
+        // RelicDraftService 等 Core 側の変更が必要になる可能性が高くスコープ外)。
 
         /// <summary>残光 (メタ進行通貨) の残高。</summary>
         public int MetaCurrency { get; set; }
 
-        /// <summary>ドラフトプールに解放済みのレリックID (Phase 5c 以降で消費予定、現状は永続化のみ)。</summary>
+        /// <summary>ドラフトプールに解放済みのレリックID (Phase 5c: TryUnlockRelic() で追加。
+        /// 現状の唯一の消費先はスターターパーク装備可否の判定 — ドラフト自体 (RelicDraftService) は
+        /// Core 側で常に RelicCatalog.All 全種を対象にしており、本リストを参照しない)。</summary>
         public List<string> UnlockedRelicIds { get; set; } = new List<string>();
 
         /// <summary>解放済みコスメティックID (Phase 5c 以降で消費予定、現状は永続化のみ)。</summary>
@@ -338,13 +342,48 @@ namespace EscapeNine.Runtime
 
         /// <summary>
         /// 残光を加算して永続化する。ラン終了時 (GameController.EndGame) から呼ばれる。
-        /// 消費 (SpendMetaCurrency 等) は MetaShopScreen と一緒に Phase 5c で実装する —
-        /// 蓄積だけ先に始めても、後から画面を足した時に蓄積分は失われない。
+        /// 消費側は Phase 5c で追加した TryUnlockRelic() / SetStarterPerk() (MetaShopScreen から呼ばれる)。
         /// </summary>
         public void AddMetaCurrency(int amount)
         {
             if (amount <= 0) return;
             MetaCurrency += amount;
+            Save();
+        }
+
+        /// <summary>指定レリックがドラフトプールに解放済みか (Phase 5c: MetaShopScreen のスターターパーク解放判定)。</summary>
+        public bool IsRelicUnlocked(string relicId) =>
+            !string.IsNullOrEmpty(relicId) && UnlockedRelicIds.Contains(relicId);
+
+        /// <summary>
+        /// Phase 5c: 残光を消費してレリックを解放する (MetaShopScreen「解放」ボタン)。
+        /// 既に解放済み・残高不足の場合は何もせず false を返す (呼び出し側でボタンの活性判定も行う想定だが、
+        /// 二重タップ等への防御としてここでも判定する)。単価 (レアリティ別コスト) は呼び出し側 (UI 層) が
+        /// 決める設計 — PlayerState はメタ進行の永続化・残高管理に専念し、価格テーブルは持たない
+        /// (価格は §3.2 が [要検証] としている調整対象であり、UI 側で完結させた方がチューニングしやすい)。
+        /// </summary>
+        public bool TryUnlockRelic(string relicId, int cost)
+        {
+            if (string.IsNullOrEmpty(relicId)) return false;
+            if (IsRelicUnlocked(relicId)) return false;
+            if (cost < 0 || MetaCurrency < cost) return false;
+
+            MetaCurrency -= cost;
+            UnlockedRelicIds.Add(relicId);
+            Save();
+            return true;
+        }
+
+        /// <summary>
+        /// Phase 5c: スターターパークの装備/解除 (MetaShopScreen「装備」「解除」トグル)。
+        /// 1枠のみ (§3.2) のため、新しい relicId をセットするだけで前の装備は自動的に外れる。
+        /// null/空文字を渡すと解除。解放済み・レアリティ (Common/Uncommon) の検証は呼び出し側
+        /// (MetaShopScreen / GameController.ApplyStarterPerk の二重防御) が行う — PlayerState は
+        /// UnlockedCharacters と同様、単純な永続化窓口に留める。
+        /// </summary>
+        public void SetStarterPerk(string relicId)
+        {
+            StarterPerkRelicId = string.IsNullOrEmpty(relicId) ? null : relicId;
             Save();
         }
 

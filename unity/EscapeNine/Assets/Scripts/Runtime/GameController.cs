@@ -243,6 +243,25 @@ namespace EscapeNine.Runtime
                 Session.DailyChallengeConditions = pending.Conditions;
             }
 
+            // Phase 5a: レリック状態は完全にラン限り。前ランの所持レリック/ドラフトサービスを
+            // 持ち越さない (§9未決事項1: 永続要素はスターターパークのみ、5aはスコープ外)。
+            // Phase 5c: この reset を Session.StartGame() より前へ移動した (旧: StartGame の後)。
+            // 理由: 直後の ApplyStarterPerk() が _ownedRelicIds に加える内容を、この Clear() が
+            // 後から上書きしてしまう順序ミスを避けるため。GameController 自身のローカル状態リセットで
+            // あり Session.StartGame の実行結果には依存しないため、移動しても既存挙動
+            // (レリックなしランでの動作) に影響はない。
+            _relicDraftService = new RelicDraftService();
+            _ownedRelicIds.Clear();
+            CurrentDraftCandidates = Array.Empty<RelicDefinition>();
+            IsRelicDraftPending = false;
+
+            // Phase 5c: スターターパーク (§3.2) の自動適用。Session.StartGame() より前に呼ぶ必要がある —
+            // #10 護りの起点 (MinStartDistance) 等、Relics の値を GameSession.StartGame() 内の
+            // 初期配置ロジックが直接参照するため (GameSession.cs 参照)、StartGame の後に適用すると
+            // 1階層目だけ効果が反映されない事故になる。ChooseRelic (階層クリア後のみ呼ばれる) では
+            // この問題が起きないが、「ラン開始時装備」であるスターターパークはここを踏む必要がある。
+            ApplyStarterPerk();
+
             Session.StartGame(startFloor);
 
             // ラン計測の初期化 (Swift: gameStartTime / floorStartTime / elapsedSeconds / nearMissDistance)
@@ -253,13 +272,6 @@ namespace EscapeNine.Runtime
             LastTimingGrade = null;
             IsFloorClearPending = false;
             IsInvisible = false; // 前ランの透明化表示フラグを持ち越さない
-
-            // Phase 5a: レリック状態は完全にラン限り。前ランの所持レリック/ドラフトサービスを
-            // 持ち越さない (§9未決事項1: 永続要素はスターターパークのみ、5aはスコープ外)。
-            _relicDraftService = new RelicDraftService();
-            _ownedRelicIds.Clear();
-            CurrentDraftCandidates = Array.Empty<RelicDefinition>();
-            IsRelicDraftPending = false;
 
             // Phase 5c: 分岐ルート/ボスパターンの状態も完全にラン限りで持ち越さない。
             IsRouteChoicePending = false;
@@ -275,8 +287,9 @@ namespace EscapeNine.Runtime
             _audio.PlaySfx("game_start");                    // Swift: playSoundEffect(.gameStart)
             _audio.PlayBgmForFloor(Session.CurrentFloor);    // Swift: playBGMMusic(.forFloor(currentFloor))
 
-            // Phase 5b: #15 加速の証 (BpmMultiplierBonus)。ラン開始時点では Relics.None のため恒等だが、
-            // 将来のスターターパーク (§3.2、ラン開始時装備) に備えて開始時も同じ経路を通す。
+            // Phase 5b: #15 加速の証 (BpmMultiplierBonus)。通常はラン開始時点で Relics.None のため恒等だが、
+            // Phase 5c: 上の ApplyStarterPerk() でスターターパークが装備されていれば既にこの時点で
+            // Relics へ適用済みのため、そのボーナス (#15 が装備された場合) も自然に反映される。
             // デバッグ上書き (bpmOverride) はレリック乗算の対象外 (デバッグ値が最優先)。
             double bpm = bpmOverride > 0 ? bpmOverride : ApplyRelicBpm(Floor.CalculateBPM(Session.CurrentFloor));
 
@@ -286,6 +299,35 @@ namespace EscapeNine.Runtime
 
             // TODO(Phase 3): AnalyticsLogger.logGameStarted 相当 (floor / characterId)。
             OnStateChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Phase 5c: スターターパーク (docs/unity-phase5-roguelike-design.md §3.2) をラン開始時に
+        /// 自動適用する。MetaShopScreen で装備された、残光で解放済みの Common/Uncommon レリックを
+        /// 1つだけ「ドラフト消費なしで」Session.Relics へ適用する (§3.2「ドラフト消費なしで
+        /// 付与される点が通常レリックと異なる」)。ChooseRelic メソッドと同じ
+        /// 「ApplyTo(Session.Relics) + _ownedRelicIds.Add」の適用経路を踏襲する。
+        /// 呼び出し側 (StartNewRun) の制約: _ownedRelicIds リセット後・Session.StartGame() 呼び出し
+        /// 「前」に呼ぶこと (理由は StartNewRun 内のコメント参照)。
+        /// デイリーチャレンジ中は公平性のため適用しない (レリックドラフト/分岐ルートと同じ扱い、§4)。
+        /// </summary>
+        private void ApplyStarterPerk()
+        {
+            if (_player == null) return;
+            if (Session.DailyChallengeMode) return;
+
+            string relicId = _player.StarterPerkRelicId;
+            if (string.IsNullOrEmpty(relicId)) return;
+            if (!_player.IsRelicUnlocked(relicId)) return; // 解放取り消し等への防御 (二重チェック)
+
+            RelicDefinition? def = RelicCatalog.Find(relicId);
+            if (def == null) return;
+            // §3.2: Rare以上は対象外 (MetaShopScreen 側でも同条件で選択肢を絞っているが、
+            // PlayerPrefs の直接改変等に備えてここでも二重に防御する)。
+            if (def.Value.Rarity > RelicRarity.Uncommon) return;
+
+            def.Value.ApplyTo(Session.Relics);
+            _ownedRelicIds.Add(relicId);
         }
 
         /// <summary>
@@ -904,8 +946,8 @@ namespace EscapeNine.Runtime
             PersistRunResult();
 
             // Phase 5b: 残光 (メタ進行通貨) 付与 (docs/unity-phase5-roguelike-design.md §3.1、[要検証・仮の式])。
-            // Swift正本には対応なし (Unity固有拡張)。消費導線 (MetaShopScreen 等、§3.2) は Phase 5c で
-            // 画面と一緒に実装する前提のため、本タスクでは蓄積のみを行う。
+            // Swift正本には対応なし (Unity固有拡張)。消費導線 (MetaShopScreen、§3.2) は Phase 5c で追加済み
+            // (PlayerState.TryUnlockRelic / SetStarterPerk)。
             // Session.CurrentFloor は勝利時 101 のまま (PersistRunResult と同じ Swift パリティ踏襲の値)。
             int glowEarned = MetaProgressionCalculator.CalculateGlow(Session.CurrentFloor, won, dailyChallengeCompletedThisRun);
             _player.AddMetaCurrency(glowEarned);

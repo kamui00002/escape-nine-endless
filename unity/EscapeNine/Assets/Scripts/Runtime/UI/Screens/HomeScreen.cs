@@ -160,10 +160,10 @@ namespace EscapeNine.Runtime.UI
         private void BuildButtonSection(RectTransform parent)
         {
             const float w = 0.72f;  // Swift: ResponsiveLayout.buttonWidth 相当を比率で固定
-            // セカンダリボタンが 5→6 個 (実績追加) になったため、行高/行間を詰めて
-            // 最高到達階層セクションとの重なりを避ける (Phase 2.5)。
-            const float h = 0.046f;
-            const float gap = 0.050f;
+            // セカンダリボタンが 6→7 個 (遺物庫追加、Phase 5c) になったため、行高/行間をさらに詰めて
+            // 最高到達階層セクションとの重なりを避ける (5→6 個の時 (Phase 2.5) と同じ対処の継続)。
+            const float h = 0.040f;
+            const float gap = 0.044f;
 
             // 1. 冒険を始める (primary: 明色背景 + 濃色文字。glow/pulse は Phase 4 送り)
             var play = UIFactory.TextButton(parent, "PlayButton", "冒険を始める", 60,
@@ -175,8 +175,9 @@ namespace EscapeNine.Runtime.UI
             // 2. デイリーチャレンジ (Swift: highestFloor >= 10 のときだけ表示。可視制御は RefreshDynamic)
             BuildDailyChallengeButton(parent, w);
 
-            // 3〜8. セカンダリボタン群 (Swift: GameButton style: .secondary、並び順も正本どおり
-            // キャラクター→ランキング→ショップ→実績→遊び方→設定)
+            // 3〜9. セカンダリボタン群 (Swift: GameButton style: .secondary、並び順も正本どおり
+            // キャラクター→ランキング→ショップ→実績→遊び方→設定→遺物庫。遺物庫のみ Swift 正本に
+            // 対応なし、Unity 独自の Phase 5c メタ進行導線)
             CreateSecondaryButton(parent, "CharacterButton", "キャラクター", 0.550f, w, h,
                 () => NavigateTo(ScreenId.CharacterSelect));
             CreateSecondaryButton(parent, "RankingButton", "ランキング", 0.550f - gap, w, h,
@@ -189,6 +190,11 @@ namespace EscapeNine.Runtime.UI
                 () => NavigateTo(ScreenId.Tutorial));
             CreateSecondaryButton(parent, "SettingsButton", "設定", 0.550f - gap * 5, w, h,
                 () => NavigateTo(ScreenId.Settings));
+
+            // 7. 遺物庫 (Phase 5c、MetaShopScreen)。既存の「ショップ」(ScreenId.Shop = IAP でのキャラ購入・
+            // 広告削除) とは別物なので、混同を避けるため「遺物庫」(レリックを集め・管理する場所) と命名する。
+            CreateSecondaryButton(parent, "RelicVaultButton", "遺物庫", 0.550f - gap * 6, w, h,
+                () => NavigateTo(ScreenId.MetaShop));
         }
 
         private void CreateSecondaryButton(RectTransform parent, string name, string label,

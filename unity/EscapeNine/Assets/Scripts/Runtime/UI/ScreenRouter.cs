@@ -23,6 +23,7 @@ namespace EscapeNine.Runtime.UI
         Tutorial,        // TutorialOverlayView
         DailyChallenge,  // DailyChallengeView (Phase 2.5)
         Achievements,    // AchievementListView (Phase 2.5)
+        MetaShop,        // MetaShopScreen (Phase 5c、Swift正本には対応なし。残光/スターターパーク)
     }
 
     /// <summary>
