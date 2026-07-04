@@ -59,6 +59,15 @@ namespace EscapeNine.Core
         public bool DailyChallengeMode { get; set; }
         public List<ChallengeCondition> DailyChallengeConditions { get; set; } = new List<ChallengeCondition>();
 
+        // --- Phase 5 レリック (Unity固有拡張、Swift正本には存在しない) ---
+        // docs/unity-phase5-roguelike-design.md §1原則1: 既存公開APIへの「追加のみ」。
+        // 既定値 RelicEffects.None のとき、以下の全フックは既存(Phase 5以前)の挙動と完全に一致する。
+        public RelicEffects Relics { get; set; } = RelicEffects.None;
+
+        /// <summary>「影の抜け道」系(DisappearForgivenessPerFloor)の今階層内の残り使用回数。
+        /// 階層開始時に Relics.DisappearForgivenessPerFloor へ再チャージされる (§2.4)。</summary>
+        private int _disappearForgivenessRemainingThisFloor;
+
         public GameSession(Character character, AILevel selectedAILevel = AILevel.Easy, AIEngine ai = null, IRandomSource rng = null)
         {
             CurrentCharacter = character;
@@ -70,20 +79,34 @@ namespace EscapeNine.Core
         public void SetCharacter(Character character) => CurrentCharacter = character;
 
         // --- derived ---
-        public int RemainingSkillUses => Skill.MaxUsage - SkillUsageCount;
+        /// <summary>スキル最大使用回数のレリックボーナスを加算した残り使用回数。Relics.None なら既存挙動と同一。</summary>
+        public int RemainingSkillUses => Skill.MaxUsage + Relics.SkillMaxUsageBonus - SkillUsageCount;
 
-        /// <summary>現在階層の必要ターン数。Floor 0 はプロローグ短縮。Swift: maxTurns</summary>
-        public int MaxTurns =>
-            CurrentFloor == TutorialConstants.PrologueFloor
-                ? TutorialConstants.PrologueClearTurns
-                : GameConfig.GetMaxTurns(CurrentFloor);
+        /// <summary>現在階層の必要ターン数。Floor 0 はプロローグ短縮。Swift: maxTurns
+        /// レリック(#4 老練の構え)の TurnCountReduction を減算し、最低3にクランプする。</summary>
+        public int MaxTurns
+        {
+            get
+            {
+                if (CurrentFloor == TutorialConstants.PrologueFloor) return TutorialConstants.PrologueClearTurns;
+                int baseTurns = GameConfig.GetMaxTurns(CurrentFloor);
+                return Math.Max(3, baseTurns - Relics.TurnCountReduction);
+            }
+        }
 
         public bool IsBossFloor => Floor.IsBossFloor(CurrentFloor);
 
-        /// <summary>コンボによるスコア倍率。Swift: scoreMultiplier</summary>
-        public double ScoreMultiplier =>
-            ComboCount >= GameConfig.ComboMultiplierThreshold2 ? 2.0 :
-            ComboCount >= GameConfig.ComboMultiplierThreshold1 ? 1.5 : 1.0;
+        /// <summary>コンボによるスコア倍率。Swift: scoreMultiplier
+        /// レリック(#14 連鎖の証、5aカタログ外だがフックとして実装)の ComboThresholdReduction をしきい値から減算する。</summary>
+        public double ScoreMultiplier
+        {
+            get
+            {
+                int threshold1 = GameConfig.ComboMultiplierThreshold1 - Relics.ComboThresholdReduction;
+                int threshold2 = GameConfig.ComboMultiplierThreshold2 - Relics.ComboThresholdReduction;
+                return ComboCount >= threshold2 ? 2.0 : ComboCount >= threshold1 ? 1.5 : 1.0;
+            }
+        }
 
         /// <summary>現在のプレイヤー・敵間の Chebyshev 距離 (惜しさメーター)。</summary>
         public int CurrentNearMissDistance => ChebyshevDistance(PlayerPosition, EnemyPosition);
@@ -103,10 +126,27 @@ namespace EscapeNine.Core
             ShieldActive = false;
             LastDefeatReason = null;
             ComboCount = 0;
+            // #11 影の抜け道 (5aカタログ外だがフックとして実装)。Relics.None なら常に0のため実質no-op。
+            _disappearForgivenessRemainingThisFloor = Relics.DisappearForgivenessPerFloor;
 
             // 配置 (Swift: 1..9 の distinct。消失計算は配置後なので player/enemy は消えない)
+            // #10 護りの起点: enemyPos が明示指定されていない場合のみ、Relics.MinStartDistance を
+            // 満たす配置を保証する。Relics.MinStartDistance <= 0 (既定) のときは既存の
+            // RandomPositionExcluding 経路のみを通り、乱数消費順を含めて既存挙動と完全に一致する。
             int p = playerPos ?? RandomPosition();
-            int e = enemyPos ?? RandomPositionExcluding(p);
+            int e;
+            if (enemyPos.HasValue)
+            {
+                e = enemyPos.Value;
+            }
+            else if (Relics.MinStartDistance > 0)
+            {
+                e = RandomPositionSatisfyingDistance(p, Relics.MinStartDistance);
+            }
+            else
+            {
+                e = RandomPositionExcluding(p);
+            }
             PlayerPosition = p;
             EnemyPosition = e;
             PendingPlayerMove = null;
@@ -138,6 +178,8 @@ namespace EscapeNine.Core
             ShieldActive = false;
             LastDefeatReason = null;
             // 注意: comboCount は Swift の nextFloor でもリセットしない (階層跨ぎで継続)
+            // #11 影の抜け道 (5aカタログ外だがフックとして実装)。Relics.None なら常に0のため実質no-op。
+            _disappearForgivenessRemainingThisFloor = Relics.DisappearForgivenessPerFloor;
 
             if (CurrentFloor > GameConfig.MaxFloors)
             {
@@ -158,10 +200,23 @@ namespace EscapeNine.Core
             }
 
             int playerPos = available[_rng.NextInt(available.Count)];
-            var enemyCandidates = available.Where(p => p != playerPos).ToList();
-            int enemyPos = enemyCandidates.Count > 0
-                ? enemyCandidates[_rng.NextInt(enemyCandidates.Count)]
-                : (playerPos == 1 ? 9 : 1);
+            int enemyPos;
+            if (Relics.MinStartDistance > 0)
+            {
+                // #10 護りの起点: 距離条件を満たす候補があればそこから抽選、なければ既存のフォールバックへ。
+                var distanceCandidates = available.Where(p => p != playerPos && ChebyshevDistance(p, playerPos) >= Relics.MinStartDistance).ToList();
+                var candidates = distanceCandidates.Count > 0 ? distanceCandidates : available.Where(p => p != playerPos).ToList();
+                enemyPos = candidates.Count > 0
+                    ? candidates[_rng.NextInt(candidates.Count)]
+                    : (playerPos == 1 ? 9 : 1);
+            }
+            else
+            {
+                var enemyCandidates = available.Where(p => p != playerPos).ToList();
+                enemyPos = enemyCandidates.Count > 0
+                    ? enemyCandidates[_rng.NextInt(enemyCandidates.Count)]
+                    : (playerPos == 1 ? 9 : 1);
+            }
 
             PlayerPosition = playerPos;
             EnemyPosition = enemyPos;
@@ -193,12 +248,33 @@ namespace EscapeNine.Core
                 return Defeat(DefeatReason.CaughtByEnemy);
             }
 
-            if (shouldConsume && RemainingSkillUses > 0) SkillUsageCount++;
+            // 斜め移動 (盗賊スキル) を実際に消費するターンかどうか。#1/#2 の統合点判定に使う。
+            bool usedDiagonalSkillThisTurn = shouldConsume && Skill.Type == SkillType.Diagonal;
+
+            if (shouldConsume && RemainingSkillUses > 0)
+            {
+                // #1 影の軽業: 斜め移動消費時のみ、Relics.ThiefDiagonalSkillSaveChance の確率でスキル残数を温存する。
+                // Relics.None (=0.0) のときは `> 0` で短絡し _rng.NextDouble() を一切呼ばないため、
+                // 消失マス抽選などで使う既存の _rng 消費シーケンスに影響しない (§2.3 末尾の注記どおり)。
+                bool skillSaved = usedDiagonalSkillThisTurn
+                    && Relics.ThiefDiagonalSkillSaveChance > 0
+                    && _rng.NextDouble() < Relics.ThiefDiagonalSkillSaveChance;
+                if (!skillSaved) SkillUsageCount++;
+            }
             IsSkillActive = false;
 
             if (DisappearedCells.Contains(next))
             {
-                return Defeat(DefeatReason.CaughtByEnemy);
+                // #11 影の抜け道 (5aカタログ外だがフックとして実装): 1階層につき許された回数だけ、
+                // 消失マスへの進入による敗北を無効化して継続する。Relics.None なら常に0のため既存挙動と同一。
+                if (_disappearForgivenessRemainingThisFloor > 0)
+                {
+                    _disappearForgivenessRemainingThisFloor--;
+                }
+                else
+                {
+                    return Defeat(DefeatReason.CaughtByEnemy);
+                }
             }
 
             // 同時移動: 敵の次位置を「プレイヤー移動前」の位置を目標に計算
@@ -213,7 +289,25 @@ namespace EscapeNine.Core
             else
             {
                 AILevel effective = Floor.GetEffectiveAILevel(CurrentFloor, SelectedAILevel);
-                nextEnemy = _ai.CalculateNextMove(EnemyPosition, PlayerPosition, effective);
+
+                // #2 残像のヴェール: 斜め移動を消費したターンは、敵の移動をEasy相当に強制する。
+                // #9 幻惑の粉 (5aカタログ外だがフックとして実装): 実効AIがHardのときのみNormalへ格下げ
+                // (表示上の effective 自体は書き換えない)。両方満たす場合はヴェールを優先する。
+                AILevel aiLevelForThisCall;
+                if (Relics.ThiefResidualVeil && usedDiagonalSkillThisTurn)
+                {
+                    aiLevelForThisCall = AILevel.Easy;
+                }
+                else if (Relics.NeutralizeHardPrediction && effective == AILevel.Hard)
+                {
+                    aiLevelForThisCall = AILevel.Normal;
+                }
+                else
+                {
+                    aiLevelForThisCall = effective;
+                }
+
+                nextEnemy = _ai.CalculateNextMove(EnemyPosition, PlayerPosition, aiLevelForThisCall);
             }
 
             PlayerPosition = next;
@@ -226,7 +320,19 @@ namespace EscapeNine.Core
 
             if (isCollision)
             {
-                if (Skill.Type == SkillType.Invisible && RemainingSkillUses > 0)
+                // #5 不死鳥の残り火 (5aカタログ外だがフックとして実装): 衝突による敗北そのものを無効化して継続する。
+                // #12 二段構えの盾: 盾スキルを持たないキャラでも、レリックのチャージ分だけ即席の盾を発動する。
+                // Relics.None (両方0) のときはどちらの分岐にも入らず、既存の透明化/盾判定にそのまま進む。
+                if (Relics.ReviveCharges > 0)
+                {
+                    Relics.ReviveCharges--;
+                }
+                else if (Relics.GenericShieldCharges > 0)
+                {
+                    Relics.GenericShieldCharges--;
+                    ComboCount = 0; // 既存の盾ガード(Shield)と同様、無効化時はコンボをリセットする
+                }
+                else if (Skill.Type == SkillType.Invisible && RemainingSkillUses > 0)
                 {
                     SkillUsageCount++; // 透明化: 衝突時に自動消費
                 }
@@ -358,8 +464,19 @@ namespace EscapeNine.Core
             if (DisappearedCells.Contains(position)) return false;
 
             PendingPlayerMove = position;
-            if (grade == TimingGrade.Just || grade == TimingGrade.Good) ComboCount++;
-            else ComboCount = 0;
+            if (grade == TimingGrade.Just || grade == TimingGrade.Good)
+            {
+                ComboCount++;
+            }
+            else if (Relics.ComboMissShieldCharges > 0)
+            {
+                // #6 コンボの守り (5aカタログ外だがフックとして実装、Tier2): Missでもコンボを維持する。
+                Relics.ComboMissShieldCharges--;
+            }
+            else
+            {
+                ComboCount = 0;
+            }
             return true;
         }
 
@@ -384,15 +501,26 @@ namespace EscapeNine.Core
             }
         }
 
-        /// <summary>敵を拘束。Swift: bindEnemy()</summary>
+        /// <summary>敵を拘束。Swift: bindEnemy()
+        /// #17 心話の絆: 拘束スキルを持たないキャラでも、レリックの専用チャージ分だけ疑似的に拘束できる
+        /// (キャラのスキル残数(SkillUsageCount)は消費しない、専用チャージのみ減らす)。</summary>
         public void BindEnemy()
         {
             if (Status != GameStatus.Playing) return;
-            if (Skill.Type != SkillType.Bind) return;
-            if (RemainingSkillUses <= 0) return;
 
-            EnemyStoppedTurns = GameConfig.BindDurationTurns;
-            SkillUsageCount++;
+            if (Skill.Type == SkillType.Bind)
+            {
+                if (RemainingSkillUses <= 0) return;
+                EnemyStoppedTurns = GameConfig.BindDurationTurns;
+                SkillUsageCount++;
+                return;
+            }
+
+            if (Relics.PseudoBindCharges > 0)
+            {
+                EnemyStoppedTurns = GameConfig.BindDurationTurns;
+                Relics.PseudoBindCharges--;
+            }
         }
 
         // MARK: - Special rules
@@ -425,17 +553,24 @@ namespace EscapeNine.Core
             }
         }
 
-        /// <summary>階層に応じた消失マス数 (段階的)。Swift: getNumberOfDisappearingCells(for:)</summary>
+        /// <summary>階層に応じた消失マス数 (段階的)。Swift: getNumberOfDisappearingCells(for:)
+        /// #7 地固めの護符: Relics.DisappearCellReduction を減算する (0未満は0にクランプ)。</summary>
         private int GetNumberOfDisappearingCells(int floor)
         {
+            int baseCount = 1;
             foreach (var stage in GameConfig.DisappearCellStages)
             {
-                if (floor >= stage.Floor) return stage.Count;
+                if (floor >= stage.Floor)
+                {
+                    baseCount = stage.Count;
+                    break;
+                }
             }
-            return 1;
+            return Math.Max(0, baseCount - Relics.DisappearCellReduction);
         }
 
-        /// <summary>霧マップ: プレイヤーから見えるマスか。Swift: isCellVisible(_:)</summary>
+        /// <summary>霧マップ: プレイヤーから見えるマスか。Swift: isCellVisible(_:)
+        /// #8 灯火の指輪: Relics.FogVisibilityRadiusBonus を視界半径 (既定1) に加算する。</summary>
         public bool IsCellVisible(int position)
         {
             if (DisappearedCells.Contains(position)) return true; // 消失マスは常に見える
@@ -446,7 +581,8 @@ namespace EscapeNine.Core
                 int playerCol = GameConfig.ColumnFromPosition(PlayerPosition);
                 int cellRow = GameConfig.RowFromPosition(position);
                 int cellCol = GameConfig.ColumnFromPosition(position);
-                return Math.Abs(cellRow - playerRow) <= 1 && Math.Abs(cellCol - playerCol) <= 1;
+                int radius = 1 + Relics.FogVisibilityRadiusBonus;
+                return Math.Abs(cellRow - playerRow) <= radius && Math.Abs(cellCol - playerCol) <= radius;
             }
             return true;
         }
@@ -488,6 +624,19 @@ namespace EscapeNine.Core
         }
 
         private int RandomPosition() => _rng.NextInt(GameConfig.GridSize) + 1; // 1..9
+
+        /// <summary>#10 護りの起点: reference から Chebyshev距離 minDistance 以上のマスを抽選する。
+        /// 満たすマスが存在しない場合 (3x3では起こり得ないが安全側) は既存の RandomPositionExcluding にフォールバックする。</summary>
+        private int RandomPositionSatisfyingDistance(int reference, int minDistance)
+        {
+            var candidates = new List<int>();
+            for (int i = 1; i <= GameConfig.GridSize; i++)
+            {
+                if (i != reference && ChebyshevDistance(i, reference) >= minDistance) candidates.Add(i);
+            }
+            if (candidates.Count == 0) return RandomPositionExcluding(reference);
+            return candidates[_rng.NextInt(candidates.Count)];
+        }
 
         private int RandomPositionExcluding(int exclude)
         {
