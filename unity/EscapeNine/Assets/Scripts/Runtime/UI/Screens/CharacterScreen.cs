@@ -14,6 +14,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.UI
@@ -46,7 +47,7 @@ namespace EscapeNine.Runtime.UI
 
         // トースト (購入スタブの案内用。ResultScreen と同じ方式)
         private RectTransform _toast;
-        private Text _toastLabel;
+        private TextMeshProUGUI _toastLabel;
         private Coroutine _toastRoutine;
 
         /// <summary>
@@ -58,13 +59,13 @@ namespace EscapeNine.Runtime.UI
             public CharacterType Type;
             public Image Border;            // GameCard の stroke: 選択中 = ゴールド / 通常 = gridBorder
             public GameObject SelectedBadge; // 「選択中」バッジ
-            public Text PriceLabel;         // 未解放の有料キャラのみ表示 (¥240)
+            public TextMeshProUGUI PriceLabel;         // 未解放の有料キャラのみ表示 (¥240)
             public Image Sprite;            // 未解放時は alpha 0.4 に落とす
             public GameObject LockOverlay;  // 黒半透明 + 「未解放」
             public Button ActionButton;
             public Image ActionBg;
-            public Text ActionLabel;
-            public Text ThiefProgress;      // 盗賊のみ: 「現在: X階層 / 必要: 10階層」
+            public TextMeshProUGUI ActionLabel;
+            public TextMeshProUGUI ThiefProgress;      // 盗賊のみ: 「現在: X階層 / 必要: 10階層」
         }
 
         // MARK: - BuildUI
@@ -108,9 +109,13 @@ namespace EscapeNine.Runtime.UI
 
             // 戻るボタン (Swift: chevron.left + 戻る → SF Symbol は使えないため "<" テキストで代替)。
             // Swift の dismiss() は NavigationStack の pop = Home へ戻ることと等価。
+            // cx は他画面 (0.12) より左寄せ (2026-07-04 重なり監査で検出): このタイトル
+            // 「キャラクター選択」は他画面より幅広 (0.6) のため、既定の cx=0.12/幅 0.18 だと
+            // 右端 (0.21) がタイトル左端 (0.5-0.3=0.2) に食い込む。幅は変えず (テキスト折返し回避)
+            // 位置だけ左へ振る。
             var back = UIFactory.TextButton(parent, "BackButton", "< 戻る", 34,
                 UITheme.Background, UITheme.TextColor, OnBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.12f, 0.965f, 0.18f, 0.042f);
+            UIFactory.Place((RectTransform)back.transform, 0.10f, 0.965f, 0.18f, 0.042f);
 
             var title = UIFactory.Label(parent, "TitleLabel", "キャラクター選択", 50, UITheme.TextColor,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -256,7 +261,7 @@ namespace EscapeNine.Runtime.UI
                 UITheme.Background, UITheme.TextColor, () => OnCardActionTapped(type));
             UIFactory.Place((RectTransform)w.ActionButton.transform, 0.5f, 0.145f, 0.92f, 0.11f);
             w.ActionBg = w.ActionButton.GetComponent<Image>();
-            w.ActionLabel = w.ActionButton.GetComponentInChildren<Text>();
+            w.ActionLabel = w.ActionButton.GetComponentInChildren<TextMeshProUGUI>();
 
             // 盗賊のみ: 解放条件の進捗表示 (Swift: 「現在: X階層 / 必要: 10階層」)
             if (type == CharacterType.Thief)

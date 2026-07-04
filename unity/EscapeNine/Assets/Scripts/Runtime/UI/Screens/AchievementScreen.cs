@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.UI
@@ -29,7 +30,7 @@ namespace EscapeNine.Runtime.UI
         // BuildUI() が走るため計 2 回呼ばれる。二重構築防止ガード (他画面と同じ対策)。
         private bool _built;
 
-        private Text _progressLabel;
+        private TextMeshProUGUI _progressLabel;
         private RectTransform _progressBarFill;
         private ScrollRect _scroll;
         private RectTransform _listContent;
@@ -78,9 +79,13 @@ namespace EscapeNine.Runtime.UI
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)title.transform, 0.5f, 0.955f, 0.5f, 0.05f);
 
+            // 幅を 0.24→0.19 に縮小 (2026-07-04 重なり監査で検出): TitleLabel (cx=0.5, 幅 0.5 →
+            // 右端 0.75) と cx=0.86 のまま幅 0.24 だと左端 0.74 が食い込む。cx は右寄せのまま
+            // (画面右端との余白は維持)、幅だけ絞って左端をタイトルから離す (表示は短い分数 "X/9" のみで
+            // 折返しリスクは無い)。
             _progressLabel = UIFactory.Label(parent, "ProgressLabel", "0/" + AllAchievements.Length, 36,
                 UITheme.Available, TextAnchor.MiddleRight, FontStyle.Bold);
-            UIFactory.Place((RectTransform)_progressLabel.transform, 0.86f, 0.955f, 0.24f, 0.045f);
+            UIFactory.Place((RectTransform)_progressLabel.transform, 0.86f, 0.955f, 0.19f, 0.045f);
         }
 
         private void OnBackTapped()

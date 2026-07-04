@@ -13,14 +13,15 @@
 using EscapeNine.Runtime.UI.Fx;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace EscapeNine.Runtime.UI
 {
     public sealed class BPMInfoWidget
     {
-        private readonly Text _floorValue;
-        private readonly Text _bpmValue;
-        private readonly Text _speedValue;
+        private readonly TextMeshProUGUI _floorValue;
+        private readonly TextMeshProUGUI _bpmValue;
+        private readonly TextMeshProUGUI _speedValue;
 
         // Phase 4 (juice): 直前の BPM。double.NaN = 未初期化 (初回 Render で誤発火しない)。
         private double _lastBpm = double.NaN;
@@ -86,7 +87,7 @@ namespace EscapeNine.Runtime.UI
         // MARK: - 内部実装
 
         /// <summary>キャプション上段 + 値下段の 1 カラムを組む。返り値は値ラベル。</summary>
-        private static Text BuildColumn(RectTransform parent, string name, string caption,
+        private static TextMeshProUGUI BuildColumn(RectTransform parent, string name, string caption,
             float cx, Color valueColor)
         {
             var cap = UIFactory.Label(parent, name + "Caption", caption, 30,

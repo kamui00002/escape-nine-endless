@@ -19,6 +19,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Runtime.UI.Fx;
 
 namespace EscapeNine.Runtime.UI
@@ -32,7 +33,7 @@ namespace EscapeNine.Runtime.UI
         /// </summary>
         public static readonly Color SwiftOrange = new Color(1f, 0.584f, 0f);
 
-        private Text _countLabel;
+        private TextMeshProUGUI _countLabel;
         private RectTransform _barFill;
         private Image _barFillImage;
         private RectTransform _dotsRow;

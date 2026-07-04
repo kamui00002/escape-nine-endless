@@ -24,6 +24,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.UI
@@ -68,19 +69,19 @@ namespace EscapeNine.Runtime.UI
         private int _currentPage; // 0-indexed
 
         // ---- ページ切替のたびに更新する参照 ----
-        private Text _stepCaptionLabel;   // "STEP n / 6"
-        private Text _titleLabel;
-        private Text _subtitleLabel;
-        private Text _boardCaptionLabel;
+        private TextMeshProUGUI _stepCaptionLabel;   // "STEP n / 6"
+        private TextMeshProUGUI _titleLabel;
+        private TextMeshProUGUI _subtitleLabel;
+        private TextMeshProUGUI _boardCaptionLabel;
         private RectTransform _board;     // セルを毎回作り直すコンテナ (AspectRatioFitter で正方形)
         private Image[] _dotImages;
         private RectTransform[] _dotRects;
         private GameObject _prevButtonRoot;
         private Button _nextButton;
         private Image _nextButtonImage;
-        private Text _nextButtonLabel;
+        private TextMeshProUGUI _nextButtonLabel;
         private GameObject _turnCounterRoot;
-        private Text _turnCounterLabel;
+        private TextMeshProUGUI _turnCounterLabel;
         private GameObject _clearLabelRoot; // "CLEAR!" (バースト演出は Phase 4 送り、静的表示)
 
         // ---- 最終ページ (ミニプレイアブル) の状態。Swift: TutorialStep4Game の @State ----
@@ -328,8 +329,8 @@ namespace EscapeNine.Runtime.UI
                 UITheme.Accent, UITheme.Background, OnNextTapped);
             UIFactory.Place((RectTransform)_nextButton.transform, 0.72f, 0.115f, 0.42f, 0.06f);
             _nextButtonImage = _nextButton.GetComponent<Image>();
-            _nextButtonLabel = _nextButton.GetComponentInChildren<Text>();
-            if (_nextButtonLabel != null) _nextButtonLabel.fontStyle = FontStyle.Bold;
+            _nextButtonLabel = _nextButton.GetComponentInChildren<TextMeshProUGUI>();
+            if (_nextButtonLabel != null) _nextButtonLabel.fontStyle = FontStyles.Bold;
         }
 
         // MARK: - ページ表示

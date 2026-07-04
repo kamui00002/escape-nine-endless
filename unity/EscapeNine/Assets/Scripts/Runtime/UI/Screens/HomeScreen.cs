@@ -11,6 +11,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.UI
@@ -28,27 +29,27 @@ namespace EscapeNine.Runtime.UI
         private bool _built;
 
         // ---- OnShow のたびに更新する動的要素への参照 ----
-        private Text _floorNumberLabel;      // 最高到達階層の数字
+        private TextMeshProUGUI _floorNumberLabel;      // 最高到達階層の数字
         private Image _characterImage;       // 選択中キャラのスプライト
-        private Text _characterNameLabel;    // 選択中キャラの名前
+        private TextMeshProUGUI _characterNameLabel;    // 選択中キャラの名前
         private GameObject _dailyButtonRoot; // デイリーチャレンジボタン (階層10未到達では非表示)
-        private Text _dailyMainLabel;        // 同ボタンのメインテキスト (完了状態で色切替。Swift: isCompleted 分岐)
-        private Text _dailySubLabel;         // 同ボタンのサブテキスト (完了状態で文言切替)
+        private TextMeshProUGUI _dailyMainLabel;        // 同ボタンのメインテキスト (完了状態で色切替。Swift: isCompleted 分岐)
+        private TextMeshProUGUI _dailySubLabel;         // 同ボタンのサブテキスト (完了状態で文言切替)
         private GameObject _dailyNewBadge;   // NEW バッジ (未クリア時のみ表示)
 
         // トースト (記録確認等の簡易通知用。ShopScreen の同名パターンを踏襲した簡易実装)
         private RectTransform _toast;
-        private Text _toastLabel;
+        private TextMeshProUGUI _toastLabel;
         private Coroutine _toastRoutine;
         private const float ToastDisplaySeconds = 1.5f;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        private Text _dbgFloorValueLabel;    // 開始階層の現在値
-        private Text _dbgBpmValueLabel;      // BPMオーバーライドの現在値
-        private Text _dbgTurnCountdownValueLabel; // ターンカウントダウンビート数の現在値
-        private Text _dbgAiLabel;            // AI難易度サイクルボタンのラベル
-        private Text _dbgUnlockLabel;        // 全キャラ解放トグルのラベル
-        private Text _dbgSkipLabel;          // 開始カウントダウン省略トグルのラベル
+        private TextMeshProUGUI _dbgFloorValueLabel;    // 開始階層の現在値
+        private TextMeshProUGUI _dbgBpmValueLabel;      // BPMオーバーライドの現在値
+        private TextMeshProUGUI _dbgTurnCountdownValueLabel; // ターンカウントダウンビート数の現在値
+        private TextMeshProUGUI _dbgAiLabel;            // AI難易度サイクルボタンのラベル
+        private TextMeshProUGUI _dbgUnlockLabel;        // 全キャラ解放トグルのラベル
+        private TextMeshProUGUI _dbgSkipLabel;          // 開始カウントダウン省略トグルのラベル
 #endif
 
         public override void BuildUI()
@@ -168,8 +169,8 @@ namespace EscapeNine.Runtime.UI
             var play = UIFactory.TextButton(parent, "PlayButton", "冒険を始める", 60,
                 UITheme.Main, UITheme.Background, TriggerPlay);
             UIFactory.Place((RectTransform)play.transform, 0.5f, 0.685f, w, 0.06f);
-            var playLabel = play.GetComponentInChildren<Text>();
-            if (playLabel != null) playLabel.fontStyle = FontStyle.Bold;
+            var playLabel = play.GetComponentInChildren<TextMeshProUGUI>();
+            if (playLabel != null) playLabel.fontStyle = FontStyles.Bold;
 
             // 2. デイリーチャレンジ (Swift: highestFloor >= 10 のときだけ表示。可視制御は RefreshDynamic)
             BuildDailyChallengeButton(parent, w);
@@ -237,11 +238,11 @@ namespace EscapeNine.Runtime.UI
             _dailyButtonRoot = btn.gameObject;
 
             // メインラベルを上寄せにして、下段にサブテキストを置く (Swift の 2 行構成を再現)
-            _dailyMainLabel = btn.GetComponentInChildren<Text>();
+            _dailyMainLabel = btn.GetComponentInChildren<TextMeshProUGUI>();
             if (_dailyMainLabel != null)
             {
                 UIFactory.Place((RectTransform)_dailyMainLabel.transform, 0.42f, 0.66f, 0.8f, 0.55f);
-                _dailyMainLabel.alignment = TextAnchor.MiddleLeft;
+                _dailyMainLabel.alignment = TextAlignmentOptions.Left; // TextAnchor.MiddleLeft 相当 (UIFactory.ToTmpAlignment と同じ対応)
             }
             _dailySubLabel = UIFactory.Label(rt, "SubLabel", "毎日新しい挑戦", 30,
                 UITheme.WithAlpha(UITheme.TextColor, 0.6f), TextAnchor.MiddleLeft);
@@ -439,17 +440,17 @@ namespace EscapeNine.Runtime.UI
             var aiBtn = UIFactory.TextButton(panel, "AiCycleButton", "", 30,
                 UITheme.Background, UITheme.TextColor, CycleDebugAiLevel);
             UIFactory.Place((RectTransform)aiBtn.transform, 0.18f, 0.105f, 0.30f, 0.19f);
-            _dbgAiLabel = aiBtn.GetComponentInChildren<Text>();
+            _dbgAiLabel = aiBtn.GetComponentInChildren<TextMeshProUGUI>();
 
             var unlockBtn = UIFactory.TextButton(panel, "UnlockAllButton", "", 30,
                 UITheme.Background, UITheme.TextColor, ToggleUnlockAllCharacters);
             UIFactory.Place((RectTransform)unlockBtn.transform, 0.50f, 0.105f, 0.28f, 0.19f);
-            _dbgUnlockLabel = unlockBtn.GetComponentInChildren<Text>();
+            _dbgUnlockLabel = unlockBtn.GetComponentInChildren<TextMeshProUGUI>();
 
             var skipBtn = UIFactory.TextButton(panel, "SkipCountdownButton", "", 30,
                 UITheme.Background, UITheme.TextColor, ToggleSkipStartCountdown);
             UIFactory.Place((RectTransform)skipBtn.transform, 0.82f, 0.105f, 0.28f, 0.19f);
-            _dbgSkipLabel = skipBtn.GetComponentInChildren<Text>();
+            _dbgSkipLabel = skipBtn.GetComponentInChildren<TextMeshProUGUI>();
         }
 
         private void CreateDebugStepButton(RectTransform parent, string name, string label, float cx, float cy, int delta)

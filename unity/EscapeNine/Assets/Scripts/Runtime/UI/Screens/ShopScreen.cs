@@ -15,6 +15,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.UI
@@ -42,7 +43,7 @@ namespace EscapeNine.Runtime.UI
 
         // トースト (購入スタブ案内用。ResultScreen と同じ方式)
         private RectTransform _toast;
-        private Text _toastLabel;
+        private TextMeshProUGUI _toastLabel;
         private Coroutine _toastRoutine;
 
         /// <summary>商品行 1 つ分の動的 UI 参照。購入状態が変わるたび RefreshItems() で書き換える。</summary>

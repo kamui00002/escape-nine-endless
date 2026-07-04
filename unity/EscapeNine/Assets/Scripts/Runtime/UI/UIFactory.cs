@@ -13,6 +13,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace EscapeNine.Runtime.UI
 {
@@ -40,26 +41,60 @@ namespace EscapeNine.Runtime.UI
         }
 
         /// <summary>
-        /// legacy Text ラベルを生成する。フォントは必ず UITheme.Font (日本語対応)。
+        /// TMP ラベルを生成する (Wave 1: legacy Text から TextMeshPro へ移行)。
+        /// フォントは必ず UITheme.FontAsset (DotGothic16、日本語対応)。
+        /// 引数の型 (TextAnchor/FontStyle) は呼び出し側の変更を最小化するため維持し、
+        /// 内部で TMP の型 (TextAlignmentOptions/FontStyles) へ変換する。
         /// raycastTarget=false: ラベルがボタン等のタップを吸わないようにする。
         /// </summary>
-        public static Text Label(Transform parent, string name, string text, int fontSize, Color color,
+        public static TextMeshProUGUI Label(Transform parent, string name, string text, int fontSize, Color color,
             TextAnchor align = TextAnchor.MiddleCenter, FontStyle style = FontStyle.Normal)
         {
             RectTransform rt = NewRect(parent, name);
-            Text t = rt.gameObject.AddComponent<Text>();
-            t.font = UITheme.Font;
+            TextMeshProUGUI t = rt.gameObject.AddComponent<TextMeshProUGUI>();
+            t.font = UITheme.FontAsset;
             t.text = text;
             t.fontSize = fontSize;
             t.color = color;
-            t.alignment = align;
-            t.fontStyle = style;
+            t.alignment = ToTmpAlignment(align);
+            t.fontStyle = ToTmpFontStyle(style);
             // 横は折り返し・縦ははみ出し許容: 比率レイアウトで枠が小さくなっても
-            // 文字が消えるより「はみ出して見える」方がデバッグしやすいため。
-            t.horizontalOverflow = HorizontalWrapMode.Wrap;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
+            // 文字が消えるより「はみ出して見える」方がデバッグしやすいため (legacy Text の
+            // HorizontalWrapMode.Wrap / VerticalWrapMode.Overflow と同等の挙動)。
+            t.textWrappingMode = TextWrappingModes.Normal;
+            t.overflowMode = TextOverflowModes.Overflow;
             t.raycastTarget = false;
             return t;
+        }
+
+        /// <summary>legacy TextAnchor → TMP TextAlignmentOptions の変換 (9 方向を網羅)。</summary>
+        private static TextAlignmentOptions ToTmpAlignment(TextAnchor align)
+        {
+            switch (align)
+            {
+                case TextAnchor.UpperLeft: return TextAlignmentOptions.TopLeft;
+                case TextAnchor.UpperCenter: return TextAlignmentOptions.Top;
+                case TextAnchor.UpperRight: return TextAlignmentOptions.TopRight;
+                case TextAnchor.MiddleLeft: return TextAlignmentOptions.Left;
+                case TextAnchor.MiddleCenter: return TextAlignmentOptions.Center;
+                case TextAnchor.MiddleRight: return TextAlignmentOptions.Right;
+                case TextAnchor.LowerLeft: return TextAlignmentOptions.BottomLeft;
+                case TextAnchor.LowerCenter: return TextAlignmentOptions.Bottom;
+                case TextAnchor.LowerRight: return TextAlignmentOptions.BottomRight;
+                default: return TextAlignmentOptions.Center;
+            }
+        }
+
+        /// <summary>legacy FontStyle → TMP FontStyles の変換。</summary>
+        private static FontStyles ToTmpFontStyle(FontStyle style)
+        {
+            switch (style)
+            {
+                case FontStyle.Bold: return FontStyles.Bold;
+                case FontStyle.Italic: return FontStyles.Italic;
+                case FontStyle.BoldAndItalic: return FontStyles.Bold | FontStyles.Italic;
+                default: return FontStyles.Normal;
+            }
         }
 
         /// <summary>
@@ -88,7 +123,7 @@ namespace EscapeNine.Runtime.UI
             }
 
             // ラベルはボタン全面に広げる (Label 側で raycastTarget=false 済み → タップは Image が受ける)
-            Text t = Label(rt, "Label", label, fontSize, fg);
+            TextMeshProUGUI t = Label(rt, "Label", label, fontSize, fg);
             Place((RectTransform)t.transform, 0.5f, 0.5f, 1f, 1f);
 
             return btn;

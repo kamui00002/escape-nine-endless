@@ -12,6 +12,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.UI
@@ -40,11 +41,11 @@ namespace EscapeNine.Runtime.UI
         private Tab _selectedTab = Tab.Local;
 
         // ---- 動的要素への参照 ----
-        private Text _myRecordLabel;      // 自己ベスト階層の数字
+        private TextMeshProUGUI _myRecordLabel;      // 自己ベスト階層の数字
         private Image _tabLocalBg;
-        private Text _tabLocalLabel;
+        private TextMeshProUGUI _tabLocalLabel;
         private Image _tabCloudBg;
-        private Text _tabCloudLabel;
+        private TextMeshProUGUI _tabCloudLabel;
         private GameObject _scrollRoot;   // ローカル履歴リスト
         private ScrollRect _scroll;
         private RectTransform _listContent;
@@ -143,13 +144,13 @@ namespace EscapeNine.Runtime.UI
                 UITheme.Background, UITheme.TextColor, () => SelectTab(Tab.Local));
             UIFactory.Place((RectTransform)local.transform, 0.29f, 0.765f, 0.42f, 0.045f);
             _tabLocalBg = local.GetComponent<Image>();
-            _tabLocalLabel = local.GetComponentInChildren<Text>();
+            _tabLocalLabel = local.GetComponentInChildren<TextMeshProUGUI>();
 
             var cloud = UIFactory.TextButton(parent, "TabCloud", "クラウド", 36,
                 UITheme.Background, UITheme.TextColor, () => SelectTab(Tab.Cloud));
             UIFactory.Place((RectTransform)cloud.transform, 0.71f, 0.765f, 0.42f, 0.045f);
             _tabCloudBg = cloud.GetComponent<Image>();
-            _tabCloudLabel = cloud.GetComponentInChildren<Text>();
+            _tabCloudLabel = cloud.GetComponentInChildren<TextMeshProUGUI>();
         }
 
         /// <summary>タブ切替 (Swift: viewModel.selectTab)。</summary>
@@ -232,7 +233,7 @@ namespace EscapeNine.Runtime.UI
             RebuildRows(entries);
         }
 
-        private static void ApplyTabVisual(Image bg, Text label, bool selected)
+        private static void ApplyTabVisual(Image bg, TextMeshProUGUI label, bool selected)
         {
             if (bg != null) bg.color = selected ? UITheme.Available : UITheme.Background;
             if (label != null)

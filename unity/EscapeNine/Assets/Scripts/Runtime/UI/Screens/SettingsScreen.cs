@@ -14,6 +14,7 @@
 
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.UI
@@ -45,21 +46,21 @@ namespace EscapeNine.Runtime.UI
         private float _cursor;
 
         // ---- OnShow のたびに更新する動的要素への参照 ----
-        private Text _floorValueLabel;       // 最高到達階層
-        private Text _characterValueLabel;   // 選択キャラクター名
+        private TextMeshProUGUI _floorValueLabel;       // 最高到達階層
+        private TextMeshProUGUI _characterValueLabel;   // 選択キャラクター名
         private Image _oneTapBg;             // ワンタップリトライのトグル背景
-        private Text _oneTapLabel;
+        private TextMeshProUGUI _oneTapLabel;
         private Image _hapticsBg;            // 触覚フィードバックのトグル背景
-        private Text _hapticsLabel;
+        private TextMeshProUGUI _hapticsLabel;
         private Image _reduceMotionBg;       // 視覚効果を減らす (Phase 4 juice) のトグル背景
-        private Text _reduceMotionLabel;
+        private TextMeshProUGUI _reduceMotionLabel;
         private Slider _bgmSlider;
-        private Text _bgmPercentLabel;
+        private TextMeshProUGUI _bgmPercentLabel;
         private Slider _sfxSlider;
-        private Text _sfxPercentLabel;
+        private TextMeshProUGUI _sfxPercentLabel;
         private GameObject _adPurchasedBadge; // 広告削除: 購入済みバッジ
         private GameObject _adBuyButton;      // 広告削除: 購入ボタン (Phase 3 スタブ)
-        private Text _purchaseStatusLabel;    // 課金スタブの案内表示
+        private TextMeshProUGUI _purchaseStatusLabel;    // 課金スタブの案内表示
         private ScrollRect _scroll;
         private RectTransform _content;
 
@@ -68,7 +69,7 @@ namespace EscapeNine.Runtime.UI
         {
             public AILevel Level;
             public Image Bg;
-            public Text Label;
+            public TextMeshProUGUI Label;
         }
 
         private AiSegment[] _aiSegments;
@@ -211,7 +212,7 @@ namespace EscapeNine.Runtime.UI
             {
                 Level = level,
                 Bg = btn.GetComponent<Image>(),
-                Label = btn.GetComponentInChildren<Text>()
+                Label = btn.GetComponentInChildren<TextMeshProUGUI>()
             };
         }
 
@@ -278,10 +279,13 @@ namespace EscapeNine.Runtime.UI
                 UITheme.WithAlpha(UITheme.TextColor, 0.7f), TextAnchor.MiddleLeft);
             UIFactory.Place((RectTransform)version.transform, 0.5f, 0.675f, 0.88f, 0.08f); // AppName 0.76 化に連動
 
+            // cy を 0.57→0.55 に下げる (2026-07-04 重なり監査で検出): VersionLabel (cy=0.675,
+            // 高さ 0.08) との行間が詰まっていた。VersionLabel 側は AppName との間隔がこれ以上
+            // 詰められないため、DescLabel だけを下げて余白を確保する。
             var desc = UIFactory.Label(card, "DescLabel",
                 "リズムに合わせてダンジョンを攻略する\nエンドレスチャレンジゲーム", 30,
                 UITheme.WithAlpha(UITheme.TextColor, 0.8f), TextAnchor.MiddleLeft);
-            UIFactory.Place((RectTransform)desc.transform, 0.5f, 0.57f, 0.88f, 0.16f);
+            UIFactory.Place((RectTransform)desc.transform, 0.5f, 0.55f, 0.88f, 0.16f);
 
             CreateDivider(card, 0.47f);
 
@@ -463,7 +467,7 @@ namespace EscapeNine.Runtime.UI
         }
 
         /// <summary>トグルの見た目 (Swift の Toggle tint: available を ON/OFF ボタンで代替)。</summary>
-        private static void ApplyToggleVisual(Image bg, Text label, bool isOn)
+        private static void ApplyToggleVisual(Image bg, TextMeshProUGUI label, bool isOn)
         {
             if (bg != null) bg.color = isOn ? UITheme.Available : UITheme.Background;
             if (label != null)
@@ -511,7 +515,7 @@ namespace EscapeNine.Runtime.UI
         }
 
         /// <summary>行の右値 (Swift: fantasyNumber / available 等)。</summary>
-        private static Text CreateRowValue(RectTransform card, string name, string text, float cy, Color color)
+        private static TextMeshProUGUI CreateRowValue(RectTransform card, string name, string text, float cy, Color color)
         {
             var t = UIFactory.Label(card, name, text, 36, color, TextAnchor.MiddleRight, FontStyle.Bold);
             UIFactory.Place((RectTransform)t.transform, 0.76f, cy, 0.40f, 0.14f);
@@ -531,21 +535,23 @@ namespace EscapeNine.Runtime.UI
         /// HomeScreen DangerZone と同じ「状態表示ボタン」方式に簡略化 (意図的差分)。
         /// </summary>
         private void BuildToggleRow(RectTransform card, string name, string title, string desc,
-            float rowCy, System.Action onTap, out Image toggleBg, out Text toggleLabel)
+            float rowCy, System.Action onTap, out Image toggleBg, out TextMeshProUGUI toggleLabel)
         {
             var t = UIFactory.Label(card, name + "Title", title, 36, UITheme.GoldText, TextAnchor.MiddleLeft);
             UIFactory.Place((RectTransform)t.transform, 0.30f, rowCy, 0.52f, 0.10f);
 
+            // DotGothic16 の実メトリクスで Title と重なったため間隔を拡大 (W1 監査、-0.095→-0.135。
+            // -0.115 では FxCard の実高で 12px 残った実測に基づく)
             var d = UIFactory.Label(card, name + "Desc", desc, 26,
                 UITheme.WithAlpha(UITheme.TextColor, 0.7f), TextAnchor.UpperLeft);
-            UIFactory.Place((RectTransform)d.transform, 0.32f, rowCy - 0.095f, 0.56f, 0.10f);
+            UIFactory.Place((RectTransform)d.transform, 0.32f, rowCy - 0.135f, 0.56f, 0.10f);
 
             var btn = UIFactory.TextButton(card, name + "Toggle", "", 32,
                 UITheme.Background, UITheme.TextColor, onTap);
             UIFactory.Place((RectTransform)btn.transform, 0.84f, rowCy - 0.025f, 0.22f, 0.12f);
 
             toggleBg = btn.GetComponent<Image>();
-            toggleLabel = btn.GetComponentInChildren<Text>();
+            toggleLabel = btn.GetComponentInChildren<TextMeshProUGUI>();
         }
 
         // MARK: - uGUI Slider のコード構築 (Swift: Slider(value:in:) tint available)

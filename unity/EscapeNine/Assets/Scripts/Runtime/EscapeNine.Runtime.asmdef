@@ -3,7 +3,8 @@
     "rootNamespace": "EscapeNine.Runtime",
     "references": [
         "EscapeNine.Core",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

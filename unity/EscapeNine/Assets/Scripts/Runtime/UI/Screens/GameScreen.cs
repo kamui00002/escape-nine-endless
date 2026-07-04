@@ -20,6 +20,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 using EscapeNine.Runtime.UI.Fx;
 
@@ -55,54 +56,54 @@ namespace EscapeNine.Runtime.UI
         private bool _subscribed;
 
         // ---- HUD 参照 ----
-        private Text _pauseButtonLabel;
+        private TextMeshProUGUI _pauseButtonLabel;
         private BPMInfoWidget _bpmInfo;
         private BeatIndicatorWidget _beatIndicator;
         private GridBoardWidget _board;
 
         private GameObject _comboRow;
-        private Text _gradeLabel;
-        private Text _comboLabel;
-        private Text _multiplierLabel;
+        private TextMeshProUGUI _gradeLabel;
+        private TextMeshProUGUI _comboLabel;
+        private TextMeshProUGUI _multiplierLabel;
 
-        private Text _turnValueLabel;
+        private TextMeshProUGUI _turnValueLabel;
         private GameObject _skillInfoRow;
-        private Text _skillNameLabel;
-        private Text _skillCountLabel;
+        private TextMeshProUGUI _skillNameLabel;
+        private TextMeshProUGUI _skillCountLabel;
 
         private Button _skillButton;
         private Image _skillButtonImage;
-        private Text _skillButtonLabel;
+        private TextMeshProUGUI _skillButtonLabel;
 
         private GameObject _specialRuleRoot;
-        private Text _specialRuleLabel;
+        private TextMeshProUGUI _specialRuleLabel;
 
         // ---- オーバーレイ参照 (Swift の ZStack と同じ重ね順で生成する) ----
         private GameObject _floorClearOverlay;
-        private Text _floorClearFloorLabel;
-        private Text _floorClearNextLabel;
+        private TextMeshProUGUI _floorClearFloorLabel;
+        private TextMeshProUGUI _floorClearNextLabel;
 
         private GameObject _skillResetToast;
 
         private GameObject _pregameOverlay;
-        private Text _pregameFloorLabel;
+        private TextMeshProUGUI _pregameFloorLabel;
         private Image[] _aiButtonImages;
-        private Text[] _aiButtonLabels;
+        private TextMeshProUGUI[] _aiButtonLabels;
 
         private GameObject _pausedOverlay;
 
         private GameObject _countdownOverlay;
         private Image _countdownBg;
         private Color _countdownBgBaseColor; // Flash 中断残留の復帰用基準色 (レビュー G2)
-        private Text _countdownLabel;
+        private TextMeshProUGUI _countdownLabel;
 
         private GameObject _gameOverOverlay;
         private Image _gameOverBg;
-        private Text _gameOverIcon;
-        private Text _gameOverText;
+        private TextMeshProUGUI _gameOverIcon;
+        private TextMeshProUGUI _gameOverText;
 
         private GameObject _bossOverlay;
-        private Text _bossFloorLabel;
+        private TextMeshProUGUI _bossFloorLabel;
 
         // ---- ラン状態 ----
 
@@ -200,7 +201,7 @@ namespace EscapeNine.Runtime.UI
             var pause = UIFactory.TextButton(parent, "PauseButton", "一時停止", 38,
                 UITheme.BackgroundSecondary, UITheme.TextColor, HandlePauseTapped);
             UIFactory.Place((RectTransform)pause.transform, 0.82f, 0.968f, 0.30f, 0.036f);
-            _pauseButtonLabel = pause.GetComponentInChildren<Text>();
+            _pauseButtonLabel = pause.GetComponentInChildren<TextMeshProUGUI>();
         }
 
         // MARK: - Top Info (Swift: BPMInfoView + BeatIndicatorView + comboDisplay + turnAndSkillInfo)
@@ -232,24 +233,28 @@ namespace EscapeNine.Runtime.UI
             _comboRow.SetActive(false);
 
             // ターン行 (Swift: turnAndSkillInfo の 1 行目)
+            // cx は左右ラベルの箱が接触しないよう振り分け (2026-07-04 重なり監査で検出。
+            // MiddleRight/MiddleLeft 揃えのため箱が接すると実際にグリフも接近する — fontSize は
+            // 変えず幅配分だけ調整する)。
             var turnCaption = UIFactory.Label(parent, "TurnCaption", "ターン", 32,
                 UITheme.WithAlpha(UITheme.TextColor, 0.7f), TextAnchor.MiddleRight);
-            UIFactory.Place((RectTransform)turnCaption.transform, 0.40f, 0.676f, 0.22f, 0.024f);
+            UIFactory.Place((RectTransform)turnCaption.transform, 0.375f, 0.676f, 0.22f, 0.024f);
             _turnValueLabel = UIFactory.Label(parent, "TurnValue", "0 / 5", 36, UITheme.Available,
                 TextAnchor.MiddleLeft, FontStyle.Bold);
-            UIFactory.Place((RectTransform)_turnValueLabel.transform, 0.62f, 0.676f, 0.30f, 0.024f);
+            UIFactory.Place((RectTransform)_turnValueLabel.transform, 0.645f, 0.676f, 0.30f, 0.024f);
 
             // スキル残数行 (Swift: 2 行目。斜め移動キャラでは非表示)
             var skillRow = UIFactory.Panel(parent, "SkillInfoRow");
             UIFactory.Place(skillRow, 0.5f, 0.648f, 0.92f, 0.024f);
             _skillInfoRow = skillRow.gameObject;
 
+            // cx は TurnCaption/TurnValue と同じ理由 (2026-07-04 重なり監査で検出) で振り分け直す。
             _skillNameLabel = UIFactory.Label(skillRow, "SkillName", "", 32,
                 UITheme.WithAlpha(UITheme.TextColor, 0.7f), TextAnchor.MiddleRight);
-            UIFactory.Place((RectTransform)_skillNameLabel.transform, 0.37f, 0.5f, 0.32f, 1f);
+            UIFactory.Place((RectTransform)_skillNameLabel.transform, 0.34f, 0.5f, 0.32f, 1f);
             _skillCountLabel = UIFactory.Label(skillRow, "SkillCount", "", 36, UITheme.Available,
                 TextAnchor.MiddleLeft, FontStyle.Bold);
-            UIFactory.Place((RectTransform)_skillCountLabel.transform, 0.63f, 0.5f, 0.30f, 1f);
+            UIFactory.Place((RectTransform)_skillCountLabel.transform, 0.66f, 0.5f, 0.30f, 1f);
         }
 
         // MARK: - Board (Swift: gridBoard)
@@ -270,8 +275,8 @@ namespace EscapeNine.Runtime.UI
                 UITheme.Available, Color.white, HandleSkillTapped);
             UIFactory.Place((RectTransform)_skillButton.transform, 0.5f, 0.168f, 0.72f, 0.055f);
             _skillButtonImage = _skillButton.GetComponent<Image>();
-            _skillButtonLabel = _skillButton.GetComponentInChildren<Text>();
-            _skillButtonLabel.fontStyle = FontStyle.Bold;
+            _skillButtonLabel = _skillButton.GetComponentInChildren<TextMeshProUGUI>();
+            _skillButtonLabel.fontStyle = FontStyles.Bold;
             _skillButton.gameObject.SetActive(false);
 
             var ruleRoot = UIFactory.Panel(parent, "SpecialRule", UITheme.BackgroundSecondary);
@@ -309,8 +314,8 @@ namespace EscapeNine.Runtime.UI
             var start = UIFactory.TextButton(overlay, "StartButton", "スタート", 54,
                 UITheme.Main, UITheme.Background, HandleFloorClearStart);
             UIFactory.Place((RectTransform)start.transform, 0.5f, 0.375f, 0.5f, 0.06f);
-            var startLabel = start.GetComponentInChildren<Text>();
-            if (startLabel != null) startLabel.fontStyle = FontStyle.Bold;
+            var startLabel = start.GetComponentInChildren<TextMeshProUGUI>();
+            if (startLabel != null) startLabel.fontStyle = FontStyles.Bold;
 
             _floorClearOverlay.SetActive(false);
         }
@@ -357,7 +362,7 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place((RectTransform)aiCaption.transform, 0.5f, 0.545f, 0.8f, 0.03f);
 
             _aiButtonImages = new Image[SelectableAiLevels.Length];
-            _aiButtonLabels = new Text[SelectableAiLevels.Length];
+            _aiButtonLabels = new TextMeshProUGUI[SelectableAiLevels.Length];
             // Swift の HStack は要素数ぶん均等に並ぶ。3→4 種になっても崩れないよう、
             // 固定 3 枠の cx 式ではなく [areaLeft, areaRight] を要素数で均等割りする式にする
             // (n=3 のときは概ね旧来の 0.23/0.50/0.77, 幅 0.24 と同等になる)。
@@ -372,14 +377,14 @@ namespace EscapeNine.Runtime.UI
                 float cx = areaLeft + slotWidth * (i + 0.5f);
                 UIFactory.Place((RectTransform)btn.transform, cx, 0.49f, slotWidth * 0.88f, 0.045f);
                 _aiButtonImages[i] = btn.GetComponent<Image>();
-                _aiButtonLabels[i] = btn.GetComponentInChildren<Text>();
+                _aiButtonLabels[i] = btn.GetComponentInChildren<TextMeshProUGUI>();
             }
 
             var start = UIFactory.TextButton(overlay, "StartButton", "冒険を始める", 56,
                 UITheme.Main, UITheme.Background, HandlePregameStart);
             UIFactory.Place((RectTransform)start.transform, 0.5f, 0.375f, 0.62f, 0.06f);
-            var startLabel = start.GetComponentInChildren<Text>();
-            if (startLabel != null) startLabel.fontStyle = FontStyle.Bold;
+            var startLabel = start.GetComponentInChildren<TextMeshProUGUI>();
+            if (startLabel != null) startLabel.fontStyle = FontStyles.Bold;
 
             var back = UIFactory.TextButton(overlay, "BackButton", "戻る", 48,
                 UITheme.BackgroundSecondary, UITheme.TextColor, HandlePregameBack);
@@ -402,8 +407,8 @@ namespace EscapeNine.Runtime.UI
             var resume = UIFactory.TextButton(overlay, "ResumeButton", "再開", 54,
                 UITheme.Main, UITheme.Background, HandleResumeTapped);
             UIFactory.Place((RectTransform)resume.transform, 0.5f, 0.50f, 0.50f, 0.06f);
-            var resumeLabel = resume.GetComponentInChildren<Text>();
-            if (resumeLabel != null) resumeLabel.fontStyle = FontStyle.Bold;
+            var resumeLabel = resume.GetComponentInChildren<TextMeshProUGUI>();
+            if (resumeLabel != null) resumeLabel.fontStyle = FontStyles.Bold;
 
             var quit = UIFactory.TextButton(overlay, "QuitButton", "終了", 48,
                 UITheme.BackgroundSecondary, UITheme.TextColor, HandleQuitTapped);

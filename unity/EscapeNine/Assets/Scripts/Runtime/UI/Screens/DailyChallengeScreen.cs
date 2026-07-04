@@ -10,6 +10,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.UI
@@ -25,15 +26,15 @@ namespace EscapeNine.Runtime.UI
         // BuildUI() が走るため計 2 回呼ばれる。二重構築防止ガード (他画面と同じ対策)。
         private bool _built;
 
-        private Text _dateLabel;
+        private TextMeshProUGUI _dateLabel;
         private RectTransform _completedBadge;
-        private Text _completedFloorLabel;
+        private TextMeshProUGUI _completedFloorLabel;
         private RectTransform[] _conditionRows;
-        private Text[] _conditionLabels;
+        private TextMeshProUGUI[] _conditionLabels;
         private Image _actionButtonImage;
-        private Text _actionButtonLabel;
+        private TextMeshProUGUI _actionButtonLabel;
         private RectTransform _toast;
-        private Text _toastLabel;
+        private TextMeshProUGUI _toastLabel;
         private Coroutine _toastRoutine;
 
         // MARK: - BuildUI
@@ -122,7 +123,7 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place((RectTransform)caption.transform, 0.5f, 0.685f, 0.8f, 0.035f);
 
             _conditionRows = new RectTransform[MaxConditionRows];
-            _conditionLabels = new Text[MaxConditionRows];
+            _conditionLabels = new TextMeshProUGUI[MaxConditionRows];
             const float rowH = 0.06f;
             const float rowGap = 0.075f;
             for (int i = 0; i < MaxConditionRows; i++)
@@ -145,8 +146,8 @@ namespace EscapeNine.Runtime.UI
                 UITheme.Available, UITheme.Background, OnActionTapped);
             UIFactory.Place((RectTransform)action.transform, 0.5f, 0.30f, 0.62f, 0.06f);
             _actionButtonImage = action.GetComponent<Image>();
-            _actionButtonLabel = action.GetComponentInChildren<Text>();
-            if (_actionButtonLabel != null) _actionButtonLabel.fontStyle = FontStyle.Bold;
+            _actionButtonLabel = action.GetComponentInChildren<TextMeshProUGUI>();
+            if (_actionButtonLabel != null) _actionButtonLabel.fontStyle = FontStyles.Bold;
 
             var back = UIFactory.TextButton(parent, "BackBottomButton", "戻る", 48,
                 UITheme.BackgroundSecondary, UITheme.TextColor, OnBackTapped);

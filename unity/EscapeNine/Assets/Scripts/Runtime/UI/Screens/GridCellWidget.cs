@@ -16,6 +16,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace EscapeNine.Runtime.UI
 {
@@ -40,9 +41,9 @@ namespace EscapeNine.Runtime.UI
         private readonly Button _button;
         private readonly Image _fill;           // マス全面の塗り (Button の targetGraphic 兼タップ受け)
         private readonly Image[] _borders;      // 上下左右の枠線 4 本
-        private readonly Text _selectedMark;    // 選択済みマーク (Swift: arrow.down.circle.fill の代替)
-        private readonly Text _fogMark;         // 霧マーク (Swift: cloud.fog.fill の代替)
-        private readonly Text _xMark;           // 消失マーク (Swift: xmark の代替)
+        private readonly TextMeshProUGUI _selectedMark;    // 選択済みマーク (Swift: arrow.down.circle.fill の代替)
+        private readonly TextMeshProUGUI _fogMark;         // 霧マーク (Swift: cloud.fog.fill の代替)
+        private readonly TextMeshProUGUI _xMark;           // 消失マーク (Swift: xmark の代替)
         private readonly CanvasGroup _group;    // disabled 時の全体減光 (Swift: .opacity(0.5))
 
         /// <summary>枠線の太さ (セルに対する比率)。Swift の lineWidth 1.5〜3pt に相当する見た目。</summary>

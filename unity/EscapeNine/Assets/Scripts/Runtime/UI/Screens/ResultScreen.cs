@@ -13,6 +13,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using EscapeNine.Core;
 using EscapeNine.Runtime.UI.Fx;
 
@@ -52,26 +53,26 @@ namespace EscapeNine.Runtime.UI
         private AILevel _retryLevel = AILevel.Easy;
 
         // MARK: - 動的 UI 参照 (OnShow のたびに書き換える)
-        private Text _titleLabel;
+        private TextMeshProUGUI _titleLabel;
         private RectTransform _bestBadge;       // 「自己ベスト!」バッジ (新記録時のみ)
-        private Text _bestCaptionLabel;         // 「ベスト: N階」(新記録でない時のみ)
-        private Text _floorNumberLabel;
-        private Text _elapsedLabel;
-        private Text _characterNameLabel;
+        private TextMeshProUGUI _bestCaptionLabel;         // 「ベスト: N階」(新記録でない時のみ)
+        private TextMeshProUGUI _floorNumberLabel;
+        private TextMeshProUGUI _elapsedLabel;
+        private TextMeshProUGUI _characterNameLabel;
         private RectTransform _defeatRow;
-        private Text _defeatLabel;
+        private TextMeshProUGUI _defeatLabel;
         private RectTransform _newRecordBadge;  // カード内の「NEW RECORD!」(Swift は自己ベストと二重に出す仕様)
-        private Text _bestFloorLabel;
+        private TextMeshProUGUI _bestFloorLabel;
         private RectTransform _nearMissBanner;  // 「あと1マスで生存だった!」
         private GameObject _oneTapLayer;        // ワンタップリトライ用透明レイヤー
         private RectTransform _toast;
-        private Text _toastLabel;
+        private TextMeshProUGUI _toastLabel;
         private Coroutine _toastRoutine;
 
         // ---- 実績解除ポップアップ (Swift: AchievementPopupView) ----
         private RectTransform _achievementPopup;
         private Image _achievementPopupImage;
-        private Text _achievementPopupLabel;
+        private TextMeshProUGUI _achievementPopupLabel;
         private Coroutine _achievementPopupRoutine;
 
         // MARK: - 内部状態
@@ -155,7 +156,7 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place(_bestBadge, 0.5f, 0.825f, 0.56f, 0.048f);
             AddBorder(_bestBadge, UITheme.WithAlpha(UITheme.Available, 0.6f), 0.010f, 0.06f);
             _bestBadgeImage = _bestBadge.GetComponent<Image>(); // Phase4 juice: NEW RECORD ループ内で Flash する対象
-            Text badgeLabel = UIFactory.Label(_bestBadge, "Label", "自己ベスト!", 48, UITheme.Available,
+            TextMeshProUGUI badgeLabel = UIFactory.Label(_bestBadge, "Label", "自己ベスト!", 48, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)badgeLabel.transform, 0.5f, 0.5f, 1f, 1f);
 
@@ -169,21 +170,22 @@ namespace EscapeNine.Runtime.UI
             AddBorder(card, UITheme.WithAlpha(UITheme.GridBorder, 0.5f), 0.008f, 0.012f); // GameCard のゴールド枠
             _statsCardRt = card; // Phase4 juice: タイトルより遅れて SlideIn する時差演出用
 
-            Text floorCaption = UIFactory.Label(card, "FloorCaption", "到達階層",
+            TextMeshProUGUI floorCaption = UIFactory.Label(card, "FloorCaption", "到達階層",
                 32, UITheme.WithAlpha(UITheme.TextColor, 0.7f));
-            UIFactory.Place((RectTransform)floorCaption.transform, 0.5f, 0.92f, 0.9f, 0.10f);
+            // DotGothic16 の実メトリクスで FloorNumber(130pt) と 17px 重なったため間隔を拡大 (W1 監査)
+            UIFactory.Place((RectTransform)floorCaption.transform, 0.5f, 0.93f, 0.9f, 0.10f);
 
             // Swift: AnimatedNumber (0.8 秒カウントアップ) + glow → 静的表示に簡略化 (Phase 4)
             _floorNumberLabel = UIFactory.Label(card, "FloorNumber", "1", 130, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
-            UIFactory.Place((RectTransform)_floorNumberLabel.transform, 0.5f, 0.775f, 0.9f, 0.20f);
+            UIFactory.Place((RectTransform)_floorNumberLabel.transform, 0.5f, 0.76f, 0.9f, 0.20f);
 
             // 挑戦時間 (Swift: elapsedSeconds > 0 のときのみ表示。stopwatch アイコンは Phase 4)
             _elapsedLabel = UIFactory.Label(card, "Elapsed", "", 34, UITheme.GoldText);
             UIFactory.Place((RectTransform)_elapsedLabel.transform, 0.5f, 0.60f, 0.9f, 0.09f);
 
             // 使用キャラクター (Swift: caption + 名前の 2 トーン HStack。左右 2 ラベルで再現)
-            Text charCaption = UIFactory.Label(card, "CharacterCaption", "使用キャラクター",
+            TextMeshProUGUI charCaption = UIFactory.Label(card, "CharacterCaption", "使用キャラクター",
                 32, UITheme.WithAlpha(UITheme.TextColor, 0.7f), TextAnchor.MiddleRight);
             UIFactory.Place((RectTransform)charCaption.transform, 0.30f, 0.49f, 0.44f, 0.09f);
             _characterNameLabel = UIFactory.Label(card, "CharacterName", "", 34, UITheme.GoldText,
@@ -202,12 +204,12 @@ namespace EscapeNine.Runtime.UI
             _newRecordBadge = UIFactory.Panel(card, "NewRecordBadge", UITheme.WithAlpha(UITheme.Available, 0.15f));
             UIFactory.Place(_newRecordBadge, 0.5f, 0.24f, 0.60f, 0.10f);
             AddBorder(_newRecordBadge, UITheme.WithAlpha(UITheme.Available, 0.5f), 0.010f, 0.05f);
-            Text newRecordLabel = UIFactory.Label(_newRecordBadge, "Label", "NEW RECORD!",
+            TextMeshProUGUI newRecordLabel = UIFactory.Label(_newRecordBadge, "Label", "NEW RECORD!",
                 40, UITheme.Available, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)newRecordLabel.transform, 0.5f, 0.5f, 1f, 1f);
 
             // 最高記録 (Swift: 常時表示の控えめ 2 段)
-            Text bestCaption = UIFactory.Label(card, "BestCaption", "最高記録",
+            TextMeshProUGUI bestCaption = UIFactory.Label(card, "BestCaption", "最高記録",
                 28, UITheme.WithAlpha(UITheme.TextColor, 0.5f));
             UIFactory.Place((RectTransform)bestCaption.transform, 0.5f, 0.115f, 0.9f, 0.07f);
             _bestFloorLabel = UIFactory.Label(card, "BestFloor", "", 30, UITheme.GoldText);
@@ -221,7 +223,7 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place(_nearMissBanner, 0.5f, 0.435f, 0.72f, 0.05f);
             AddBorder(_nearMissBanner, UITheme.WithAlpha(UITheme.Warning, 0.55f), 0.008f, 0.06f);
             _nearMissBannerImage = _nearMissBanner.GetComponent<Image>(); // Phase4 juice: 表示時に赤 Flash 1 回
-            Text nearMissLabel = UIFactory.Label(_nearMissBanner, "Label", "あと1マスで生存だった!",
+            TextMeshProUGUI nearMissLabel = UIFactory.Label(_nearMissBanner, "Label", "あと1マスで生存だった!",
                 40, UITheme.Warning, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)nearMissLabel.transform, 0.5f, 0.5f, 1f, 1f);
 

@@ -4,6 +4,7 @@
 // 色値の複製を防ぐため、UI コードは必ず本クラス経由で色・フォントを取得すること。
 
 using UnityEngine;
+using TMPro;
 
 namespace EscapeNine.Runtime.UI
 {
@@ -79,6 +80,62 @@ namespace EscapeNine.Runtime.UI
                 if (_font == null) _font = ResolveFont();
                 return _font;
             }
+        }
+
+        // ---- TMP フォント (Wave 1: TextMeshPro 化) ----
+        // Font/ResolveFont() は削除しない: Wave 1 完了直後は UIFactory 以外からの参照が
+        // 残っている可能性があり、ここで消すとコンパイルが割れる。清掃は別タスクで行う。
+
+        private static TMP_FontAsset _fontAsset;
+
+        /// <summary>
+        /// 日本語表示可能な TMP_FontAsset (DotGothic16、動的アトラス)。
+        /// UIFactory.Label/TextButton はこれを唯一のフォント供給元として使う。
+        /// Resources/Fonts/DotGothic16-Regular.ttf から Font をロードし、
+        /// TMP_FontAsset.CreateFontAsset() でその場に動的フォントアセットを生成する
+        /// (動的アトラスのため、日本語グリフは実際に使われた文字だけオンデマンドで
+        /// アトラスへ焼かれる = .asset をリポジトリに増やさずに済む)。
+        /// ロード/生成失敗時 (.ttf の Font Import Settings で "Include Font Data" が
+        /// 無効な場合など) は ResolveFont() の OS フォント (Hiragino 等) を
+        /// TMP_FontAsset でラップしてフォールバックする。
+        /// 注意: TMP_Settings.defaultFontAsset は使わない — これは "TMP Settings" という
+        /// 名前の Resources アセット (TMP Essentials インポートで生成される) に依存し、
+        /// 本プロジェクトは TMP Essentials 未導入のため instance が null のままとなり、
+        /// アクセスすると NullReferenceException になる (TMP_Settings.cs の instance
+        /// ゲッターで確認済み)。CreateFontAsset(Font) 自体は TMP_Settings に依存しないため
+        /// ResolveFont() 経由のフォールバックは Essentials 有無に関わらず安全。
+        /// </summary>
+        public static TMP_FontAsset FontAsset
+        {
+            get
+            {
+                if (_fontAsset == null) _fontAsset = ResolveFontAsset();
+                return _fontAsset;
+            }
+        }
+
+        private static TMP_FontAsset ResolveFontAsset()
+        {
+            const string resourcePath = "Fonts/DotGothic16-Regular";
+
+            Font dotGothic = Resources.Load<Font>(resourcePath);
+            if (dotGothic != null)
+            {
+                TMP_FontAsset created = TMP_FontAsset.CreateFontAsset(dotGothic);
+                if (created != null) return created;
+            }
+
+            Debug.LogWarning(
+                $"[UITheme] DotGothic16 の TMP_FontAsset 生成に失敗 (Resources/{resourcePath})。" +
+                "Font Import Settings で \"Include Font Data\" が有効か確認すること。" +
+                "ResolveFont() の OS フォールバック (Hiragino 等) から TMP_FontAsset を生成する。");
+
+            Font fallbackFont = ResolveFont();
+            TMP_FontAsset fallbackAsset = TMP_FontAsset.CreateFontAsset(fallbackFont);
+            if (fallbackAsset != null) return fallbackAsset;
+
+            Debug.LogError("[UITheme] TMP_FontAsset のフォールバック生成にも失敗。文字が表示されない可能性がある。");
+            return null;
         }
 
         /// <summary>色のアルファだけ差し替えるユーティリティ。Swift の .opacity(a) 相当。</summary>
