@@ -63,6 +63,28 @@ namespace EscapeNine.Runtime
         /// <summary>階層クリア表示中 (AdvanceToNextFloor 待ち)。Swift: showFloorClear</summary>
         public bool IsFloorClearPending { get; private set; }
 
+        // ---- Phase 5a: レリックドラフト (docs/unity-phase5-roguelike-design.md §2.1/§6.3) ----
+        // Swift正本には存在しない (Unity固有の追加機能)。IsFloorClearPending と同じ「ゲート」の
+        // 設計思想: true の間は AdvanceToNextFloor を無視し、UI 側が ChooseRelic を呼ぶまで待つ。
+
+        /// <summary>レリックドラフト提示中か。デイリーチャレンジ中 (Session.DailyChallengeMode) は
+        /// 公平性のため常に false (§8: デイリーチャレンジ中はドラフト無効化)。</summary>
+        public bool IsRelicDraftPending { get; private set; }
+
+        /// <summary>現在提示中のドラフト候補 (既定3件)。プール枯渇時はそれ未満、ドラフト非提示時は空。</summary>
+        public IReadOnlyList<RelicDefinition> CurrentDraftCandidates { get; private set; } = Array.Empty<RelicDefinition>();
+
+        /// <summary>このランで所持中のレリックID一覧 (スタック分は同一IDが複数回含まれる)。
+        /// ラン限り (§9 未決事項1: 永続要素はスターターパークのみで、5aはスコープ外)。
+        /// HUD の簡易カウンタ表示用に公開する。</summary>
+        public IReadOnlyList<string> OwnedRelicIds => _ownedRelicIds;
+
+        /// <summary>階層クリア確定と同時にドラフト候補が生成された (Swift正本には対応なし)。</summary>
+        public event System.Action OnRelicDraftOffered;
+
+        /// <summary>ChooseRelic でレリックが確定した (Swift正本には対応なし)。</summary>
+        public event System.Action OnRelicChosen;
+
         /// <summary>直近の移動タイミング判定。Swift: lastTimingGrade (表示の 0.8 秒消去は UI 側)</summary>
         public TimingGrade? LastTimingGrade { get; private set; }
 
@@ -94,6 +116,14 @@ namespace EscapeNine.Runtime
         private Coroutine _startCountdownCoroutine;                  // 実時間 1.0s 間隔の開始カウントダウン (Swift: gameStartCountdownTimer)
         private bool _resultPersisted;                              // このランのスコア送信/自己ベスト更新が済んだか (二重送信防止)
         private int _turnBeats = GameConfig.TurnCountdownBeats;     // 1 ターンの拍数 (デバッグで可変)
+
+        // ---- Phase 5a: レリックドラフト内部状態 ----
+        // GameSession と同じ「IRandomSource 既定値 = new SystemRandomSource() (時刻シード)」の
+        // 作法に合わせ、GameSession 同様に StartNewRun のたびに新規インスタンスを持たせる
+        // (GameController は GameSession 生成時も rng を明示注入していないため、ここでも揃える)。
+        private RelicDraftService _relicDraftService;
+        private readonly List<string> _ownedRelicIds = new List<string>(); // ラン限りの所持レリックID (§9未決事項1)
+
         private float _runStartRealtime;                            // Swift: gameStartTime
         private float _floorStartRealtime;                          // Swift: floorStartTime (Phase 3 の計装用)
         private const float GameOverOverlaySeconds = 1.5f;          // Swift: asyncAfter(.now() + 1.5)
@@ -179,6 +209,13 @@ namespace EscapeNine.Runtime
             LastTimingGrade = null;
             IsFloorClearPending = false;
             IsInvisible = false; // 前ランの透明化表示フラグを持ち越さない
+
+            // Phase 5a: レリック状態は完全にラン限り。前ランの所持レリック/ドラフトサービスを
+            // 持ち越さない (§9未決事項1: 永続要素はスターターパークのみ、5aはスコープ外)。
+            _relicDraftService = new RelicDraftService();
+            _ownedRelicIds.Clear();
+            CurrentDraftCandidates = Array.Empty<RelicDefinition>();
+            IsRelicDraftPending = false;
             TurnCountdown = _turnBeats;
             _resultPersisted = false; // 新しいランのスコア送信/自己ベスト更新をまた許可する
             LastUnlockedAchievements = Array.Empty<Achievement>(); // 前ランのポップアップ対象を持ち越さない
@@ -239,12 +276,40 @@ namespace EscapeNine.Runtime
         }
 
         /// <summary>
+        /// Phase 5a: レリックドラフト候補から1つを確定する。Swift正本には対応なし。
+        /// UI (RelicDraftScreen 相当のオーバーレイ) の1/2/3キー・カードタップの両方から呼ばれる。
+        /// 候補外の ID (二重タップ等での不正な呼び出し) は無視する。
+        /// </summary>
+        public void ChooseRelic(string relicId)
+        {
+            if (!IsRelicDraftPending) return;
+
+            RelicDefinition? chosen = null;
+            foreach (var def in CurrentDraftCandidates)
+            {
+                if (def.Id == relicId) { chosen = def; break; }
+            }
+            if (chosen == null) return;
+
+            chosen.Value.ApplyTo(Session.Relics);
+            _ownedRelicIds.Add(relicId);
+
+            IsRelicDraftPending = false;
+            CurrentDraftCandidates = Array.Empty<RelicDefinition>();
+            OnRelicChosen?.Invoke();
+            OnStateChanged?.Invoke();
+        }
+
+        /// <summary>
         /// 階層クリア画面の「スタート」ボタンから呼ぶ (Swift: GameView の floorClearOverlay →
         /// viewModel.nextFloor()。自動遷移ではなくユーザー操作起点なのが正本仕様)。
         /// </summary>
         public void AdvanceToNextFloor()
         {
             if (!IsFloorClearPending) return;
+            // Phase 5a: レリック選択が済むまで次階層へ進ませない (§6.3 の順序:
+            // FloorCleared → RelicDraft → AdvanceToNextFloor 解禁)。
+            if (IsRelicDraftPending) return;
             IsFloorClearPending = false;
 
             var advance = Session.NextFloor();
@@ -493,6 +558,23 @@ namespace EscapeNine.Runtime
                     _audio.PlaySfx("move");
                     _phase = Phase.FloorClear; // 以後の拍は無視 (Swift: pauseBGM でメトロノーム停止)
                     IsFloorClearPending = true;
+
+                    // Phase 5a: 階層クリア確定と同時にレリックドラフト候補を生成する
+                    // (docs/unity-phase5-roguelike-design.md §2.1)。デイリーチャレンジ中は
+                    // 同一日替わりシードに挑む全プレイヤー間の公平性を優先し無効化する (§8)。
+                    if (!Session.DailyChallengeMode)
+                    {
+                        var candidates = _relicDraftService.DraftCandidates(_ownedRelicIds, Session.CurrentCharacter.Type);
+                        if (candidates.Count > 0)
+                        {
+                            CurrentDraftCandidates = candidates;
+                            IsRelicDraftPending = true;
+                            OnRelicDraftOffered?.Invoke();
+                        }
+                        // candidates.Count == 0 (プール完全枯渇) の場合は5aスコープ外のため
+                        // ドラフト非提示のまま (§2.1 のメタ通貨フォールバックは5b送り)。
+                    }
+
                     _audio.PlaySfx("floor_clear"); // Swift: playSoundEffect(.floorClear)
                     OnTurnResolved?.Invoke(result);
                     // TODO(Phase 3): AnalyticsLogger.logFloorCleared(floor:, clearSeconds:) 相当。

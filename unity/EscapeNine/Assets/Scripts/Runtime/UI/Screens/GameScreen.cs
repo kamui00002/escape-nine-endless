@@ -47,6 +47,12 @@ namespace EscapeNine.Runtime.UI
         private static readonly Color InvisibleAbsorbColor = new Color(0.72f, 0.42f, 0.98f); // 紫 (透明化吸収)
         private static readonly Color ShieldAbsorbColor = new Color(0.35f, 0.62f, 1f);        // 青 (盾ガード消費)
 
+        // ---- Phase 5a: レリックドラフト (docs/unity-phase5-roguelike-design.md §2.2/§6.3) ----
+        // UITheme にレアリティ色の定義が無いため本画面固有で追加する (InvisibleAbsorbColor 等と同じ作法)。
+        private static readonly Color RelicRareColor = new Color(0.45f, 0.62f, 1f);      // 青
+        private static readonly Color RelicEpicColor = new Color(0.72f, 0.42f, 0.98f);   // 紫
+        private const int RelicDraftMaxCards = 3;
+
         /// <summary>
         /// プレゲームの AI 難易度選択肢 (Swift: GameView.aiLevelSelector の
         /// `ForEach(AILevel.allCases, id: \.self)`。全 4 種を忠実に列挙する)。
@@ -64,6 +70,11 @@ namespace EscapeNine.Runtime.UI
 
         // ---- HUD 参照 ----
         private TextMeshProUGUI _pauseButtonLabel;
+
+        /// <summary>Phase 5a: 所持レリック数の簡易カウンタ (「遺物 N」)。タップでの一覧表示
+        /// (レリック名/効果の詳細確認) は Phase 5b の MetaShopScreen 系と合わせて実装する予定
+        /// (§6.3 の要件どおり「タップで一覧は5b送り」— 5a では非タップの Label に留める)。</summary>
+        private TextMeshProUGUI _relicCountLabel;
         private BPMInfoWidget _bpmInfo;
         private BeatIndicatorWidget _beatIndicator;
         private IBoardView _board;
@@ -102,6 +113,28 @@ namespace EscapeNine.Runtime.UI
         private GameObject _floorClearOverlay;
         private TextMeshProUGUI _floorClearFloorLabel;
         private TextMeshProUGUI _floorClearNextLabel;
+
+        // ---- Phase 5a: レリックドラフトオーバーレイ (Swift正本には対応なし) ----
+        // 独立 ScreenBase (RelicDraftScreen) にせず GameScreen 内オーバーレイとして実装する
+        // 意図的差分: Router.Show() で画面遷移すると OnHide が BoardStage を非表示にするため
+        // (BuildWorldBoard / OnHide 参照)、階層クリア→ドラフト→次階層クリアの間、
+        // §1.5 で規定する舞台演出 (背景ボケ・盤面) が一瞬消える隙間ができてしまう。
+        // floorClearOverlay と同じ「兄弟オーバーレイ」に統一することで舞台を表示させ続ける。
+        private GameObject _relicDraftOverlay;
+        private GameObject[] _relicCardSlots;
+        private Image[] _relicCardFrames;
+        private Image[] _relicCardInnerImages;
+        private TextMeshProUGUI[] _relicCardNameLabels;
+        private TextMeshProUGUI[] _relicCardRarityLabels;
+        private TextMeshProUGUI[] _relicCardDescLabels;
+
+        /// <summary>
+        /// UI ローカルの「ドラフトオーバーレイを実際に開いたか」フラグ。
+        /// GameController.IsRelicDraftPending は「階層クリア確定と同時」に true になるが (§2.1)、
+        /// UX 上は FloorClear オーバーレイの「スタート」を押すまでドラフト画面を出さない
+        /// (§6.3 タスク仕様どおり)。両者を区別するため UI 側だけが持つ状態。
+        /// </summary>
+        private bool _relicDraftScreenOpen;
 
         private GameObject _skillResetToast;
 
@@ -198,8 +231,10 @@ namespace EscapeNine.Runtime.UI
             BuildBottom(safe);
 
             // オーバーレイは Swift の ZStack と同じ順で兄弟生成 (後に生成したものが上に描画される):
-            // floorClear < skillReset < startGame(pregame) < paused < countdown < gameOver < bossWarning
+            // floorClear < relicDraft < skillReset < startGame(pregame) < paused < countdown < gameOver < bossWarning
+            // (relicDraft は Phase 5a 追加。floorClear のすぐ後 = 階層クリアフローの一部として直後に重なる)
             BuildFloorClearOverlay();
+            BuildRelicDraftOverlay();
             BuildSkillResetToast();
             BuildPregameOverlay();
             BuildPausedOverlay();
@@ -222,6 +257,12 @@ namespace EscapeNine.Runtime.UI
                 UITheme.BackgroundSecondary, UITheme.TextColor, HandlePauseTapped);
             UIFactory.Place((RectTransform)pause.transform, 0.82f, 0.968f, 0.30f, 0.036f);
             _pauseButtonLabel = pause.GetComponentInChildren<TextMeshProUGUI>();
+
+            // Phase 5a: 所持レリック数カウンタ。Back(cx=0.16,w=0.26)/Pause(cx=0.82,w=0.30) の間の
+            // 空き ([0.29, 0.67]) に収まる幅で配置する。
+            _relicCountLabel = UIFactory.Label(parent, "RelicCount", "", 32, UITheme.GoldText,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)_relicCountLabel.transform, 0.5f, 0.968f, 0.30f, 0.036f);
         }
 
         // MARK: - Top Info (Swift: BPMInfoView + BeatIndicatorView + comboDisplay + turnAndSkillInfo)
@@ -398,6 +439,77 @@ namespace EscapeNine.Runtime.UI
             if (startLabel != null) startLabel.fontStyle = FontStyles.Bold;
 
             _floorClearOverlay.SetActive(false);
+        }
+
+        /// <summary>
+        /// Phase 5a: レリックドラフト (docs/unity-phase5-roguelike-design.md §2.1/§6.3)。
+        /// Swift正本には対応なし。floorClearOverlay の「スタート」タップで表示に切り替わる
+        /// (BuildFloorClearOverlay の直下に生成する意図的な兄弟順序。理由は _relicDraftOverlay
+        /// フィールドのコメント参照)。
+        ///
+        /// 縦積み3枚を採用: CanvasScaler の基準解像度 1170x2532 (UIFactory.cs 冒頭コメント参照) は
+        /// 縦長のポートレート比率のため、横3分割よりも縦積みの方が説明文 (最大40文字程度の
+        /// 日本語) を折り返しなく収められる幅を確保できる。
+        /// </summary>
+        private void BuildRelicDraftOverlay()
+        {
+            var overlay = UIFactory.Panel(transform, "RelicDraftOverlay",
+                UITheme.WithAlpha(UITheme.Background, 0.95f));
+            _relicDraftOverlay = overlay.gameObject;
+
+            var title = UIFactory.Label(overlay, "Title", "レリックを選べ", 56, UITheme.GoldText,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)title.transform, 0.5f, 0.82f, 0.9f, 0.06f);
+
+            _relicCardSlots = new GameObject[RelicDraftMaxCards];
+            _relicCardFrames = new Image[RelicDraftMaxCards];
+            _relicCardInnerImages = new Image[RelicDraftMaxCards];
+            _relicCardNameLabels = new TextMeshProUGUI[RelicDraftMaxCards];
+            _relicCardRarityLabels = new TextMeshProUGUI[RelicDraftMaxCards];
+            _relicCardDescLabels = new TextMeshProUGUI[RelicDraftMaxCards];
+
+            float[] cardCy = { 0.635f, 0.455f, 0.275f };
+            for (int i = 0; i < RelicDraftMaxCards; i++)
+            {
+                int index = i; // クロージャ用固定
+                var slot = UIFactory.Panel(overlay, "Card" + i);
+                UIFactory.Place(slot, 0.5f, cardCy[i], 0.88f, 0.155f);
+                _relicCardSlots[index] = slot.gameObject;
+
+                // フレーム: レアリティ色の縁取り。§1.5 は「レアリティ別発光 = Bloom 閾値超えの
+                // エミッシブ色」を規定するが、uGUI (Canvas Overlay/Screen Space) は URP Bloom の
+                // 対象外 (Bloom はカメラのポストプロセスであり Canvas 直描画には掛からない)。
+                // 正直に: ここでは Bloom の代替として枠の明度 (レアリティ色そのもの) と太さ
+                // (RarityFrameInset、レアリティが高いほど枠が太い = inner の inset が小さい) で
+                // 「特別感」を表現するに留める。真の発光表現は Phase 4.5 W4 完了後の別課題。
+                var frame = UIFactory.ColorRect(slot, "Frame", Color.white);
+                UIFactory.Place((RectTransform)frame.transform, 0.5f, 0.5f, 1f, 1f);
+                _relicCardFrames[index] = frame;
+
+                var inner = UIFactory.Panel(slot, "Inner", UITheme.BackgroundSecondary);
+                UIFactory.Place(inner, 0.5f, 0.5f, 0.965f, 0.90f); // 既定 inset (Common 相当)。実際の値は ShowRelicDraft が候補のレアリティで再設定する
+                var btn = inner.gameObject.AddComponent<Button>();
+                btn.targetGraphic = inner.GetComponent<Image>();
+                btn.transition = Selectable.Transition.ColorTint;
+                btn.navigation = new Navigation { mode = Navigation.Mode.None }; // TextButton と同じ理由 (レビューC2)
+                btn.onClick.AddListener(() => HandleRelicCardTapped(index));
+                _relicCardInnerImages[index] = inner.GetComponent<Image>();
+
+                var nameLabel = UIFactory.Label(inner, "Name", "", 38, UITheme.TextColor,
+                    TextAnchor.MiddleCenter, FontStyle.Bold);
+                UIFactory.Place((RectTransform)nameLabel.transform, 0.5f, 0.76f, 0.92f, 0.30f);
+                _relicCardNameLabels[index] = nameLabel;
+
+                var rarityLabel = UIFactory.Label(inner, "Rarity", "", 24, UITheme.TextColor);
+                UIFactory.Place((RectTransform)rarityLabel.transform, 0.5f, 0.53f, 0.92f, 0.16f);
+                _relicCardRarityLabels[index] = rarityLabel;
+
+                var descLabel = UIFactory.Label(inner, "Desc", "", 26, UITheme.WithAlpha(UITheme.TextColor, 0.85f));
+                UIFactory.Place((RectTransform)descLabel.transform, 0.5f, 0.20f, 0.9f, 0.36f);
+                _relicCardDescLabels[index] = descLabel;
+            }
+
+            _relicDraftOverlay.SetActive(false);
         }
 
         /// <summary>スキル回復通知 (Swift: skillResetNotification)。10 階層ごとの回復時に 2 秒表示。</summary>
@@ -738,6 +850,7 @@ namespace EscapeNine.Runtime.UI
             if (!isActiveAndEnabled) return;
             if (result == TurnResult.FloorCleared)
             {
+                _relicDraftScreenOpen = false; // 新しい階層クリアサイクルは必ずFloorClear表示から始まる
                 ShowFloorClear(); // 「スタート」で AdvanceToNextFloor (自動遷移しないのが正本仕様)
             }
             else if (result == TurnResult.Continued)
@@ -778,6 +891,8 @@ namespace EscapeNine.Runtime.UI
             if (!isActiveAndEnabled) return;
 
             _floorClearOverlay.SetActive(false);
+            _relicDraftOverlay.SetActive(false); // Phase 5a: 進行済みなら念のため閉じておく (防御的)
+            _relicDraftScreenOpen = false;
             _board.SnapNextRender(); // 新階層のランダム配置をスライドさせない
 
             // スキル回復通知 (Swift: showSkillReset)。判定式は GameController のコメント指定どおり。
@@ -874,6 +989,32 @@ namespace EscapeNine.Runtime.UI
             HandlePauseTapped();
         }
 
+        /// <summary>
+        /// Phase 6a (デスクトップ): キーボード (Space/Enter) からの階層クリア「スタート」相当。
+        /// ドラフト提示中かどうかの分岐を含む HandleFloorClearStart と同一処理を公開する
+        /// (KeyboardInput.cs から呼ばれる)。GameController.AdvanceToNextFloor を直接叩くと
+        /// ドラフトオーバーレイへの分岐が起きない (IsRelicDraftPending ゲートで無視されるだけに
+        /// なる) ため、Steam体験版のキーボード操作は必ずこの経由にすること (§2.1)。
+        /// </summary>
+        public void TriggerFloorClearStartFromKeyboard()
+        {
+            HandleFloorClearStart();
+        }
+
+        /// <summary>
+        /// Phase 6a (デスクトップ): レリックドラフト提示中の 1/2/3 キー選択 (KeyboardInput.cs から
+        /// 呼ばれる。§2.1: Steam体験版のキーボード操作対応の必須要件)。
+        /// ドラフトオーバーレイが実際に開いている間 (_relicDraftScreenOpen) のみ受理する —
+        /// GameController.IsRelicDraftPending は FloorClear オーバーレイ表示中から既に true のため、
+        /// ここでガードしないと「スタート」を押す前 (ドラフト画面が見えていない状態) でも
+        /// 1/2/3 キーが不可視のカードを選択できてしまう。
+        /// </summary>
+        public void SelectRelicCardFromKeyboard(int index)
+        {
+            if (!_relicDraftScreenOpen) return;
+            HandleRelicCardTapped(index);
+        }
+
         private void HandleResumeTapped()
         {
             App.I.Audio.PlaySfx("button_tap"); // Swift: GameButton 内蔵の buttonTap
@@ -890,7 +1031,39 @@ namespace EscapeNine.Runtime.UI
         private void HandleFloorClearStart()
         {
             App.I.Audio.PlaySfx("button_tap"); // Swift: GameButton 内蔵の buttonTap
-            App.I.Game.AdvanceToNextFloor();
+            var game = App.I.Game;
+
+            // Phase 5a: ドラフト提示中 (§2.1: 階層クリア確定と同時に候補生成済み) ならまだ
+            // AdvanceToNextFloor を呼ばず、ドラフトオーバーレイへ切り替える (§6.3 のタスク仕様:
+            // 「フロアクリアオーバーレイのスタート押下時にドラフトオーバーレイを表示」)。
+            if (game.IsRelicDraftPending)
+            {
+                _relicDraftScreenOpen = true;
+                _floorClearOverlay.SetActive(false);
+                ShowRelicDraft();
+                return;
+            }
+
+            game.AdvanceToNextFloor();
+        }
+
+        /// <summary>
+        /// Phase 5a: レリックカードタップ (§6.3)。GameController.ChooseRelic → オーバーレイを閉じる →
+        /// 既存の Advance フローへ、の順で処理する。index は候補配列の位置 (カードタップ / 1-2-3 キー共通)。
+        /// </summary>
+        private void HandleRelicCardTapped(int index)
+        {
+            var game = App.I.Game;
+            var candidates = game.CurrentDraftCandidates;
+            if (index < 0 || index >= candidates.Count) return; // プール枯渇で候補3枚未満の空きスロット対策
+
+            App.I.Audio.PlaySfx("button_tap");
+            string relicId = candidates[index].Id;
+            game.ChooseRelic(relicId);
+
+            _relicDraftScreenOpen = false;
+            _relicDraftOverlay.SetActive(false);
+            game.AdvanceToNextFloor(); // ChooseRelic で IsRelicDraftPending=false になっているためゲートを通過する
         }
 
         private void HandleAiLevelSelected(AILevel level)
@@ -1008,6 +1181,87 @@ namespace EscapeNine.Runtime.UI
             }
         }
 
+        /// <summary>
+        /// Phase 5a: レリックドラフトオーバーレイの表示 (§2.1/§6.3)。RefreshAll から毎回呼ばれても
+        /// 安全な冪等実装 (カード内容は候補配列から都度再構築、SlideIn 演出だけ立ち上がりエッジで実行)。
+        /// </summary>
+        private void ShowRelicDraft()
+        {
+            var game = App.I.Game;
+            var candidates = game.CurrentDraftCandidates;
+
+            for (int i = 0; i < RelicDraftMaxCards; i++)
+            {
+                bool hasCard = i < candidates.Count;
+                _relicCardSlots[i].SetActive(hasCard);
+                if (!hasCard) continue;
+
+                var def = candidates[i];
+                Color rarityColor = RelicRarityColor(def.Rarity);
+
+                _relicCardFrames[i].color = rarityColor;
+                // §1.5: uGUI (Canvas Overlay) は URP Bloom (ポストプロセス) の対象外のため、
+                // 真のレアリティ発光は表現できない。ここでは枠の太さ (inset が小さいほど太い枠)
+                // で代替する — 正直な劣化表現であり、真の発光は Phase 4.5 W4 完了後の別課題。
+                float inset = RelicRarityFrameInset(def.Rarity);
+                UIFactory.Place((RectTransform)_relicCardInnerImages[i].transform, 0.5f, 0.5f, inset, inset * 0.90f);
+
+                _relicCardNameLabels[i].text = def.Name;
+                _relicCardNameLabels[i].color = rarityColor;
+                _relicCardRarityLabels[i].text = RelicRarityLabelText(def.Rarity);
+                _relicCardRarityLabels[i].color = rarityColor;
+                _relicCardDescLabels[i].text = def.Description;
+            }
+
+            bool wasActive = _relicDraftOverlay.activeSelf;
+            _relicDraftOverlay.SetActive(true);
+            if (!wasActive)
+            {
+                FxKit.SlideIn(this, (RectTransform)_relicDraftOverlay.transform, new Vector2(0f, -100f));
+            }
+        }
+
+        /// <summary>レアリティ色 (§2.2 の Common〜Legendary)。UITheme に無い色は本画面固有の定義を使う。</summary>
+        private static Color RelicRarityColor(RelicRarity rarity)
+        {
+            switch (rarity)
+            {
+                case RelicRarity.Common: return Color.white;
+                case RelicRarity.Uncommon: return UITheme.Success;    // 緑
+                case RelicRarity.Rare: return RelicRareColor;          // 青
+                case RelicRarity.Epic: return RelicEpicColor;          // 紫
+                case RelicRarity.Legendary: return UITheme.GoldText;   // 金
+                default: return Color.white;
+            }
+        }
+
+        /// <summary>枠の太さ (Bloom 代替、値が小さいほど太い枠になる inset 比率)。</summary>
+        private static float RelicRarityFrameInset(RelicRarity rarity)
+        {
+            switch (rarity)
+            {
+                case RelicRarity.Common: return 0.980f;
+                case RelicRarity.Uncommon: return 0.972f;
+                case RelicRarity.Rare: return 0.962f;
+                case RelicRarity.Epic: return 0.950f;
+                case RelicRarity.Legendary: return 0.935f;
+                default: return 0.980f;
+            }
+        }
+
+        private static string RelicRarityLabelText(RelicRarity rarity)
+        {
+            switch (rarity)
+            {
+                case RelicRarity.Common: return "Common";
+                case RelicRarity.Uncommon: return "Uncommon";
+                case RelicRarity.Rare: return "Rare";
+                case RelicRarity.Epic: return "Epic";
+                case RelicRarity.Legendary: return "Legendary";
+                default: return "";
+            }
+        }
+
         private void ShowSkillResetToast()
         {
             _skillResetToast.SetActive(true);
@@ -1072,6 +1326,7 @@ namespace EscapeNine.Runtime.UI
             _prevIsInvisible = false;
             _prevShieldActive = false;
             _lastComboCount = 0;
+            _relicDraftScreenOpen = false; // Phase 5a: 前ランの「ドラフト画面を開いた」状態を持ち越さない
 
             if (_floorClearOverlay != null)
             {
@@ -1079,6 +1334,11 @@ namespace EscapeNine.Runtime.UI
                 // 担当A juice: StopAllCoroutines() で SlideIn が中断された場合、
                 // anchoredPosition が中間値のまま残り次回の演出が原点からズレるのを防ぐ。
                 ((RectTransform)_floorClearOverlay.transform).anchoredPosition = Vector2.zero;
+            }
+            if (_relicDraftOverlay != null)
+            {
+                _relicDraftOverlay.SetActive(false);
+                ((RectTransform)_relicDraftOverlay.transform).anchoredPosition = Vector2.zero;
             }
             if (_skillResetToast != null) _skillResetToast.SetActive(false);
             if (_pregameOverlay != null) _pregameOverlay.SetActive(false);
@@ -1116,6 +1376,8 @@ namespace EscapeNine.Runtime.UI
                 _specialRuleRoot.SetActive(false);
                 _pausedOverlay.SetActive(false);
                 _floorClearOverlay.SetActive(false);
+                _relicDraftOverlay.SetActive(false);
+                _relicCountLabel.gameObject.SetActive(false);
                 _board.Render(null, true, null, null);
                 return;
             }
@@ -1143,8 +1405,30 @@ namespace EscapeNine.Runtime.UI
             _pauseButtonLabel.text = session.Status == GameStatus.Paused ? "再開" : "一時停止";
             _pausedOverlay.SetActive(session.Status == GameStatus.Paused);
 
-            if (game.IsFloorClearPending) ShowFloorClear();
-            else _floorClearOverlay.SetActive(false);
+            // Phase 5a: FloorClear / RelicDraft の2オーバーレイの表示権はここで一元管理する。
+            // IsRelicDraftPending は階層クリア確定と同時に true になる (§2.1) が、UI 上は
+            // 「スタート」を押す (_relicDraftScreenOpen=true) までドラフト画面を出さない —
+            // よって両方 true の間は「まだ FloorClear を見せている」と判定して FloorClear を出す。
+            if (game.IsRelicDraftPending && _relicDraftScreenOpen)
+            {
+                _floorClearOverlay.SetActive(false);
+                ShowRelicDraft();
+            }
+            else if (game.IsFloorClearPending && !_relicDraftScreenOpen)
+            {
+                ShowFloorClear();
+                _relicDraftOverlay.SetActive(false);
+            }
+            else
+            {
+                _floorClearOverlay.SetActive(false);
+                _relicDraftOverlay.SetActive(false);
+            }
+
+            // 所持レリック簡易カウンタ (§6.3。一覧表示へのタップ導線は Phase 5b 送り)
+            int relicCount = game.OwnedRelicIds.Count;
+            _relicCountLabel.gameObject.SetActive(relicCount > 0);
+            if (relicCount > 0) _relicCountLabel.text = "遺物 " + relicCount;
 
             RenderBoard(session);
 

@@ -76,17 +76,34 @@ namespace EscapeNine.Runtime
             GameController game = App.I.Game;
             if (game == null) return;
 
-            for (int i = 0; i < MoveKeyMap.Length; i++)
+            if (game.IsRelicDraftPending)
             {
-                if (Input.GetKeyDown(MoveKeyMap[i].key))
+                // Phase 5a (docs/unity-phase5-roguelike-design.md §2.1): レリックドラフト提示中は
+                // 1/2/3 キーのみカード選択として扱い、既存の1-9移動キーとは排他にする
+                // (Steam体験版のキーボード操作対応の必須要件)。
+                if (Input.GetKeyDown(KeyCode.Alpha1) && _gameScreen != null) _gameScreen.SelectRelicCardFromKeyboard(0);
+                if (Input.GetKeyDown(KeyCode.Alpha2) && _gameScreen != null) _gameScreen.SelectRelicCardFromKeyboard(1);
+                if (Input.GetKeyDown(KeyCode.Alpha3) && _gameScreen != null) _gameScreen.SelectRelicCardFromKeyboard(2);
+            }
+            else
+            {
+                for (int i = 0; i < MoveKeyMap.Length; i++)
                 {
-                    game.RequestMove(MoveKeyMap[i].position);
+                    if (Input.GetKeyDown(MoveKeyMap[i].key))
+                    {
+                        game.RequestMove(MoveKeyMap[i].position);
+                    }
                 }
             }
 
+            // FloorClear オーバーレイの「スタート」相当。ドラフト提示中でもまだ「スタート」を
+            // 押していない間 (GameScreen 側がドラフト画面を開いていない間) は有効なままにする
+            // 必要があるため、上の draftPending 分岐の外側で常時判定する。
+            // GameController.AdvanceToNextFloor を直接叩くとドラフトへの分岐が起きない
+            // (IsRelicDraftPending ゲートで無視されるだけになる) ため、必ず GameScreen 経由にする。
             if (IsAdvanceKeyDown() && game.IsFloorClearPending)
             {
-                game.AdvanceToNextFloor();
+                if (_gameScreen != null) _gameScreen.TriggerFloorClearStartFromKeyboard();
             }
 
             if (Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.LeftShift))
