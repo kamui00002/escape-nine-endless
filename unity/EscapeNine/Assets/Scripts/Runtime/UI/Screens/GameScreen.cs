@@ -23,12 +23,19 @@ using UnityEngine.UI;
 using TMPro;
 using EscapeNine.Core;
 using EscapeNine.Runtime.UI.Fx;
+using EscapeNine.Runtime.Stage;
 
 namespace EscapeNine.Runtime.UI
 {
     public sealed class GameScreen : ScreenBase
     {
         public override ScreenId Id => ScreenId.Game;
+
+        // ---- Wave 2: 3D BoardStage への切替フラグ (docs/unity-phase4-5-visual-upgrade-design.md) ----
+        // true: BoardAnchor + BoardStage (ワールド空間の 3D 盤面) を使う。
+        // false: 旧 GridBoardWidget (uGUI 盤面) を使う。GridBoardWidget.cs は W4 ゲート
+        // 通過までの比較対象として温存するため、この切替で両経路とも動作を維持する。
+        private const bool UseWorldBoard = true;
 
         // ---- 表示タイマー定数 (Swift: DispatchQueue.asyncAfter の秒数) ----
         private const float GoDisplaySeconds = 0.5f;    // GO! 表示 (GameController コメント指定)
@@ -59,7 +66,13 @@ namespace EscapeNine.Runtime.UI
         private TextMeshProUGUI _pauseButtonLabel;
         private BPMInfoWidget _bpmInfo;
         private BeatIndicatorWidget _beatIndicator;
-        private GridBoardWidget _board;
+        private IBoardView _board;
+
+        // ---- Wave 2: 3D BoardStage 参照 (UseWorldBoard=true の時のみ非 null) ----
+        private RectTransform _boardAnchor;
+        private BoardStage _boardStage;
+        private StageCameraDirector _cameraDirector;
+        private StageRenderView _renderView;
 
         private GameObject _comboRow;
         private TextMeshProUGUI _gradeLabel;
@@ -261,10 +274,61 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildBoard(RectTransform parent)
         {
-            _board = GridBoardWidget.Create(parent);
-            UIFactory.Place((RectTransform)_board.transform, 0.5f, 0.425f, 0.94f, 0.36f);
+            if (UseWorldBoard)
+            {
+                BuildWorldBoard(parent);
+            }
+            else
+            {
+                var widget = GridBoardWidget.Create(parent);
+                UIFactory.Place((RectTransform)widget.transform, 0.5f, 0.425f, 0.94f, 0.36f);
+                _board = new GridBoardWidgetAdapter(widget);
+            }
+
             _board.OnCellTapped += HandleCellTapped;
             _board.OnEnemyTapped += HandleEnemyTapped;
+        }
+
+        /// <summary>
+        /// Wave 2: 3D BoardStage への統合 (docs/unity-phase4-5-visual-upgrade-design.md)。
+        /// BoardAnchor は旧 GridBoard と全く同じ配置比率 (0.5, 0.425, 0.94, 0.36) を
+        /// 踏襲する透明な RectTransform。その周囲を safe 内の相対比率だけで計算した
+        /// 静的な背景バンド 4 枚 (Top/Bottom/Left/Right) で囲み、BoardAnchor の位置だけ
+        /// 「穴」を開けて背後の 3D BoardStage をカメラ経由で見せる。
+        /// バンドは BoardAnchor と同じ親 (safe) の相対比率で計算しているため、
+        /// SafeAreaFitter が safe 全体をどう動かしても穴の位置は追従し続け、
+        /// ランタイムでの再計算は不要 (camera.rect のみ StageViewportSync が毎フレーム
+        /// 実スクリーン px で同期する)。
+        /// </summary>
+        private void BuildWorldBoard(RectTransform parent)
+        {
+            // v2 (RenderTexture 方式): 旧 GridBoard と同じ配置比率の BoardAnchor に RawImage を
+            // 付け、StageRenderView がカメラ→RT→RawImage を結線する。穴あけバンドは廃止
+            // (全画面 Background と共存できず HUD も覆った。詳細は StageRenderView.cs 冒頭)。
+            RectTransform anchor = UIFactory.Panel(parent, "BoardAnchor");
+            UIFactory.Place(anchor, 0.5f, 0.425f, 0.94f, 0.36f);
+            _boardAnchor = anchor;
+
+            var rawImage = anchor.gameObject.AddComponent<UnityEngine.UI.RawImage>();
+            rawImage.raycastTarget = false; // タップは StageInput の物理レイキャストが受ける
+            rawImage.enabled = false;       // RT 結線まで白矩形を出さない (StageRenderView が有効化)
+
+            _boardStage = BoardStage.Create();
+            _boardStage.gameObject.SetActive(false); // OnShow まで無効 (他画面表示中は消す)
+
+            // Camera.main が見つからないケース (例: OverlapAudit.cs の Edit モード BuildUI
+            // フォールバック経路が MainCamera 未タグのシーンで動く場合) でも BuildUI 自体は
+            // クラッシュさせない。カメラ演出無しの盤面のみ生成される劣化状態で継続する。
+            _cameraDirector = StageCameraDirector.EnsureOnMainCamera();
+            _renderView = _boardStage.gameObject.AddComponent<StageRenderView>();
+            var input = _boardStage.gameObject.AddComponent<StageInput>();
+            if (_cameraDirector != null)
+            {
+                _renderView.Configure(anchor, rawImage, _cameraDirector.Cam);
+                input.Configure(_cameraDirector.Cam, _boardStage, anchor);
+            }
+
+            _board = _boardStage;
         }
 
         // MARK: - Bottom (Swift: skillButton + specialRuleLabel)
@@ -474,6 +538,15 @@ namespace EscapeNine.Runtime.UI
             TrySubscribe(); // BuildUI 時点で App 未初期化だった場合の保険
             ResetTransientUI();
 
+            // Wave 2 v2: GameScreen 表示中のみ BoardStage を有効化し、RT 結線 (StageRenderView) と
+            // カメラフレーミングを 1 フレーム目から適用しておく (白フラッシュ/ズレ防止)。
+            if (UseWorldBoard && _boardStage != null)
+            {
+                _boardStage.gameObject.SetActive(true);
+                _renderView.Apply();
+                if (_cameraDirector != null) _cameraDirector.ApplyFraming();
+            }
+
             var req = payload as GameStartRequest;
             if (req != null)
             {
@@ -506,6 +579,13 @@ namespace EscapeNine.Runtime.UI
         public override void OnHide()
         {
             ResetTransientUI();
+
+            // Wave 2 v2: 他画面へ切り替わる時は BoardStage を無効化する。RT の解放と
+            // camera.targetTexture の切断は StageRenderView.OnDisable が行う。
+            if (UseWorldBoard && _boardStage != null)
+            {
+                _boardStage.gameObject.SetActive(false);
+            }
         }
 
         private void OnDestroy()
