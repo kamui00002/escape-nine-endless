@@ -117,6 +117,15 @@ namespace EscapeNine.Runtime
         private bool _resultPersisted;                              // このランのスコア送信/自己ベスト更新が済んだか (二重送信防止)
         private int _turnBeats = GameConfig.TurnCountdownBeats;     // 1 ターンの拍数 (デバッグで可変)
 
+        /// <summary>Phase 5b: レリック #16 刻の猶予 (TurnCountdownBonus) を加算した実効ターン拍数 (§2.4)。
+        /// Relics.None (=0) のときは _turnBeats と同値 = 既存挙動と完全一致。</summary>
+        private int EffectiveTurnBeats => _turnBeats + (Session?.Relics.TurnCountdownBonus ?? 0);
+
+        /// <summary>Phase 5b: レリック #15 加速の証 (BpmMultiplierBonus) を乗算した実効BPM (§2.4)。
+        /// Core は値の保持のみで、乗算は Runtime (ここ) が行う。Relics.None (=0.0) なら恒等。</summary>
+        private double ApplyRelicBpm(double bpm) =>
+            bpm * (1.0 + (Session != null ? Session.Relics.BpmMultiplierBonus : 0.0));
+
         // ---- Phase 5a: レリックドラフト内部状態 ----
         // GameSession と同じ「IRandomSource 既定値 = new SystemRandomSource() (時刻シード)」の
         // 作法に合わせ、GameSession 同様に StartNewRun のたびに新規インスタンスを持たせる
@@ -224,7 +233,10 @@ namespace EscapeNine.Runtime
             _audio.PlaySfx("game_start");                    // Swift: playSoundEffect(.gameStart)
             _audio.PlayBgmForFloor(Session.CurrentFloor);    // Swift: playBGMMusic(.forFloor(currentFloor))
 
-            double bpm = bpmOverride > 0 ? bpmOverride : Floor.CalculateBPM(Session.CurrentFloor);
+            // Phase 5b: #15 加速の証 (BpmMultiplierBonus)。ラン開始時点では Relics.None のため恒等だが、
+            // 将来のスターターパーク (§3.2、ラン開始時装備) に備えて開始時も同じ経路を通す。
+            // デバッグ上書き (bpmOverride) はレリック乗算の対象外 (デバッグ値が最優先)。
+            double bpm = bpmOverride > 0 ? bpmOverride : ApplyRelicBpm(Floor.CalculateBPM(Session.CurrentFloor));
 
             if (Session.IsBossFloor) OnBossWarning?.Invoke(); // Swift: showBossWarning (2秒消去は UI 側)
 
@@ -328,7 +340,9 @@ namespace EscapeNine.Runtime
             // BGM 帯域が変わった場合のみ切替 (AudioDirector 側の同一 BGM ガードが Swift の条件を再現)
             _audio.PlayBgmForFloor(Session.CurrentFloor);
 
-            double bpm = Floor.CalculateBPM(Session.CurrentFloor);
+            // Phase 5b: #15 加速の証 (BpmMultiplierBonus) を乗算してから Conductor へ渡す (§2.4)。
+            // デバッグ上書き (DebugBPMOverride) はレリック乗算の対象外 (デバッグ値が最優先)。
+            double bpm = ApplyRelicBpm(Floor.CalculateBPM(Session.CurrentFloor));
             bool skipCountdown = false;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (_player != null)
@@ -433,7 +447,7 @@ namespace EscapeNine.Runtime
             }
 
             _startCountdownBpm = bpm;
-            TurnCountdown = _turnBeats; // Swift: resetTurnCountdown()
+            TurnCountdown = EffectiveTurnBeats; // Swift: resetTurnCountdown() + Phase 5b #16 刻の猶予
 
             if (skipCountdown)
             {
@@ -468,7 +482,7 @@ namespace EscapeNine.Runtime
             // GO! → プレイ開始。拍クロックはここで初めて起動する (Swift: completion() 内の startBGM(bpm:))。
             OnCountdownTick?.Invoke(0);
             _phase = Phase.Playing;
-            TurnCountdown = _turnBeats;
+            TurnCountdown = EffectiveTurnBeats; // Phase 5b #16 刻の猶予
             _conductor.ChangeBPM(_startCountdownBpm);
             OnGameStarted?.Invoke();
             _startCountdownCoroutine = null;
@@ -550,7 +564,7 @@ namespace EscapeNine.Runtime
             {
                 case TurnResult.Continued:
                     _audio.PlaySfx("move");
-                    TurnCountdown = _turnBeats; // Swift: onBeat 側の turnCountdown リセット相当
+                    TurnCountdown = EffectiveTurnBeats; // Swift: onBeat 側の turnCountdown リセット相当 + Phase 5b #16 刻の猶予
                     OnTurnResolved?.Invoke(result);
                     break;
 
@@ -562,17 +576,39 @@ namespace EscapeNine.Runtime
                     // Phase 5a: 階層クリア確定と同時にレリックドラフト候補を生成する
                     // (docs/unity-phase5-roguelike-design.md §2.1)。デイリーチャレンジ中は
                     // 同一日替わりシードに挑む全プレイヤー間の公平性を優先し無効化する (§8)。
-                    if (!Session.DailyChallengeMode)
+                    //
+                    // Phase 5c: RelicConfig.ShouldOfferDraft (DraftInterval / MaxRelicsPerRun) で
+                    // 「そもそも今回ドラフトを提示するか」を先に判定する (BALANCE_REPORT_PHASE5.md 案A/B)。
+                    // #18 蒐集家の目の残り階層カウント (DraftCandidateBonusFloorsRemaining) は、
+                    // この判定を通過して実際にドラフトを検討する回 (=提示された回) にのみ消費する。
+                    // 「N階層分」ではなく「次のドラフト提示N回分」の意味に変わる点は既知の仕様変更
+                    // ([要検証] BALANCE_REPORT_PHASE5.md 参照。DraftInterval > 1 の間は提示されない
+                    // 階層で無為に減らないほうが自然という判断)。
+                    if (!Session.DailyChallengeMode
+                        && RelicConfig.ShouldOfferDraft(Session.CurrentFloor, _ownedRelicIds.Count))
                     {
-                        var candidates = _relicDraftService.DraftCandidates(_ownedRelicIds, Session.CurrentCharacter.Type);
+                        // Phase 5b: §2.2 の弱点タグ重み付け (character/selectedAI/floor) を渡す。
+                        // #18 蒐集家の目 (DraftCandidateBonusFloorsRemaining) 所持中は候補数を3→4に
+                        // 増やし、この1回のドラフト提示ぶんだけ残り階層数を消費する。
+                        int draftCount = Session.Relics.DraftCandidateBonusFloorsRemaining > 0 ? 4 : 3;
+                        var candidates = _relicDraftService.DraftCandidates(
+                            _ownedRelicIds,
+                            Session.CurrentCharacter.Type,
+                            count: draftCount,
+                            selectedAI: Session.SelectedAILevel,
+                            floor: Session.CurrentFloor);
+                        if (Session.Relics.DraftCandidateBonusFloorsRemaining > 0)
+                        {
+                            Session.Relics.DraftCandidateBonusFloorsRemaining--;
+                        }
                         if (candidates.Count > 0)
                         {
                             CurrentDraftCandidates = candidates;
                             IsRelicDraftPending = true;
                             OnRelicDraftOffered?.Invoke();
                         }
-                        // candidates.Count == 0 (プール完全枯渇) の場合は5aスコープ外のため
-                        // ドラフト非提示のまま (§2.1 のメタ通貨フォールバックは5b送り)。
+                        // candidates.Count == 0 (プール完全枯渇) の場合はドラフト非提示のまま
+                        // (§2.1 のメタ通貨フォールバックは本タスクのスコープ外、§9未決事項)。
                     }
 
                     _audio.PlaySfx("floor_clear"); // Swift: playSoundEffect(.floorClear)
@@ -669,7 +705,9 @@ namespace EscapeNine.Runtime
 
             // デイリーチャレンジ完了記録 (勝利時のみ)。Swift: endGame(result:) の
             // `if result == .win && dailyChallengeMode { DailyChallengeService.shared.markCompleted(...) }`
-            if (won && Session.DailyChallengeMode)
+            // 残光 (メタ進行通貨) の算出にも使うため、フラグリセット前に判定結果を控えておく。
+            bool dailyChallengeCompletedThisRun = won && Session.DailyChallengeMode;
+            if (dailyChallengeCompletedThisRun)
             {
                 _dailyChallenge?.MarkCompleted(Session.CurrentFloor);
                 Session.DailyChallengeMode = false; // Swift: dailyChallengeMode = false
@@ -678,6 +716,13 @@ namespace EscapeNine.Runtime
             // 4) スコア送信 + 自己ベスト更新 (敗北は HandleDefeat で即時実行済み。
             //    PersistRunResult 内の _resultPersisted ガードにより二重送信はしない)
             PersistRunResult();
+
+            // Phase 5b: 残光 (メタ進行通貨) 付与 (docs/unity-phase5-roguelike-design.md §3.1、[要検証・仮の式])。
+            // Swift正本には対応なし (Unity固有拡張)。消費導線 (MetaShopScreen 等、§3.2) は Phase 5c で
+            // 画面と一緒に実装する前提のため、本タスクでは蓄積のみを行う。
+            // Session.CurrentFloor は勝利時 101 のまま (PersistRunResult と同じ Swift パリティ踏襲の値)。
+            int glowEarned = MetaProgressionCalculator.CalculateGlow(Session.CurrentFloor, won, dailyChallengeCompletedThisRun);
+            _player.AddMetaCurrency(glowEarned);
 
             // 5) 実績チェック（勝利時のみ）。Swift: GameViewModel.swift:954-964 (AchievementManager.checkAchievements)。
             //    新規解除は LastUnlockedAchievements に控え、ResultScreen がポップアップ演出を出す (Phase 2.5)。

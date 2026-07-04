@@ -1,10 +1,12 @@
 // RelicDraftService.cs
-// Unity Phase 5「ローグライク深化」設計文書 §2.1 (ドラフトの仕組み) / §6.1 に基づく。
-// Swift正本には存在しない (Unity固有の追加機能)。
+// Unity Phase 5「ローグライク深化」設計文書 §2.1 (ドラフトの仕組み) / §2.2 (弱点タグ重み付け) /
+// §6.1 に基づく。Swift正本には存在しない (Unity固有の追加機能)。
 //
-// Phase 5a スコープ: 重み付けなしの均等抽選 (弱点タグ重み付けは §2.2、Phase 5bで実装)。
+// Phase 5b スコープ: §2.2 の弱点タグ付き重み付けドラフトを実装する。
+// 重み = baseRarityWeight(rarity) × tagMultiplier(tags, character, selectedAI, floor)。
 // 重複禁止 (1ドラフト内で同じレリックは1回だけ) / スタック可・上限あり / プール枯渇時は
-// 候補数が減る (0件なら空リスト) を実装する。
+// 候補数が減る (0件なら空リスト) は Phase 5a から変更なし。
+// 魔法使い所持時の HardAICounter タグは重み0=候補から完全除外する (§2.2 原則5の明示ルール)。
 
 using System.Collections.Generic;
 
@@ -16,7 +18,7 @@ namespace EscapeNine.Core
         private readonly IReadOnlyList<RelicDefinition> _pool;
 
         /// <param name="rng">省略時は既定の System 乱数。</param>
-        /// <param name="pool">省略時は RelicCatalog.All (Phase 5aの8種)。テストでは差し替え可能。</param>
+        /// <param name="pool">省略時は RelicCatalog.All (18種)。テストでは差し替え可能。</param>
         public RelicDraftService(IRandomSource rng = null, IReadOnlyList<RelicDefinition> pool = null)
         {
             _rng = rng ?? new SystemRandomSource();
@@ -25,13 +27,18 @@ namespace EscapeNine.Core
 
         /// <summary>
         /// ドラフト候補を生成する (既定3択)。
-        /// character は Phase 5b の弱点タグ重み付けドラフトでシグネチャを変えずに済むよう、
-        /// 5aの時点から受け取っておく (5aでは未使用)。
         /// </summary>
         /// <param name="ownedIds">現在のランで既に所持しているレリックID (スタック分は同じIDが複数回含まれる想定)。</param>
-        /// <param name="character">ドラフト対象キャラクター (5aでは重み付けに使用しない)。</param>
-        /// <param name="count">提示する候補数 (既定3)。</param>
-        public List<RelicDefinition> DraftCandidates(IReadOnlyList<string> ownedIds, CharacterType character, int count = 3)
+        /// <param name="character">ドラフト対象キャラクター (弱点タグ重み付けに使用)。</param>
+        /// <param name="count">提示する候補数 (既定3。#18 蒐集家の目所持中は呼び出し側が4を渡す)。</param>
+        /// <param name="selectedAI">プレイヤーが選択したAI難易度 (既定Normal、HardAICounterタグの重み付けに使用)。</param>
+        /// <param name="floor">現在の階層 (既定1、LateGameタグの重み付けに使用)。</param>
+        public List<RelicDefinition> DraftCandidates(
+            IReadOnlyList<string> ownedIds,
+            CharacterType character,
+            int count = 3,
+            AILevel selectedAI = AILevel.Normal,
+            int floor = 1)
         {
             var ownedCounts = new Dictionary<string, int>();
             if (ownedIds != null)
@@ -43,22 +50,101 @@ namespace EscapeNine.Core
             }
 
             // スタック上限に達していないレリックのみが抽選対象。
-            var eligible = new List<RelicDefinition>();
+            // さらに、重み<=0 (魔法使い所持時のHardAICounterタグ等、§2.2原則5) のものは
+            // 候補プールから完全除外する (「非常に出にくい」ではなく「出ない」を保証するため)。
+            var weighted = new List<(RelicDefinition def, double weight)>();
             foreach (var def in _pool)
             {
                 int owned = ownedCounts.TryGetValue(def.Id, out var c) ? c : 0;
-                if (owned < def.StackLimit) eligible.Add(def);
+                if (owned >= def.StackLimit) continue;
+
+                double weight = ComputeWeight(def, character, selectedAI, floor);
+                if (weight > 0) weighted.Add((def, weight));
             }
 
             var result = new List<RelicDefinition>();
-            int draws = System.Math.Min(count, eligible.Count);
+            int draws = System.Math.Min(count, weighted.Count);
             for (int i = 0; i < draws; i++)
             {
-                int idx = _rng.NextInt(eligible.Count);
-                result.Add(eligible[idx]);
-                eligible.RemoveAt(idx); // 同一ドラフト内での重複表示を禁止
+                double total = 0;
+                foreach (var item in weighted) total += item.weight;
+
+                double roll = _rng.NextDouble() * total;
+                double cumulative = 0;
+                int pickIdx = weighted.Count - 1; // 浮動小数の丸め誤差でcumulativeが僅かに届かない場合の保険
+                for (int j = 0; j < weighted.Count; j++)
+                {
+                    cumulative += weighted[j].weight;
+                    if (roll < cumulative) { pickIdx = j; break; }
+                }
+
+                result.Add(weighted[pickIdx].def);
+                weighted.RemoveAt(pickIdx); // 同一ドラフト内での重複表示を禁止
             }
             return result;
+        }
+
+        /// <summary>
+        /// ドラフト候補の重み。§2.2 の重み付け表と1:1対応。
+        /// 戻り値が0以下の場合、呼び出し側 (DraftCandidates) が候補から除外する。
+        /// </summary>
+        private static double ComputeWeight(RelicDefinition def, CharacterType character, AILevel selectedAI, int floor)
+        {
+            double weight = BaseRarityWeight(def.Rarity);
+            RelicTag tags = def.Tags;
+
+            if ((tags & RelicTag.ThiefRescue) != 0)
+            {
+                weight *= character == CharacterType.Thief ? 3.0 : 0.15;
+            }
+
+            if ((tags & RelicTag.HardAICounter) != 0)
+            {
+                if (character == CharacterType.Wizard)
+                {
+                    // §2.2 原則5: 魔法使いはHardAICounter系レリックをドラフト対象外にする
+                    // (Hard vs 魔法使い創発の悪化を防ぐ明示ルール)。他のタグ倍率を計算するまでもなく0。
+                    return 0.0;
+                }
+                if (selectedAI == AILevel.Hard)
+                {
+                    weight *= 2.5;
+                }
+            }
+
+            if ((tags & RelicTag.LateGame) != 0)
+            {
+                if (floor >= GameConfig.CombinedRulesStartFloor) weight *= 2.5;
+                else if (floor >= GameConfig.DisappearStartFloor) weight *= 2.0;
+            }
+
+            if ((tags & RelicTag.General) != 0 && character == CharacterType.Wizard)
+            {
+                weight *= 0.5;
+            }
+
+            if ((tags & RelicTag.Safety) != 0
+                && (character == CharacterType.Hero || character == CharacterType.Elf)
+                && (selectedAI == AILevel.Hard || selectedAI == AILevel.Boss))
+            {
+                weight *= 1.3;
+            }
+
+            return weight;
+        }
+
+        /// <summary>基準レアリティ出現率 (§2.2)。Common45 / Uncommon30 / Rare18 / Epic6 / Legendary1。</summary>
+        private static double BaseRarityWeight(RelicRarity rarity)
+        {
+            switch (rarity)
+            {
+                case RelicRarity.Common: return 45.0;
+                case RelicRarity.Uncommon: return 30.0;
+                case RelicRarity.Rare: return 18.0;
+                case RelicRarity.Epic: return 6.0;
+                case RelicRarity.Legendary: return 1.0;
+                default: return 1.0;
+            }
         }
     }
 }

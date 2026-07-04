@@ -309,5 +309,51 @@ namespace EscapeNine.Tests.EditMode
             s.BindEnemy(); // チャージ枯渇後は no-op
             Assert.AreEqual(0, s.EnemyStoppedTurns);
         }
+
+        // MARK: - Phase 5b で追加した効果フィールド (§2.3 の残り10種ぶん)
+
+        [Test]
+        public void ThiefSkillMaxUsageBonus_OnlyAppliesToThief()
+        {
+            // #3 影分身の型: 盗賊専用。盗賊: MaxUsage=5 → +3 で 8。
+            var thief = NewSession(CharacterType.Thief);
+            thief.Relics.ThiefSkillMaxUsageBonus = 3;
+            Assert.AreEqual(8, thief.RemainingSkillUses, "#3 影分身の型で盗賊のスキル最大使用回数が+3される");
+
+            // 他キャラ (勇者 MaxUsage=3) には乗らない (クロスピックしても無効)。
+            var hero = NewSession(CharacterType.Hero);
+            hero.Relics.ThiefSkillMaxUsageBonus = 3;
+            Assert.AreEqual(3, hero.RemainingSkillUses, "盗賊専用ボーナスは他キャラに適用されない");
+        }
+
+        [Test]
+        public void ComboThresholdBonusMultiplier_AddsToMultiplierAtThresholds()
+        {
+            // #15 加速の証: しきい値到達時の倍率 +0.5 (しきい値未満の 1.0 は変わらない)。
+            var s = NewSession();
+            s.Relics.ComboThresholdBonusMultiplier = 0.5;
+
+            s.ComboCount = 0; Assert.AreEqual(1.0, s.ScoreMultiplier, 1e-9, "しきい値未満はボーナス対象外");
+            s.ComboCount = 3; Assert.AreEqual(2.0, s.ScoreMultiplier, 1e-9, "combo>=3: 1.5+0.5");
+            s.ComboCount = 5; Assert.AreEqual(2.5, s.ScoreMultiplier, 1e-9, "combo>=5: 2.0+0.5");
+        }
+
+        [Test]
+        public void RuntimeOnlyFields_AreHeldButDoNotAffectCoreBehavior()
+        {
+            // #15 BpmMultiplierBonus / #16 TurnCountdownBonus / #18 DraftCandidateBonusFloorsRemaining は
+            // Runtime (GameController) が消費する値の保持のみで、Core (GameSession) の判定には影響しない (§2.4)。
+            var s = NewSession();
+            s.StartGame(1, 1, 9);
+            int maxTurnsBefore = s.MaxTurns;
+
+            s.Relics.BpmMultiplierBonus = 0.08;
+            s.Relics.TurnCountdownBonus = 1;
+            s.Relics.DraftCandidateBonusFloorsRemaining = 3;
+
+            Assert.AreEqual(maxTurnsBefore, s.MaxTurns, "TurnCountdownBonus は締切拍数 (Runtime) であって必要ターン数 (Core) ではない");
+            s.PendingPlayerMove = 2;
+            Assert.AreEqual(TurnResult.Continued, s.ResolveTurn(), "Runtime専用フィールドはターン解決に影響しない");
+        }
     }
 }

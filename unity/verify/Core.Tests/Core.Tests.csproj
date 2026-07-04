@@ -18,7 +18,11 @@
 
   <ItemGroup>
     <Compile Include="../../EscapeNine/Assets/Scripts/Core/**/*.cs" />
-    <Compile Include="../../EscapeNine/Assets/Tests/EditMode/**/*.cs" />
+    <!-- PlayerStateTests / RankingStoreTests は EscapeNine.Runtime (UnityEngine.PlayerPrefs) 依存の
+         Unity Editor 専用テストのため headless からは除外する (本 csproj は Core しかコンパイル
+         しないため原理的にコンパイル不能。Unity Test Runner 側では従来どおり実行される)。 -->
+    <Compile Include="../../EscapeNine/Assets/Tests/EditMode/**/*.cs"
+             Exclude="../../EscapeNine/Assets/Tests/EditMode/PlayerStateTests.cs;../../EscapeNine/Assets/Tests/EditMode/RankingStoreTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

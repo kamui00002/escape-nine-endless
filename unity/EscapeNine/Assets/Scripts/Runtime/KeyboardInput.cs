@@ -79,11 +79,14 @@ namespace EscapeNine.Runtime
             if (game.IsRelicDraftPending)
             {
                 // Phase 5a (docs/unity-phase5-roguelike-design.md §2.1): レリックドラフト提示中は
-                // 1/2/3 キーのみカード選択として扱い、既存の1-9移動キーとは排他にする
+                // 1/2/3/4 キーのみカード選択として扱い、既存の1-9移動キーとは排他にする
                 // (Steam体験版のキーボード操作対応の必須要件)。
+                // 4 は Phase 5b の #18 蒐集家の目 (候補3→4) 用。候補が3枚以下のときは
+                // GameScreen.SelectRelicCardFromKeyboard 側の範囲ガードで無視される。
                 if (Input.GetKeyDown(KeyCode.Alpha1) && _gameScreen != null) _gameScreen.SelectRelicCardFromKeyboard(0);
                 if (Input.GetKeyDown(KeyCode.Alpha2) && _gameScreen != null) _gameScreen.SelectRelicCardFromKeyboard(1);
                 if (Input.GetKeyDown(KeyCode.Alpha3) && _gameScreen != null) _gameScreen.SelectRelicCardFromKeyboard(2);
+                if (Input.GetKeyDown(KeyCode.Alpha4) && _gameScreen != null) _gameScreen.SelectRelicCardFromKeyboard(3);
             }
             else
             {

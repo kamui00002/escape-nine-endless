@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using EscapeNine.Core;
+using EscapeNine.Runtime.Stage; // StageQualityTier / StageQuality.PlatformDefault (Phase 4.5 W5)
 
 namespace EscapeNine.Runtime
 {
@@ -33,8 +34,17 @@ namespace EscapeNine.Runtime
         private const string OneTapRetryEnabledKey = "oneTapRetryEnabled";
         private const string HapticsEnabledKey = "hapticsEnabled"; // Swift: HapticsHelper.storageKey
         private const string ReduceMotionEnabledKey = "reduceMotionEnabled"; // Phase 4 (juice): Swift 正本に対応キー無し。Unity 独自の演出軽減設定
+        private const string StageQualityTierKey = "stageQualityTier"; // Phase 4.5 W5: Swift 正本に対応キー無し。演出品質ティア (StageQualityTier の int ordinal)
         private const string PurchasedProductsKey = "purchasedProductIDs"; // Swift は Keychain 保存。Unity は PlayerPrefs (Phase 3 で StoreKit/IAP 導入時にセキュア化を検討)
         private const string AILevelKey = "aiLevel"; // Swift は非永続 (GameView の @State)。Unity では画面間受け渡しのため永続化 (意図的差分)
+
+        // Phase 5b: メタ進行 (残光)。Swift正本には対応なし (Unity固有拡張、
+        // docs/unity-phase5-roguelike-design.md §3.3)。既存キーと同じ「CSV文字列 + 明示的Save()」方式。
+        private const string MetaCurrencyKey = "metaCurrency";
+        private const string UnlockedRelicIdsKey = "unlockedRelicIds";
+        private const string UnlockedCosmeticIdsKey = "unlockedCosmeticIds";
+        private const string StarterPerkRelicIdKey = "starterPerkRelicId";
+        private const string LifetimeRelicsCollectedKey = "lifetimeRelicsCollected";
 
         // Debug 系 (Swift: #if DEBUG の debug* プロパティ。Unity では Editor / Development Build から使う)
         private const string DebugStartFloorKey = "debugStartFloor";
@@ -78,11 +88,36 @@ namespace EscapeNine.Runtime
         /// <summary>Phase 4 (juice) の演出軽減設定。true でパンチ/シェイク/破片/ビートパルス等を抑制する。</summary>
         public bool ReduceMotionEnabled { get; set; }
 
+        /// <summary>
+        /// Phase 4.5 W5 の演出品質ティア (Bloom / パーティクル / RT フォーマットを一括制御。
+        /// 適用ロジックは Stage/StageQuality.cs)。既定はプラットフォーム別 (デスクトップ=High / モバイル=Medium)。
+        /// </summary>
+        public StageQualityTier StageQualityTier { get; set; } = StageQuality.PlatformDefault;
+
         /// <summary>選択中の AI 難易度 (Home/Game 画面間の受け渡し用)。</summary>
         public AILevel SelectedAILevel { get; set; } = AILevel.Easy;
 
         /// <summary>購入済み商品 ID (広告削除含む)。Phase 3 で StoreKit/IAP 検証と接続する。</summary>
         public HashSet<string> PurchasedProducts { get; set; } = new HashSet<string>();
+
+        // --- Phase 5b: メタ進行 (残光、§3.3) ---
+        // Swift正本には対応なし (Unity固有拡張)。消費導線 (コスメティック購入・レリックプール解放・
+        // スターターパーク装備・MetaShopScreen) は Phase 5c 送り。本フェーズはスキーマと蓄積のみ。
+
+        /// <summary>残光 (メタ進行通貨) の残高。</summary>
+        public int MetaCurrency { get; set; }
+
+        /// <summary>ドラフトプールに解放済みのレリックID (Phase 5c 以降で消費予定、現状は永続化のみ)。</summary>
+        public List<string> UnlockedRelicIds { get; set; } = new List<string>();
+
+        /// <summary>解放済みコスメティックID (Phase 5c 以降で消費予定、現状は永続化のみ)。</summary>
+        public List<string> UnlockedCosmeticIds { get; set; } = new List<string>();
+
+        /// <summary>現在装備中のスターターパーク (Rare未満のレリックのみ対象、§3.2)。未装備は null。</summary>
+        public string StarterPerkRelicId { get; set; }
+
+        /// <summary>累計レリック取得数 (将来の実績候補、§8参照)。</summary>
+        public int LifetimeRelicsCollected { get; set; }
 
         // Debug (Swift: #if DEBUG。Unity では常時読み書き可能だがデバッグ UI からのみ触る想定)
         public int DebugStartFloor { get; set; } = 1;
@@ -135,12 +170,25 @@ namespace EscapeNine.Runtime
             OneTapRetryEnabled = GetBool(OneTapRetryEnabledKey, true);
             HapticsEnabled = GetBool(HapticsEnabledKey, true);
             ReduceMotionEnabled = GetBool(ReduceMotionEnabledKey, false);
+            // 範囲外の保存値 (将来のティア削除・改変セーブ) はプラットフォーム既定へフォールバック
+            int qualityRaw = PlayerPrefs.GetInt(StageQualityTierKey, (int)StageQuality.PlatformDefault);
+            StageQualityTier = qualityRaw >= (int)StageQualityTier.High && qualityRaw <= (int)StageQualityTier.Low
+                ? (StageQualityTier)qualityRaw
+                : StageQuality.PlatformDefault;
             SelectedAILevel = ParseAILevel(PlayerPrefs.GetString(AILevelKey, "Easy"), AILevel.Easy);
 
             string purchasedRaw = PlayerPrefs.GetString(PurchasedProductsKey, "");
             PurchasedProducts = string.IsNullOrEmpty(purchasedRaw)
                 ? new HashSet<string>()
                 : new HashSet<string>(purchasedRaw.Split(',').Where(s => !string.IsNullOrEmpty(s)));
+
+            // Phase 5b: メタ進行 (残光、§3.3)
+            MetaCurrency = PlayerPrefs.GetInt(MetaCurrencyKey, 0);
+            UnlockedRelicIds = SplitCsv(PlayerPrefs.GetString(UnlockedRelicIdsKey, ""));
+            UnlockedCosmeticIds = SplitCsv(PlayerPrefs.GetString(UnlockedCosmeticIdsKey, ""));
+            string starterPerkRaw = PlayerPrefs.GetString(StarterPerkRelicIdKey, "");
+            StarterPerkRelicId = string.IsNullOrEmpty(starterPerkRaw) ? null : starterPerkRaw;
+            LifetimeRelicsCollected = PlayerPrefs.GetInt(LifetimeRelicsCollectedKey, 0);
 
             // Debug (Swift: #if DEBUG の対称。リリースビルドでは端末に残った旧 PlayerPrefs 値や
             // 外部からの改変を読み込ませず、常にデフォルト(無効)値にする)
@@ -189,8 +237,16 @@ namespace EscapeNine.Runtime
             SetBool(OneTapRetryEnabledKey, OneTapRetryEnabled);
             SetBool(HapticsEnabledKey, HapticsEnabled);
             SetBool(ReduceMotionEnabledKey, ReduceMotionEnabled);
+            PlayerPrefs.SetInt(StageQualityTierKey, (int)StageQualityTier);
             PlayerPrefs.SetString(AILevelKey, SelectedAILevel.RawValue());
             PlayerPrefs.SetString(PurchasedProductsKey, string.Join(",", PurchasedProducts));
+
+            // Phase 5b: メタ進行 (残光、§3.3)
+            PlayerPrefs.SetInt(MetaCurrencyKey, MetaCurrency);
+            PlayerPrefs.SetString(UnlockedRelicIdsKey, string.Join(",", UnlockedRelicIds));
+            PlayerPrefs.SetString(UnlockedCosmeticIdsKey, string.Join(",", UnlockedCosmeticIds));
+            PlayerPrefs.SetString(StarterPerkRelicIdKey, StarterPerkRelicId ?? "");
+            PlayerPrefs.SetInt(LifetimeRelicsCollectedKey, LifetimeRelicsCollected);
 
             PlayerPrefs.SetInt(DebugStartFloorKey, DebugStartFloor);
             PlayerPrefs.SetString(DebugAILevelKey, DebugAILevel.RawValue());
@@ -278,7 +334,27 @@ namespace EscapeNine.Runtime
             Save();
         }
 
+        // MARK: - Meta Progression (Phase 5b: 残光、§3.1/§3.3)
+
+        /// <summary>
+        /// 残光を加算して永続化する。ラン終了時 (GameController.EndGame) から呼ばれる。
+        /// 消費 (SpendMetaCurrency 等) は MetaShopScreen と一緒に Phase 5c で実装する —
+        /// 蓄積だけ先に始めても、後から画面を足した時に蓄積分は失われない。
+        /// </summary>
+        public void AddMetaCurrency(int amount)
+        {
+            if (amount <= 0) return;
+            MetaCurrency += amount;
+            Save();
+        }
+
         // MARK: - Helpers
+
+        /// <summary>CSV文字列 → リスト (空文字は空リスト)。unlockedCharacters と同じシリアライズ方式。</summary>
+        private static List<string> SplitCsv(string raw) =>
+            string.IsNullOrEmpty(raw)
+                ? new List<string>()
+                : raw.Split(',').Where(s => !string.IsNullOrEmpty(s)).ToList();
 
         // PlayerPrefs には bool が無いため int 0/1 で保存する
         private static bool GetBool(string key, bool defaultValue) =>

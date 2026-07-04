@@ -79,8 +79,18 @@ namespace EscapeNine.Core
         public void SetCharacter(Character character) => CurrentCharacter = character;
 
         // --- derived ---
-        /// <summary>スキル最大使用回数のレリックボーナスを加算した残り使用回数。Relics.None なら既存挙動と同一。</summary>
-        public int RemainingSkillUses => Skill.MaxUsage + Relics.SkillMaxUsageBonus - SkillUsageCount;
+        /// <summary>スキル最大使用回数のレリックボーナスを加算した残り使用回数。Relics.None なら既存挙動と同一。
+        /// #3 影分身の型 (ThiefSkillMaxUsageBonus) は「盗賊専用」レリックのため、CurrentCharacter が
+        /// 盗賊のときのみ加算する (他キャラが誤ってクロスピックしても効果が乗らないようにする)。</summary>
+        public int RemainingSkillUses
+        {
+            get
+            {
+                int bonus = Relics.SkillMaxUsageBonus;
+                if (CurrentCharacter.Type == CharacterType.Thief) bonus += Relics.ThiefSkillMaxUsageBonus;
+                return Skill.MaxUsage + bonus - SkillUsageCount;
+            }
+        }
 
         /// <summary>現在階層の必要ターン数。Floor 0 はプロローグ短縮。Swift: maxTurns
         /// レリック(#4 老練の構え)の TurnCountReduction を減算し、最低3にクランプする。</summary>
@@ -97,14 +107,17 @@ namespace EscapeNine.Core
         public bool IsBossFloor => Floor.IsBossFloor(CurrentFloor);
 
         /// <summary>コンボによるスコア倍率。Swift: scoreMultiplier
-        /// レリック(#14 連鎖の証、5aカタログ外だがフックとして実装)の ComboThresholdReduction をしきい値から減算する。</summary>
+        /// レリック(#14 連鎖の証)の ComboThresholdReduction をしきい値から減算し、
+        /// レリック(#15 加速の証)の ComboThresholdBonusMultiplier をしきい値到達時の倍率に加算する。</summary>
         public double ScoreMultiplier
         {
             get
             {
                 int threshold1 = GameConfig.ComboMultiplierThreshold1 - Relics.ComboThresholdReduction;
                 int threshold2 = GameConfig.ComboMultiplierThreshold2 - Relics.ComboThresholdReduction;
-                return ComboCount >= threshold2 ? 2.0 : ComboCount >= threshold1 ? 1.5 : 1.0;
+                if (ComboCount >= threshold2) return 2.0 + Relics.ComboThresholdBonusMultiplier;
+                if (ComboCount >= threshold1) return 1.5 + Relics.ComboThresholdBonusMultiplier;
+                return 1.0;
             }
         }
 

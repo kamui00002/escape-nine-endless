@@ -70,6 +70,31 @@ namespace EscapeNine.Core
         /// <summary>拘束スキルを持たないキャラでも敵を拘束できる残り回数。#17 心話の絆。</summary>
         public int PseudoBindCharges;
 
+        // --- Phase 5b (docs/unity-phase5-roguelike-design.md §2.3 の残り10種) で追加したフィールド ---
+
+        /// <summary>盗賊のスキル最大使用回数に加算するボーナス (盗賊専用、GameSession側で
+        /// CurrentCharacter.Type == Thief のときのみ加算する)。#3 影分身の型。</summary>
+        public int ThiefSkillMaxUsageBonus;
+
+        /// <summary>以後のBPMに乗算する倍率ボーナス (例 0.08 = +8%)。#15 加速の証。
+        /// Runtime専用フック (§2.4): GameController が Floor.CalculateBPM の結果に乗算してから
+        /// Conductor.ChangeBPM へ渡す想定。Core (GameSession) はこの値を保持するのみで参照しない。</summary>
+        public double BpmMultiplierBonus;
+
+        /// <summary>コンボ倍率のしきい値到達時に ScoreMultiplier へ加算するボーナス。#15 加速の証
+        /// (BPM上昇のリスクとの引き換え)。ThresholdReduction とは独立に加算する。</summary>
+        public double ComboThresholdBonusMultiplier;
+
+        /// <summary>1ターンの締切拍数に加算するボーナス。#16 刻の猶予。
+        /// Runtime専用フック (§2.4): GameController._turnBeats に加算する想定。
+        /// Core (GameSession) はこの値を保持するのみで参照しない (MaxTurns/ターン数とは無関係)。</summary>
+        public int TurnCountdownBonus;
+
+        /// <summary>レリックドラフトの候補数を3→4に増やす効果が残っている階層数。#18 蒐集家の目。
+        /// ドラフト候補生成のたび (階層クリアごと) に呼び出し側が1ずつ減算する想定 (Runtime/Simの
+        /// ドラフト生成箇所が消費者。GameSession自体はこの値を読まない)。</summary>
+        public int DraftCandidateBonusFloorsRemaining;
+
         /// <summary>ゼロ効果 (レリック未装備) を表す新規インスタンス。
         /// 呼び出す度に new する (チャージ系フィールドの共有ミューテート事故を防ぐため、意図的にシングルトンにしない)。</summary>
         public static RelicEffects None => new RelicEffects();
