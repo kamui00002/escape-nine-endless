@@ -74,6 +74,13 @@ namespace EscapeNine.Runtime.UI
         private StageCameraDirector _cameraDirector;
         private StageRenderView _renderView;
 
+        // ---- Wave 3 (a): ポストプロセス + ビート同期脈動 (UseWorldBoard=true の時のみ非 null) ----
+        private StagePostFx _postFx;
+        private BeatVolumePulse _beatVolumePulse;
+
+        // ---- Wave 3 (b): カメラワーク (衝突インパルス/回り込み/圧迫ズーム) ----
+        private CameraRig _cameraRig;
+
         private GameObject _comboRow;
         private TextMeshProUGUI _gradeLabel;
         private TextMeshProUGUI _comboLabel;
@@ -327,6 +334,15 @@ namespace EscapeNine.Runtime.UI
                 _renderView.Configure(anchor, rawImage, _cameraDirector.Cam);
                 input.Configure(_cameraDirector.Cam, _boardStage, anchor);
             }
+
+            // Wave 3 (a): URP Volume (Bloom/Vignette/ColorAdjustments) + ビート同期脈動。
+            // _cameraDirector が null (Camera.main 不在) の場合も StagePostFx.Create は
+            // camera=null を許容し、Volume 自体は生成される (演出無しの劣化状態で継続)。
+            _postFx = StagePostFx.Create(_boardStage.transform, _cameraDirector != null ? _cameraDirector.Cam : null);
+            _beatVolumePulse = _boardStage.gameObject.AddComponent<BeatVolumePulse>();
+            _beatVolumePulse.Configure(App.I != null ? App.I.Conductor : null, _postFx);
+            _cameraRig = _boardStage.gameObject.AddComponent<CameraRig>();
+            _cameraRig.Configure(_cameraDirector != null ? _cameraDirector.Cam : null);
 
             _board = _boardStage;
         }
@@ -705,6 +721,16 @@ namespace EscapeNine.Runtime.UI
 
             if (!isActiveAndEnabled) return;
             RefreshAll();
+
+            // Wave 3 (b): 圧迫ズーム更新 + 2階層目以降の GO で回り込み演出。
+            // 設計上は「階層クリア時」だが、FloorClear オーバーレイ (全画面95%不透明) が
+            // 盤面を覆って回り込みが見えないため、「新しい階へ入る瞬間」に移した (意図的差分)。
+            if (_cameraRig != null && App.I.Game.Session != null)
+            {
+                int floor = App.I.Game.Session.CurrentFloor;
+                _cameraRig.PressureZoom(floor);
+                if (floor > 1) _cameraRig.OrbitOnFloorClear();
+            }
         }
 
         private void HandleTurnResolved(TurnResult result)
@@ -738,10 +764,12 @@ namespace EscapeNine.Runtime.UI
             {
                 _board.FlashPlayer(InvisibleAbsorbColor);
                 _board.BurstAtPlayer(InvisibleAbsorbColor);
+                if (_cameraRig != null) _cameraRig.Impulse(0.04f); // 非致死衝突は死亡時(0.08)より弱く
             }
             else if (_prevShieldActive && !session.ShieldActive)
             {
                 _board.FlashPlayer(ShieldAbsorbColor);
+                if (_cameraRig != null) _cameraRig.Impulse(0.04f);
             }
         }
 
@@ -781,6 +809,7 @@ namespace EscapeNine.Runtime.UI
             _board.Shake();
             _board.FlashPlayer(UITheme.Warning);
             _board.BurstAtPlayer(UITheme.Warning);
+            if (_cameraRig != null) _cameraRig.Impulse(0.08f); // Wave 3 (b): 死亡時のカメラインパルス
         }
 
         private void HandleBossWarning()

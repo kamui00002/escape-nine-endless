@@ -53,7 +53,10 @@ namespace EscapeNine.Runtime.Stage
             if (_rt == null || _rt.width != w || _rt.height != h)
             {
                 ReleaseRt();
-                _rt = new RenderTexture(w, h, 24) { name = "BoardStageRT" };
+                // HDR 化 (Wave 3): LDR (0-1 clamp) の RT だと Bloom の閾値超え発光が
+                // クランプで潰れて滲みが出ない。DefaultHDR で 1.0 超の輝度を保持したまま
+                // RT へ描画し、Volume の Bloom がそれを拾えるようにする。
+                _rt = new RenderTexture(w, h, 24, RenderTextureFormat.DefaultHDR) { name = "BoardStageRT" };
                 _camera.targetTexture = _rt;
                 _camera.rect = new Rect(0f, 0f, 1f, 1f); // 旧方式が設定した部分 rect を打ち消す
                 _rawImage.texture = _rt;
