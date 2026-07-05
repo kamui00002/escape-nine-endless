@@ -18,6 +18,7 @@
 using System;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
@@ -27,6 +28,12 @@ namespace EscapeNine.EditorTools
     {
         private const string ScenePath = "Assets/Scenes/Main.unity";
         private const string ResultMarkerFileName = "build-mac-result.txt";
+        private const string IosResultMarkerFileName = "build-ios-result.txt";
+
+        // iOS 実機テスト用の設定 (2026-07-05 オーナー実機テスト、Bundle ID はテスト用に配信中 Swift 版と分離)。
+        private const string IosBundleId = "com.yoshidometoru.escapenine.unity";
+        private const string IosTeamId = "B7F79FDM78"; // 元 Swift アプリと同一 Apple Developer チーム
+        private const string IosMinVersion = "15.0";
 
         /// <summary>
         /// デスクトップ(スタンドアロン)専用の PlayerSettings。iOS/Android には影響しない。
@@ -81,6 +88,65 @@ namespace EscapeNine.EditorTools
                 // ビルド自体が例外で中断した場合も、成否判定できるようマーカーだけは必ず残す。
                 WriteExceptionMarker(resultMarkerPath, outputPath, e);
             }
+        }
+
+        /// <summary>
+        /// iOS 実機テスト用: PlayerSettings を設定 → iOS ターゲットへ切替 → Xcode プロジェクトを
+        /// Builds/ios/ に生成する。署名・実機転送は生成後に Xcode で行う (自動署名前提)。
+        /// 初回のターゲット切替は全アセットの iOS 再インポートが走るため時間がかかる。
+        /// 結果は build-ios-result.txt に書く (macOS と同じマーカー方式)。
+        /// </summary>
+        [MenuItem("EscapeNine/Build iOS (Xcode project)")]
+        public static void BuildIOS()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string resultMarkerPath = Path.Combine(projectRoot, IosResultMarkerFileName);
+            if (File.Exists(resultMarkerPath)) File.Delete(resultMarkerPath);
+
+            string outputPath = Path.Combine(projectRoot, "Builds", "ios");
+
+            try
+            {
+                UrpBootstrap.EnsureConfigured();
+                ApplyIosPlayerSettings();
+
+                // iOS ターゲットが非アクティブなら切り替える (BuildPlayer は非アクティブターゲットを弾く)。
+                if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.iOS)
+                {
+                    EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.iOS, BuildTarget.iOS);
+                }
+
+                var options = new BuildPlayerOptions
+                {
+                    scenes = new[] { ScenePath },
+                    locationPathName = outputPath,
+                    target = BuildTarget.iOS,
+                    options = BuildOptions.None, // Xcode プロジェクト生成のみ (実機転送は Xcode 側)
+                };
+
+                BuildReport report = BuildPipeline.BuildPlayer(options);
+                WriteResultMarker(resultMarkerPath, report, outputPath);
+            }
+            catch (Exception e)
+            {
+                WriteExceptionMarker(resultMarkerPath, outputPath, e);
+            }
+        }
+
+        /// <summary>iOS 専用 PlayerSettings (Bundle ID / 署名チーム / 縦向き / 最小 iOS)。macOS には影響しない。</summary>
+        private static void ApplyIosPlayerSettings()
+        {
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, IosBundleId);
+            PlayerSettings.iOS.appleDeveloperTeamID = IosTeamId;
+            PlayerSettings.iOS.appleEnableAutomaticSigning = true; // Xcode 自動署名
+            PlayerSettings.iOS.targetOSVersionString = IosMinVersion;
+
+            // 縦向き固定 (本作は縦持ち専用。回転で 3D 舞台のフレーミングが崩れるのを防ぐ)。
+            PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+            PlayerSettings.allowedAutorotateToPortrait = true;
+            PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
+            PlayerSettings.allowedAutorotateToLandscapeLeft = false;
+            PlayerSettings.allowedAutorotateToLandscapeRight = false;
         }
 
         private static void WriteResultMarker(string markerPath, BuildReport report, string outputPath)

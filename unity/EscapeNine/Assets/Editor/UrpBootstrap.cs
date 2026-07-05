@@ -37,6 +37,22 @@ namespace EscapeNine.EditorTools
 
         private const string ResultMarkerFileName = "urp-bootstrap-result.txt";
 
+        // 実行時に Shader.Find でのみ参照する URP シェーダ。マテリアル資産から参照されないため
+        // ビルド時のシェーダストリップで削除され、iOS 実機で Shader.Find が null → フォールバックの
+        // Standard が URP 下でマゼンタ描画になる (盤面全体がマゼンタ矩形化)。macOS はストリップが緩く再現しない。
+        // AlwaysIncludedShaders に登録してストリップから守る (2026-07-05 実機テストで発見)。
+        private static readonly string[] AlwaysIncludeShaderNames =
+        {
+            "Universal Render Pipeline/Lit",             // TileView (盤面タイル)
+            "Universal Render Pipeline/Unlit",           // フォールバック用 (Standard の代替)
+            "Universal Render Pipeline/Particles/Unlit", // StageParticles / BoardStage バースト粒子
+            // TMP テキストの保険 (iOS で TMP シェーダがストリップされると全テキストが不可視/マゼンタ化)。
+            // 見つからなければ EnsureAlwaysIncludedShaders が警告してスキップする (無害)。
+            "TextMeshPro/Distance Field",
+            "TextMeshPro/Mobile/Distance Field",
+            "TextMeshPro/Sprite",
+        };
+
         [MenuItem("EscapeNine/Setup URP")]
         public static void Setup()
         {
@@ -98,6 +114,7 @@ namespace EscapeNine.EditorTools
                 }
 
                 AssignToGraphicsAndQuality(urpAsset);
+                EnsureAlwaysIncludedShaders();
                 AssetDatabase.SaveAssets();
 
                 WriteResultMarker(resultMarkerPath, urpAsset);
@@ -126,6 +143,48 @@ namespace EscapeNine.EditorTools
                 QualitySettings.renderPipeline = urpAsset;
             }
             QualitySettings.SetQualityLevel(originalLevel, false);
+        }
+
+        /// <summary>
+        /// 実行時 Shader.Find 専用の URP シェーダを GraphicsSettings の AlwaysIncludedShaders へ登録し、
+        /// iOS ビルドのシェーダストリップから守る。冪等 (既に含まれていれば追加しない)。
+        /// </summary>
+        private static void EnsureAlwaysIncludedShaders()
+        {
+            var graphicsSettings = GraphicsSettings.GetGraphicsSettings();
+            var so = new SerializedObject(graphicsSettings);
+            var arr = so.FindProperty("m_AlwaysIncludedShaders");
+            if (arr == null)
+            {
+                Debug.LogWarning("[UrpBootstrap] m_AlwaysIncludedShaders プロパティが見つかりません。シェーダ登録を中止。");
+                return;
+            }
+
+            bool changed = false;
+            foreach (var name in AlwaysIncludeShaderNames)
+            {
+                Shader shader = Shader.Find(name);
+                if (shader == null)
+                {
+                    Debug.LogWarning($"[UrpBootstrap] シェーダ '{name}' が見つからず AlwaysIncluded に追加できません。");
+                    continue;
+                }
+
+                bool present = false;
+                for (int i = 0; i < arr.arraySize; i++)
+                {
+                    if (arr.GetArrayElementAtIndex(i).objectReferenceValue == shader) { present = true; break; }
+                }
+                if (present) continue;
+
+                int idx = arr.arraySize;
+                arr.InsertArrayElementAtIndex(idx);
+                arr.GetArrayElementAtIndex(idx).objectReferenceValue = shader;
+                changed = true;
+                Debug.Log($"[UrpBootstrap] AlwaysIncludedShaders に追加: {name}");
+            }
+
+            if (changed) so.ApplyModifiedProperties();
         }
 
         private static void WriteResultMarker(string markerPath, UniversalRenderPipelineAsset urpAsset)

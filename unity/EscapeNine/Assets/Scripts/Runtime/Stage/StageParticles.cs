@@ -55,7 +55,8 @@ namespace EscapeNine.Runtime.Stage
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
             // シェーダー未検出時は Standard へフォールバック (BoardStage.EnsureBurstParticles と同じ保険)。
             Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-            renderer.material = new Material(shader != null ? shader : Shader.Find("Standard"));
+            // フォールバックは URP/Unlit (Standard は URP 下でマゼンタ。両方 AlwaysIncludedShaders 登録済み)。
+            renderer.material = new Material(shader != null ? shader : Shader.Find("Universal Render Pipeline/Unlit"));
         }
 
         private void OnDestroy()

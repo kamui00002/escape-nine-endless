@@ -154,7 +154,8 @@ namespace EscapeNine.Runtime.Stage
 
             Renderer fillRenderer = fillGo.GetComponent<Renderer>();
             var shader = Shader.Find("Universal Render Pipeline/Lit");
-            fillRenderer.sharedMaterial = new Material(shader != null ? shader : Shader.Find("Standard"));
+            // フォールバックは URP/Unlit (Standard は URP 下でマゼンタになるため使わない。両方 AlwaysIncludedShaders 登録済み)。
+            fillRenderer.sharedMaterial = new Material(shader != null ? shader : Shader.Find("Universal Render Pipeline/Unlit"));
 
             var hitTarget = fillGo.AddComponent<TileHitTarget>();
             hitTarget.Position = position;
