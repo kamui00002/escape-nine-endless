@@ -13,6 +13,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using EscapeNine.Core;
+using EscapeNine.Runtime.UI.Fx;
 
 namespace EscapeNine.Runtime.UI
 {
@@ -43,6 +44,20 @@ namespace EscapeNine.Runtime.UI
         private Coroutine _toastRoutine;
         private const float ToastDisplaySeconds = 1.5f;
 
+        // ---- HD-2D (2026-07-06 追加): 背景パララックス / タイトル浮遊の駆動状態 ----
+        // どちらも「酔わない範囲の極小演出」。FxKit.MotionEnabled (Reduce Motion) を毎 tick 見て、
+        // 無効時は即座に基準位置へ戻す (BeatPulse.SettleToBase と同じ考え方)。
+        private RectTransform _bgFar;
+        private RectTransform _bgMid;
+        private RectTransform _bgNear;
+        private Coroutine _parallaxRoutine;
+        private RectTransform _titleLabelRt;
+        private RectTransform _titleShadowRt;
+        private Coroutine _titleFloatRoutine;
+        private const float TitleBaseCy = 0.905f;
+        private const float TitleShadowDx = 0.004f;
+        private const float TitleShadowDy = 0.006f;
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private TextMeshProUGUI _dbgFloorValueLabel;    // 開始階層の現在値
         private TextMeshProUGUI _dbgBpmValueLabel;      // BPMオーバーライドの現在値
@@ -67,9 +82,8 @@ namespace EscapeNine.Runtime.UI
                 root.offsetMax = Vector2.zero;
             }
 
-            // 背景はノッチ下まで全面に敷く (Swift: GameBackground。パーティクル演出は Phase 4/juice 送り)
-            var bg = UIFactory.ColorRect(transform, "Background", UITheme.Background);
-            UIFactory.Place((RectTransform)bg.transform, 0.5f, 0.5f, 1f, 1f);
+            // 背景はノッチ下まで全面に敷く (HD-2D: 単色 → 3層パララックスへ、2026-07-06)
+            BuildBackgroundParallax(transform);
 
             // コンテンツはセーフエリア内に収める (SwiftUI では自動処理されていた部分)
             var safe = UIFactory.Panel(transform, "SafeArea");
@@ -99,6 +113,14 @@ namespace EscapeNine.Runtime.UI
             // AudioDirector.PlayBgm は同一曲再生中なら no-op なので毎回呼んで安全。
             App.I.Audio.PlayMenuBgm();
 
+            // HD-2D (2026-07-06): 背景パララックス / タイトル浮遊を張り直す。
+            // GameObject の非活性化で既存コルーチンは自動停止するため、再表示のたびに開始し直す
+            // (ToastRoutine と同じ「既存があれば止めてから張り直す」パターン)。
+            if (_parallaxRoutine != null) StopCoroutine(_parallaxRoutine);
+            _parallaxRoutine = StartCoroutine(ParallaxDriftRoutine());
+            if (_titleFloatRoutine != null) StopCoroutine(_titleFloatRoutine);
+            _titleFloatRoutine = StartCoroutine(TitleFloatRoutine());
+
             // 初回起動はチュートリアルへ自動遷移 (Swift: fullScreenCover(showTutorial))。
             // 注意: ここで直接 Router.Show を呼ぶと Router.Show(Home) の実行途中に再入して
             //       _current / active 状態が壊れるため、必ず 1 フレーム遅らせる。
@@ -117,6 +139,16 @@ namespace EscapeNine.Runtime.UI
         public override void OnHide()
         {
             HideToast();
+            if (_parallaxRoutine != null)
+            {
+                StopCoroutine(_parallaxRoutine);
+                _parallaxRoutine = null;
+            }
+            if (_titleFloatRoutine != null)
+            {
+                StopCoroutine(_titleFloatRoutine);
+                _titleFloatRoutine = null;
+            }
         }
 
         private IEnumerator ShowTutorialNextFrame()
@@ -131,11 +163,19 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildTitleSection(RectTransform parent)
         {
-            // グラデーション / グロー / シマー / バウンス演出は Phase 4 (juice) 送り。
-            // 色は Swift の available (ゴールド) を採用。
+            // 影 (奥行き): 本体よりわずかに右下・暗色の複製を先に敷いてから本体を重ねる
+            // (シェーダー不要の疑似ドロップシャドウ。HD-2D、2026-07-06 追加)。
+            var titleShadow = UIFactory.Label(parent, "TitleShadow", "ESCAPE NINE", 110,
+                UITheme.WithAlpha(Color.black, 0.35f), TextAnchor.MiddleCenter, FontStyle.Bold);
+            _titleShadowRt = (RectTransform)titleShadow.transform;
+            UIFactory.Place(_titleShadowRt, 0.5f + TitleShadowDx, TitleBaseCy - TitleShadowDy, 0.94f, 0.06f);
+
+            // グラデーション / グロー / シマー演出は Phase 4 (juice) 送り。
+            // 色は Swift の available (ゴールド) を採用。ごく緩い上下フロートのみ追加 (演出用、拍非同期)。
             var title = UIFactory.Label(parent, "TitleLabel", "ESCAPE NINE", 110, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
-            UIFactory.Place((RectTransform)title.transform, 0.5f, 0.905f, 0.94f, 0.06f);
+            _titleLabelRt = (RectTransform)title.transform;
+            UIFactory.Place(_titleLabelRt, 0.5f, TitleBaseCy, 0.94f, 0.06f);
 
             var subtitle = UIFactory.Label(parent, "SubtitleLabel", "Endless Dungeon", 52,
                 UITheme.WithAlpha(UITheme.TextColor, 0.8f));
@@ -146,6 +186,13 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildCharacterSection(RectTransform parent)
         {
+            // 接地影 (足元の柔らかい楕円影。「浮いて見える」を「立っている」に変える。HD-2D、2026-07-06)
+            var groundShadow = UIFactory.FillImage(parent, "CharacterGroundShadow",
+                UIFactory.SoftShadowSprite(40, 128, 30));
+            groundShadow.color = UITheme.WithAlpha(Color.black, 0.35f);
+            groundShadow.raycastTarget = false;
+            UIFactory.Place((RectTransform)groundShadow.transform, 0.5f, 0.748f, 0.22f, 0.045f);
+
             // スプライトは OnShow のたびに選択キャラで差し替える (CharacterSelect から戻った時に反映)
             _characterImage = UIFactory.SpriteImage(parent, "CharacterImage", null);
             _characterImage.raycastTarget = false; // ホームでは飾りなのでタップを吸わせない
@@ -155,54 +202,185 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place((RectTransform)_characterNameLabel.transform, 0.5f, 0.744f, 0.5f, 0.025f);
         }
 
+        // MARK: - HD-2D 背景パララックス (Swift 正本になし、2026-07-06 追加)
+        // 3層 (遠景グラデ / 中景シルエット+灯り / 近景ヴィネット) を重ね、
+        // ParallaxDriftRoutine が緩い自動ドリフトで奥ほど小さく動かす (奥行き知覚)。
+        // gyro は使わず自動ドリフトのみ (酔い防止、振幅は極小)。
+
+        private void BuildBackgroundParallax(Transform parent)
+        {
+            // 遠景: ダンジョン奥の縦グラデ (既存テーマ2色の組み合わせのみ、新規の彩度を足さない)
+            _bgFar = (RectTransform)UIFactory.FillImage(parent, "BgFar",
+                UIFactory.VerticalGradientSprite(UITheme.BackgroundSecondary, UITheme.Background, 128)).transform;
+            UIFactory.Place(_bgFar, 0.5f, 0.5f, 1.06f, 1.06f);
+
+            // 中景: 石柱シルエット + 篝火の暖色グロー (盤面 StageLights の暖色ライティング感と統一)
+            _bgMid = UIFactory.Panel(parent, "BgMid");
+            UIFactory.Place(_bgMid, 0.5f, 0.5f, 1.06f, 1.06f);
+            BuildMidLayerDecor(_bgMid);
+
+            // 近景: 下端のヴィネット (足元の暗がり。ボタン群に接地感を持たせる)
+            _bgNear = (RectTransform)UIFactory.FillImage(parent, "BgNear",
+                UIFactory.VerticalGradientSprite(new Color(0f, 0f, 0f, 0f), new Color(0f, 0f, 0f, 0.40f), 64)).transform;
+            UIFactory.Place(_bgNear, 0.5f, 0.075f, 1.06f, 0.16f);
+        }
+
+        private void BuildMidLayerDecor(RectTransform parent)
+        {
+            // 石柱シルエット (低アルファの黒、装飾のみなので raycastTarget=false 固定の ColorRect でよい)
+            Color pillarColor = UITheme.WithAlpha(Color.black, 0.22f);
+            float[] pillarCx = { 0.12f, 0.34f, 0.66f, 0.88f };
+            foreach (float cx in pillarCx)
+            {
+                var pillar = UIFactory.ColorRect(parent, "Pillar", pillarColor);
+                UIFactory.Place((RectTransform)pillar.transform, cx, 0.55f, 0.05f, 0.9f);
+            }
+
+            // 篝火のグロー (暖色 Main を低アルファで。SoftShadowSprite を光暈の代用として流用)
+            Color glow = UITheme.WithAlpha(UITheme.Main, 0.16f);
+            float[] glowCx = { 0.22f, 0.78f };
+            foreach (float cx in glowCx)
+            {
+                var g = UIFactory.FillImage(parent, "Glow", UIFactory.SoftShadowSprite(40, 128, 40));
+                g.color = glow;
+                g.raycastTarget = false;
+                UIFactory.Place((RectTransform)g.transform, cx, 0.30f, 0.18f, 0.10f);
+            }
+        }
+
+        /// <summary>
+        /// 背景3層の緩い自動ドリフト。8-9Hz 程度で十分滑らかに見えるため毎フレームは呼ばない
+        /// (Canvas の再レイアウトコストを抑える)。Reduce Motion 時は基準位置に固定する。
+        /// </summary>
+        private IEnumerator ParallaxDriftRoutine()
+        {
+            var wait = new WaitForSecondsRealtime(0.12f);
+            float t = 0f;
+            while (true)
+            {
+                if (FxKit.MotionEnabled)
+                {
+                    t += 0.12f;
+                    float driftFar = Mathf.Sin(t * 0.10f) * 0.006f;
+                    float driftMid = Mathf.Sin(t * 0.14f + 1.3f) * 0.014f;
+                    float driftNear = Mathf.Sin(t * 0.18f + 2.6f) * 0.022f;
+                    if (_bgFar != null) UIFactory.Place(_bgFar, 0.5f + driftFar, 0.5f, 1.06f, 1.06f);
+                    if (_bgMid != null) UIFactory.Place(_bgMid, 0.5f + driftMid, 0.5f, 1.06f, 1.06f);
+                    if (_bgNear != null) UIFactory.Place(_bgNear, 0.5f + driftNear, 0.075f, 1.06f, 0.16f);
+                }
+                else
+                {
+                    if (_bgFar != null) UIFactory.Place(_bgFar, 0.5f, 0.5f, 1.06f, 1.06f);
+                    if (_bgMid != null) UIFactory.Place(_bgMid, 0.5f, 0.5f, 1.06f, 1.06f);
+                    if (_bgNear != null) UIFactory.Place(_bgNear, 0.5f, 0.075f, 1.06f, 0.16f);
+                }
+                yield return wait;
+            }
+        }
+
+        /// <summary>タイトルのごく緩い上下フロート (演出のみ、拍非同期)。Reduce Motion 時は基準位置に固定する。</summary>
+        private IEnumerator TitleFloatRoutine()
+        {
+            var wait = new WaitForSecondsRealtime(0.08f);
+            float t = 0f;
+            while (true)
+            {
+                if (FxKit.MotionEnabled)
+                {
+                    t += 0.08f;
+                    float offsetY = Mathf.Sin(t * 0.6f) * 0.0016f;
+                    if (_titleLabelRt != null) UIFactory.Place(_titleLabelRt, 0.5f, TitleBaseCy + offsetY, 0.94f, 0.06f);
+                    if (_titleShadowRt != null)
+                    {
+                        UIFactory.Place(_titleShadowRt, 0.5f + TitleShadowDx, TitleBaseCy - TitleShadowDy + offsetY, 0.94f, 0.06f);
+                    }
+                }
+                else
+                {
+                    if (_titleLabelRt != null) UIFactory.Place(_titleLabelRt, 0.5f, TitleBaseCy, 0.94f, 0.06f);
+                    if (_titleShadowRt != null)
+                    {
+                        UIFactory.Place(_titleShadowRt, 0.5f + TitleShadowDx, TitleBaseCy - TitleShadowDy, 0.94f, 0.06f);
+                    }
+                }
+                yield return wait;
+            }
+        }
+
         // MARK: - Button Section (Swift: buttonSection。並び順も正本に合わせる)
 
         private void BuildButtonSection(RectTransform parent)
         {
             const float w = 0.72f;  // Swift: ResponsiveLayout.buttonWidth 相当を比率で固定
-            // セカンダリボタンが 6→7 個 (遺物庫追加、Phase 5c) になったため、行高/行間をさらに詰めて
-            // 最高到達階層セクションとの重なりを避ける (5→6 個の時 (Phase 2.5) と同じ対処の継続)。
             const float h = 0.040f;
-            const float gap = 0.044f;
+            // HD-2D (2026-07-06): 全ボタンを Card 化 (影で浮かせる) する。余白改善のため、頻度の低い
+            // 参照系アクション「実績」「遊び方」を1行にペア化して空いた1行分を残り6行の gap 拡大に還元。
+            // 旧: 7行 gap=0.044 (すき間はボタン高の約10%、最高到達階層とのクリアランス0.011) →
+            // 新: 6行 gap=0.052 (約30%、クリアランス0.015)。並び順は Swift 正本どおり維持。
+            const float gap = 0.052f;
 
             // 1. 冒険を始める (primary: 明色背景 + 濃色文字。glow/pulse は Phase 4 送り)
-            var play = UIFactory.TextButton(parent, "PlayButton", "冒険を始める", 60,
-                UITheme.Main, UITheme.Background, TriggerPlay);
-            UIFactory.Place((RectTransform)play.transform, 0.5f, 0.685f, w, 0.06f);
+            Button play = CreateElevatedButton(parent, "PlayButton", "冒険を始める", 60,
+                UITheme.Main, UITheme.Background, 0.5f, 0.685f, w, 0.06f, TriggerPlay);
             var playLabel = play.GetComponentInChildren<TextMeshProUGUI>();
             if (playLabel != null) playLabel.fontStyle = FontStyles.Bold;
 
             // 2. デイリーチャレンジ (Swift: highestFloor >= 10 のときだけ表示。可視制御は RefreshDynamic)
             BuildDailyChallengeButton(parent, w);
 
-            // 3〜9. セカンダリボタン群 (Swift: GameButton style: .secondary、並び順も正本どおり
-            // キャラクター→ランキング→ショップ→実績→遊び方→設定→遺物庫。遺物庫のみ Swift 正本に
+            // 3〜8. セカンダリボタン群 (Swift: GameButton style: .secondary、並び順も正本どおり
+            // キャラクター→ランキング→ショップ→[実績|遊び方]→設定→遺物庫。遺物庫のみ Swift 正本に
             // 対応なし、Unity 独自の Phase 5c メタ進行導線)
-            CreateSecondaryButton(parent, "CharacterButton", "キャラクター", 0.550f, w, h,
+            CreateSecondaryButton(parent, "CharacterButton", "キャラクター", 0.5f, 0.550f, w, h,
                 () => NavigateTo(ScreenId.CharacterSelect));
-            CreateSecondaryButton(parent, "RankingButton", "ランキング", 0.550f - gap, w, h,
+            CreateSecondaryButton(parent, "RankingButton", "ランキング", 0.5f, 0.550f - gap, w, h,
                 () => NavigateTo(ScreenId.Ranking));
-            CreateSecondaryButton(parent, "ShopButton", "ショップ", 0.550f - gap * 2, w, h,
+            CreateSecondaryButton(parent, "ShopButton", "ショップ", 0.5f, 0.550f - gap * 2, w, h,
                 () => NavigateTo(ScreenId.Shop));
-            CreateSecondaryButton(parent, "AchievementButton", "実績", 0.550f - gap * 3, w, h,
+
+            // ペア行 (実績 / 遊び方)。頻度の低い参照系アクションを1行にまとめて視覚的な階層を付ける。
+            const float pairGap = 0.02f;
+            const float pairW = (w - pairGap) * 0.5f;
+            float pairCy = 0.550f - gap * 3;
+            CreateSecondaryButton(parent, "AchievementButton", "実績",
+                0.5f - pairW * 0.5f - pairGap * 0.5f, pairCy, pairW, h,
                 () => NavigateTo(ScreenId.Achievements));
-            CreateSecondaryButton(parent, "HowToButton", "遊び方", 0.550f - gap * 4, w, h,
+            CreateSecondaryButton(parent, "HowToButton", "遊び方",
+                0.5f + pairW * 0.5f + pairGap * 0.5f, pairCy, pairW, h,
                 () => NavigateTo(ScreenId.Tutorial));
-            CreateSecondaryButton(parent, "SettingsButton", "設定", 0.550f - gap * 5, w, h,
+
+            CreateSecondaryButton(parent, "SettingsButton", "設定", 0.5f, 0.550f - gap * 4, w, h,
                 () => NavigateTo(ScreenId.Settings));
 
-            // 7. 遺物庫 (Phase 5c、MetaShopScreen)。既存の「ショップ」(ScreenId.Shop = IAP でのキャラ購入・
+            // 遺物庫 (Phase 5c、MetaShopScreen)。既存の「ショップ」(ScreenId.Shop = IAP でのキャラ購入・
             // 広告削除) とは別物なので、混同を避けるため「遺物庫」(レリックを集め・管理する場所) と命名する。
-            CreateSecondaryButton(parent, "RelicVaultButton", "遺物庫", 0.550f - gap * 6, w, h,
+            CreateSecondaryButton(parent, "RelicVaultButton", "遺物庫", 0.5f, 0.550f - gap * 5, w, h,
                 () => NavigateTo(ScreenId.MetaShop));
         }
 
         private void CreateSecondaryButton(RectTransform parent, string name, string label,
-            float cy, float w, float h, System.Action onClick)
+            float cx, float cy, float w, float h, System.Action onClick)
         {
-            var btn = UIFactory.TextButton(parent, name, label, 54,
-                UITheme.BackgroundSecondary, UITheme.TextColor, onClick);
-            UIFactory.Place((RectTransform)btn.transform, 0.5f, cy, w, h);
+            CreateElevatedButton(parent, name, label, 54, UITheme.BackgroundSecondary, UITheme.TextColor,
+                cx, cy, w, h, onClick);
+        }
+
+        /// <summary>
+        /// Card (影 + 角丸グラデ) で包んだ TextButton を生成する。HD-2D: 全ボタンを浮かせる (2026-07-06)。
+        /// Card 自体は影+マスク+グラデ+ハイライトの4層コンテナで、TextButton は Card いっぱいに重ねる
+        /// (TextButton 自身の bg 色がそのまま見た目の主色になり、Card は主に影の提供元になる)。
+        /// </summary>
+        private Button CreateElevatedButton(RectTransform parent, string name, string label, int fontSize,
+            Color bg, Color fg, float cx, float cy, float w, float h, System.Action onClick)
+        {
+            RectTransform card = UIFactory.Card(parent, name + "Card", out RectTransform shadow);
+            UIFactory.Place(card, cx, cy, w, h);
+
+            Button btn = UIFactory.TextButton(card, name, label, fontSize, bg, fg, onClick);
+            UIFactory.Place((RectTransform)btn.transform, 0.5f, 0.5f, 1f, 1f);
+            UIFactory.AttachCardPressFeedback(btn.gameObject, shadow);
+
+            return btn;
         }
 
         /// <summary>効果音 → 画面遷移の共通処理 (Swift: GameButton が内部で buttonTap を鳴らすのに対応)</summary>
@@ -233,15 +411,21 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildDailyChallengeButton(RectTransform parent, float w)
         {
-            var btn = UIFactory.TextButton(parent, "DailyChallengeButton", "デイリーチャレンジ", 48,
+            // HD-2D (2026-07-06): Card で包んで影を持たせる。可視切替は Card 全体 (影含む) に対して行う
+            // (中の TextButton だけを隠すと、実体のない影だけが浮いた見た目になってしまうため)。
+            RectTransform card = UIFactory.Card(parent, "DailyChallengeCard", out RectTransform shadow);
+            UIFactory.Place(card, 0.5f, 0.617f, w, 0.05f);
+
+            var btn = UIFactory.TextButton(card, "DailyChallengeButton", "デイリーチャレンジ", 48,
                 UITheme.BackgroundSecondary, UITheme.GoldText, () =>
                 {
                     App.I.Audio.PlaySfx("button_tap");
                     App.I.Router.Show(ScreenId.DailyChallenge);
                 });
             var rt = (RectTransform)btn.transform;
-            UIFactory.Place(rt, 0.5f, 0.617f, w, 0.05f);
-            _dailyButtonRoot = btn.gameObject;
+            UIFactory.Place(rt, 0.5f, 0.5f, 1f, 1f);
+            UIFactory.AttachCardPressFeedback(btn.gameObject, shadow);
+            _dailyButtonRoot = card.gameObject;
 
             // メインラベルを上寄せにして、下段にサブテキストを置く (Swift の 2 行構成を再現)
             _dailyMainLabel = btn.GetComponentInChildren<TextMeshProUGUI>();

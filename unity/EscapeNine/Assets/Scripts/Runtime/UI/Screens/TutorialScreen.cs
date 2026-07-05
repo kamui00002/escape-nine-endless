@@ -40,9 +40,13 @@ namespace EscapeNine.Runtime.UI
         public override ScreenId Id => ScreenId.Tutorial;
 
         // ---- 盤面セルのレイアウト定数 (盤面パネルに対する比率。px ではない) ----
-        private const float CellSpacingRatio = 0.02f;                       // Swift: cellSpacing 6pt 相当
+        // HD-2D (2026-07-06): マスの余白が Game 盤面 (BoardStage、ギャップ比 約17%) の半分以下
+        // しかなく詰まって見える不具合を是正。0.02→0.13 (ゲーム盤面並みの 0.12〜0.15 の範囲)。
+        // CellSizeRatio は CellSpacingRatio から自動導出されるため、この定数変更だけで
+        // セルは自動的に縮み、代わりにマス間の余白が広がる。
+        private const float CellSpacingRatio = 0.13f;                       // 旧: 0.02 (Swift の cellSpacing 6pt 相当は踏襲しない)
         private const float CellSizeRatio = (1f - CellSpacingRatio * 2f) / 3f;
-        private const float SpriteInCellRatio = 0.78f;                      // Swift: cellSize * 0.78
+        private const float SpriteInCellRatio = 0.65f;                      // 旧: 0.78。スプライト周りに余白を作る
 
         /// <summary>1 ページ分の定義。Swift の InstructionCopy + BoardConfig を統合したもの。</summary>
         private sealed class PageDef
@@ -80,6 +84,8 @@ namespace EscapeNine.Runtime.UI
         private Button _nextButton;
         private Image _nextButtonImage;
         private TextMeshProUGUI _nextButtonLabel;
+        // 「はじめる」がロック中の理由ヒント (2026-07-06 追加。最終ページで未クリアの間だけ表示)
+        private TextMeshProUGUI _nextButtonHintLabel;
         private GameObject _turnCounterRoot;
         private TextMeshProUGUI _turnCounterLabel;
         private GameObject _clearLabelRoot; // "CLEAR!" (バースト演出は Phase 4 送り、静的表示)
@@ -331,6 +337,12 @@ namespace EscapeNine.Runtime.UI
             _nextButtonImage = _nextButton.GetComponent<Image>();
             _nextButtonLabel = _nextButton.GetComponentInChildren<TextMeshProUGUI>();
             if (_nextButtonLabel != null) _nextButtonLabel.fontStyle = FontStyles.Bold;
+
+            // ロック理由ヒント (最終ページで未クリアの間だけ UpdateNextButton() が表示する。1行のみ)
+            _nextButtonHintLabel = UIFactory.Label(parent, "NextButtonHint", "", 30,
+                UITheme.WithAlpha(UITheme.TextColor, 0.65f));
+            UIFactory.Place((RectTransform)_nextButtonHintLabel.transform, 0.5f, 0.178f, 0.86f, 0.035f);
+            _nextButtonHintLabel.gameObject.SetActive(false);
         }
 
         // MARK: - ページ表示
@@ -390,6 +402,17 @@ namespace EscapeNine.Runtime.UI
             {
                 _nextButtonImage.color = disabled ? UITheme.WithAlpha(UITheme.Accent, 0.35f) : UITheme.Accent;
             }
+
+            // ロック理由ヒント (2026-07-06 追加): 「はじめる」が押せない理由がその場で分かるように。
+            if (_nextButtonHintLabel != null)
+            {
+                bool showHint = isLast && disabled;
+                if (showHint)
+                {
+                    _nextButtonHintLabel.text = "ミニ盤面で" + TutorialConstants.TutorialClearTurns + "ターン逃げ切ると解放";
+                }
+                _nextButtonHintLabel.gameObject.SetActive(showHint);
+            }
         }
 
         // MARK: - 盤面の構築 (ページ切替・プレイアブルの 1 手ごとに全再構築)
@@ -425,21 +448,21 @@ namespace EscapeNine.Runtime.UI
 
             bool tappable = page.Playable && IsTappable(position);
 
-            RectTransform cell;
+            // HD-2D (2026-07-06): セルを Card 化 (影+角丸グラデ) して立体感を持たせる。
+            // Card() のルートは Panel() 同様の「未配置の親いっぱい RectTransform」で自身の
+            // Image を持たないため、タップ可能セルは中に透明な Panel(bg:Color.clear) を重ねて
+            // そこに Button を付ける (Card 内の装飾レイヤーは raycastTarget=false のため、
+            // タップを受けるグラフィックが別途必要)。
+            RectTransform cell = UIFactory.Card(_board, "Cell" + position, out RectTransform _);
             if (tappable)
             {
-                // タップ可能セルは Panel(bg) + Button (ColorRect は raycastTarget=false 固定のため不可)
-                cell = UIFactory.Panel(_board, "Cell" + position, UITheme.BackgroundSecondary);
-                var button = cell.gameObject.AddComponent<Button>();
-                button.targetGraphic = cell.GetComponent<Image>();
+                RectTransform tapArea = UIFactory.Panel(cell, "TapArea", Color.clear);
+                UIFactory.Place(tapArea, 0.5f, 0.5f, 1f, 1f);
+                var button = tapArea.gameObject.AddComponent<Button>();
+                button.targetGraphic = tapArea.GetComponent<Image>();
                 button.transition = Selectable.Transition.ColorTint;
                 int captured = position; // クロージャに loop 変数を直接渡さないための退避
                 button.onClick.AddListener(() => HandleBoardTap(captured));
-            }
-            else
-            {
-                cell = (RectTransform)UIFactory.ColorRect(_board, "Cell" + position,
-                    UITheme.BackgroundSecondary).transform;
             }
             UIFactory.Place(cell, cx, cy, CellSizeRatio, CellSizeRatio);
 
