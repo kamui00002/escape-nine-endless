@@ -114,7 +114,7 @@ namespace EscapeNine.Runtime.UI
             // img.color = bg の外部契約 (GetComponent<Image>() で拾って動的に色を変える呼び出し元多数)
             // は一切変えない。sprite/type だけを足すことで、既存の色制御コードは無変更のまま
             // 全画面の TextButton が角丸・立体感を得る (UIFactory 一元集約の波及)。
-            img.sprite = ButtonBevelSprite();
+            img.sprite = BevelSprite();
             img.type = Image.Type.Sliced;
             img.color = bg;
 
@@ -200,7 +200,7 @@ namespace EscapeNine.Runtime.UI
         // (メトロノーム音等、本プロジェクトの手続き的生成方針と同じ思想)。
         // ================================================================
 
-        /// <summary>生成済み Sprite のキャッシュ (RoundedSprite/SoftShadowSprite/ButtonBevelSprite 共用)。</summary>
+        /// <summary>生成済み Sprite のキャッシュ (RoundedSprite/SoftShadowSprite/BevelSprite 共用)。</summary>
         private static readonly Dictionary<string, Sprite> _depthSpriteCache = new Dictionary<string, Sprite>();
 
         /// <summary>Card() が使う既定の角丸半径。0 = 角丸なしの四角（オーナー指定: 角丸でなく四角のまま立体に）。
@@ -285,17 +285,22 @@ namespace EscapeNine.Runtime.UI
         }
 
         /// <summary>
-        /// TextButton() 専用の角丸ベベル Sprite (上をわずかに明るく・下をわずかに暗く baked した白ベース)。
-        /// Image.color の外部 tint (bg) と乗算されるため、呼び出し側がどんな色を渡しても
-        /// 「上からの光」を感じる立体感が乗る。VerticalGradientSprite と役割が違う (こちらは
-        /// 角丸マスクと明暗を 1 枚に焼き込み、TextButton の単一 Image という既存構造を変えずに使える)。
+        /// 角丸(または四角)矩形に上明下暗の縦グラデを焼き込んだ tintable な Sprite (9-slice、キャッシュ)。
+        /// 元は TextButton() 専用の ButtonBevelSprite (固定比率 topBrightness=1/bottomBrightness=0.80)
+        /// だったものを汎用公開化した (HD-2D、2026-07-06: ビートバーのゲージ表現にも同じ
+        /// 「上明下暗/上暗下明」の質感を使い回すため)。Image.color の外部 tint と乗算されるため、
+        /// 呼び出し側がどんな色を渡しても立体感が乗る。VerticalGradientSprite と役割が違う (こちらは
+        /// グレースケール1枚をマスクごと焼き込み、外部から自由に tint できる単一 Image で使える)。
+        /// topBrightness/bottomBrightness の差を大きくするほどコントラストの強い質感になる。
         /// </summary>
-        private static Sprite ButtonBevelSprite(int cornerRadiusPx = 0, int sizePx = 64)
+        public static Sprite BevelSprite(int cornerRadiusPx = 0, int sizePx = 64,
+            float topBrightness = 1f, float bottomBrightness = 0.80f)
         {
-            string key = "Bevel_" + cornerRadiusPx + "_" + sizePx;
+            string key = "Bevel_" + cornerRadiusPx + "_" + sizePx + "_"
+                + Mathf.RoundToInt(topBrightness * 1000) + "_" + Mathf.RoundToInt(bottomBrightness * 1000);
             if (_depthSpriteCache.TryGetValue(key, out Sprite cached)) return cached;
 
-            Texture2D tex = GenerateRoundedRectTexture(sizePx, cornerRadiusPx, 2f, 1f, 0.80f);
+            Texture2D tex = GenerateRoundedRectTexture(sizePx, cornerRadiusPx, 2f, topBrightness, bottomBrightness);
             float border = cornerRadiusPx + 2f;
             Sprite sprite = Sprite.Create(tex, new Rect(0, 0, sizePx, sizePx), new Vector2(0.5f, 0.5f),
                 1f, 0, SpriteMeshType.FullRect, new Vector4(border, border, border, border));
@@ -307,7 +312,7 @@ namespace EscapeNine.Runtime.UI
         /// 角丸矩形の signed-distance ベースアルファマスクを焼き込んだテクスチャを生成する。
         /// feather (px) の分だけ境界を smoothstep でぼかす (RoundedSprite は 2px = AA 目的のみ、
         /// SoftShadowSprite は 20px 前後 = 本格的なぼかし)。topBrightness/bottomBrightness で
-        /// RGB に縦グラデの明度を焼き込める (ButtonBevelSprite が使用。RoundedSprite/SoftShadowSprite
+        /// RGB に縦グラデの明度を焼き込める (BevelSprite が使用。RoundedSprite/SoftShadowSprite
         /// は両方 1 = 均一な白)。
         /// </summary>
         private static Texture2D GenerateRoundedRectTexture(int sizePx, float cornerRadiusPx, float featherPx,
@@ -449,6 +454,55 @@ namespace EscapeNine.Runtime.UI
                 float extra = pressed ? ShadowPressExtra : ShadowRestExtra;
                 Place(Shadow, 0.5f + dx, 0.5f - dy, 1f + extra, 1f + extra);
             }
+        }
+
+        /// <summary>
+        /// 矩形の四辺に薄い縁取りを敷く (HD-2D、2026-07-06: サブボタン/HUD パネルに「枠付き」の
+        /// 質感を足す最小実装)。角丸には対応しない (cornerRadiusPx=0 の四角前提、
+        /// DefaultCardCornerRadiusPx 参照) ため、4本の ColorRect のみで構成する。
+        /// Card()/TextButton() が完成した後に「後乗せの兄弟レイヤー」として呼ぶこと
+        /// (uGUI は後に生成した要素ほど手前に描画されるため、TextButton の不透明な塗りの上からでも
+        /// 縁だけは見えるようになる)。raycastTarget は ColorRect() の既定どおり false でタップを遮らない。
+        /// thicknessRatioH: 上下辺の太さ (親の高さに対する比率)。thicknessRatioV: 左右辺の太さ
+        /// (親の幅に対する比率)。本プロジェクトのボタンは横に長い矩形が多いため既定値は非対称。
+        /// </summary>
+        public static void BorderTrim(Transform parent, string name, Color color, float alpha,
+            float thicknessRatioH = 0.02f, float thicknessRatioV = 0.003f)
+        {
+            Color c = UITheme.WithAlpha(color, alpha);
+
+            var top = ColorRect(parent, name + "_BorderTop", c);
+            Place((RectTransform)top.transform, 0.5f, 1f - thicknessRatioH * 0.5f, 1f, thicknessRatioH);
+
+            var bottom = ColorRect(parent, name + "_BorderBottom", c);
+            Place((RectTransform)bottom.transform, 0.5f, thicknessRatioH * 0.5f, 1f, thicknessRatioH);
+
+            var left = ColorRect(parent, name + "_BorderLeft", c);
+            Place((RectTransform)left.transform, thicknessRatioV * 0.5f, 0.5f, thicknessRatioV, 1f);
+
+            var right = ColorRect(parent, name + "_BorderRight", c);
+            Place((RectTransform)right.transform, 1f - thicknessRatioV * 0.5f, 0.5f, thicknessRatioV, 1f);
+        }
+
+        /// <summary>
+        /// BorderTrim に「上辺ハイライト線 + 下辺シャドウ線」を足した、ボタン向けの一段強いエンボス装飾
+        /// (HD-2D、2026-07-06: Home 画面のサブボタンが背景と同化して見えなくなる問題の修正で使用)。
+        /// 「彫られた木の看板」を意図した表現: 上は明るい縁取り線、下は暗い影線、全周は細いゴールド系の
+        /// 縁取り。既存の TextButton/Card の Image.color 契約は一切変更しない (すべて後乗せの
+        /// 装飾専用レイヤーとして追加するのみ)。
+        /// </summary>
+        public static void EmbossTrim(Transform parent, string name, Color highlightColor, Color borderColor,
+            float highlightAlpha = 0.42f, float shadowAlpha = 0.26f, float borderAlpha = 0.55f,
+            float highlightHeightRatio = 0.12f, float shadowHeightRatio = 0.16f,
+            float borderThicknessRatioH = 0.02f, float borderThicknessRatioV = 0.003f)
+        {
+            var hi = ColorRect(parent, name + "_Highlight", UITheme.WithAlpha(highlightColor, highlightAlpha));
+            Place((RectTransform)hi.transform, 0.5f, 1f - highlightHeightRatio * 0.5f, 1f, highlightHeightRatio);
+
+            var sh = ColorRect(parent, name + "_Shadow", UITheme.WithAlpha(Color.black, shadowAlpha));
+            Place((RectTransform)sh.transform, 0.5f, shadowHeightRatio * 0.5f, 1f, shadowHeightRatio);
+
+            BorderTrim(parent, name, borderColor, borderAlpha, borderThicknessRatioH, borderThicknessRatioV);
         }
 
         // ---- 内部実装 ----

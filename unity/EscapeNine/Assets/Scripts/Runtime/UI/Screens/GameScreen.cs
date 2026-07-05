@@ -264,13 +264,12 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildHeader(RectTransform parent)
         {
-            var back = UIFactory.TextButton(parent, "BackButton", "< 戻る", 38,
-                UITheme.BackgroundSecondary, UITheme.TextColor, HandleBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.16f, 0.968f, 0.26f, 0.036f);
+            // HD-2D (2026-07-06): 「戻る」「一時停止」に Card ミニクロームを付ける。旧実装は
+            // UITheme.BackgroundSecondary の flat 塗りで、画面背景 (#2c1810) とほぼ同色になり
+            // 「タップできるボタン」に見えない問題があった (Home のサブボタンと同じ根本原因)。
+            CreateHudButton(parent, "BackButton", "< 戻る", 38, 0.16f, 0.968f, 0.26f, 0.036f, HandleBackTapped);
 
-            var pause = UIFactory.TextButton(parent, "PauseButton", "一時停止", 38,
-                UITheme.BackgroundSecondary, UITheme.TextColor, HandlePauseTapped);
-            UIFactory.Place((RectTransform)pause.transform, 0.82f, 0.968f, 0.30f, 0.036f);
+            var pause = CreateHudButton(parent, "PauseButton", "一時停止", 38, 0.82f, 0.968f, 0.30f, 0.036f, HandlePauseTapped);
             _pauseButtonLabel = pause.GetComponentInChildren<TextMeshProUGUI>();
 
             // Phase 5a: 所持レリック数カウンタ。Back(cx=0.16,w=0.26)/Pause(cx=0.82,w=0.30) の間の
@@ -278,6 +277,25 @@ namespace EscapeNine.Runtime.UI
             _relicCountLabel = UIFactory.Label(parent, "RelicCount", "", 32, UITheme.GoldText,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)_relicCountLabel.transform, 0.5f, 0.968f, 0.30f, 0.036f);
+        }
+
+        /// <summary>
+        /// ヘッダーの小さめボタン (戻る/一時停止) 向けの Card ミニクローム。HomeScreen の
+        /// CreateElevatedButton と同じ発想 (影+縁取りでタップ可能な質感を出す) をこの画面用に移植する。
+        /// 塗りは UITheme.ButtonFill に統一し、Home のサブボタンと同じ理由で背景埋没を防ぐ。
+        /// </summary>
+        private Button CreateHudButton(RectTransform parent, string name, string label, int fontSize,
+            float cx, float cy, float w, float h, System.Action onClick)
+        {
+            RectTransform card = UIFactory.Card(parent, name + "Card", out RectTransform shadow);
+            UIFactory.Place(card, cx, cy, w, h);
+
+            Button btn = UIFactory.TextButton(card, name, label, fontSize, UITheme.ButtonFill, UITheme.TextColor, onClick);
+            UIFactory.Place((RectTransform)btn.transform, 0.5f, 0.5f, 1f, 1f);
+            UIFactory.AttachCardPressFeedback(btn.gameObject, shadow);
+            UIFactory.BorderTrim(btn.transform, name + "Border", UITheme.Accent, 0.5f);
+
+            return btn;
         }
 
         // MARK: - Top Info (Swift: BPMInfoView + BeatIndicatorView + comboDisplay + turnAndSkillInfo)

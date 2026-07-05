@@ -62,6 +62,29 @@ namespace EscapeNine.Runtime.UI
         /// <summary>disappeared #1a1a1a 消失マスの色 (特殊ルール: マス消失)</summary>
         public static readonly Color Disappeared = Hex("#1a1a1a");
 
+        // ---- HD-2D ボタン/タイトル装飾色 (2026-07-06 追加) ----
+        // オーナー実機確認で「サブボタンが背景と同色で見えない」(BackgroundSecondary #3d2817 が
+        // 背景 #2c1810 とほぼ同明度) と指摘された修正のための専用色。既存の Main/Accent 等の
+        // 汎用色と役割が違う (ボタンの塗り/縁取り専用) ため、用途名で新規に定義する。
+
+        /// <summary>buttonFill #6b4a30: Home画面のサブボタン塗り色。背景 (#2c1810) から明度差を確保する
+        /// ため BackgroundSecondary より明確に明るい暖色にした。TextButton の BevelSprite (旧
+        /// ButtonBevelSprite) が上明下暗のベベルを自動で焼き込むため、この1色を渡すだけで
+        /// 「上が明るく下がやや暗い」木目調のグラデ塗りになる。</summary>
+        public static readonly Color ButtonFill = Hex("#6b4a30");
+
+        /// <summary>buttonHighlightLine #9a7550: ボタン上辺のハイライト線色 (エンボス表現)。</summary>
+        public static readonly Color ButtonHighlightLine = Hex("#9a7550");
+
+        /// <summary>titleGradientTop #ffe27a: タイトルロゴの金グラデ上端 (明るいメタリックゴールド)。</summary>
+        public static readonly Color TitleGradientTop = Hex("#ffe27a");
+
+        /// <summary>titleGradientBottom #d4901f: タイトルロゴの金グラデ下端。</summary>
+        public static readonly Color TitleGradientBottom = Hex("#d4901f");
+
+        /// <summary>titleOutline #1a0e08: タイトルロゴの太いアウトライン色 (濃茶)。</summary>
+        public static readonly Color TitleOutline = Hex("#1a0e08");
+
         // ---- フォント ----
 
         private static Font _font;

@@ -31,14 +31,21 @@ namespace EscapeNine.Runtime.UI
 
         public BPMInfoWidget(Transform parent)
         {
-            // 背景パネル (Swift: RoundedRectangle + available/main のグラデ枠 → 単色簡略化 Phase 4)
-            Rect = UIFactory.Panel(parent, "BPMInfo", UITheme.BackgroundSecondary);
+            // 背景パネル (Swift: RoundedRectangle + available/main のグラデ枠)。HD-2D (2026-07-06):
+            // 「枠付き計器パネル」化のため Panel → Card に変更。Card() は「子を後から足す」使い方が前提
+            // (呼び出し側コメント参照) のため、以下の BuildColumn/BuildDivider をそのまま子として重ねる
+            // だけで、Card 内部のグラデ/上辺ハイライトが (TextButton のような不透明な全面カバーが無いため)
+            // 自然に透けて見える。色は既定 (BackgroundSecondary→Background) のまま = 微グラデ狙い。
+            Rect = UIFactory.Card(parent, "BPMInfo", out _);
 
             _floorValue = BuildColumn(Rect, "Floor", "階層", 0.18f, UITheme.Available);
             BuildDivider(Rect, "Divider1", 0.345f);
             _bpmValue = BuildColumn(Rect, "BPM", "BPM", 0.50f, UITheme.GoldText);
             BuildDivider(Rect, "Divider2", 0.655f);
             _speedValue = BuildColumn(Rect, "Speed", "速度", 0.82f, UITheme.Success);
+
+            // 計器パネルらしい縁取り (HD-2D、2026-07-06): ゴールデンロッドの細い枠を全周に。
+            UIFactory.BorderTrim(Rect, "BPMInfoBorder", UITheme.Accent, 0.55f);
         }
 
         /// <summary>階層と BPM を反映する。速度レベルは BPM から導出 (Swift: speedLevel/speedColor)。</summary>
@@ -90,6 +97,12 @@ namespace EscapeNine.Runtime.UI
         private static TextMeshProUGUI BuildColumn(RectTransform parent, string name, string caption,
             float cx, Color valueColor)
         {
+            // 列見出しの色アクセント (HD-2D、2026-07-06): 値の色と揃えた小さな四角を見出しの上に置き、
+            // 「計器パネル」の各列を一目で区別しやすくする (ピクセルアイコンまでは作り込まず、手続き生成の
+            // 単色スクエアに留める = 新しいスプライト種別を増やさない最小実装)。
+            var accent = UIFactory.ColorRect(parent, name + "Accent", UITheme.WithAlpha(valueColor, 0.85f));
+            UIFactory.Place((RectTransform)accent.transform, cx, 0.90f, 0.05f, 0.045f);
+
             var cap = UIFactory.Label(parent, name + "Caption", caption, 30,
                 UITheme.WithAlpha(UITheme.TextColor, 0.6f));
             UIFactory.Place((RectTransform)cap.transform, cx, 0.72f, 0.28f, 0.36f);

@@ -65,18 +65,35 @@ namespace EscapeNine.Runtime.UI
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)widget._countLabel.transform, 0.5f, 0.66f, 0.5f, 0.62f);
 
-            // 拍進行ゲージ (Swift: プログレスリングの代替バー)
-            var barBg = UIFactory.ColorRect(root, "BeatBarBg", UITheme.WithAlpha(UITheme.GridBorder, 0.2f));
+            // 拍進行ゲージ (Swift: プログレスリングの代替バー)。HD-2D (2026-07-06): 「枠付きゲージ」化
+            // (凹んだトラック + 上明下暗の tintable ベベルフィル + 縁取り)。Render() が毎回
+            // 差し替える動的な色ロジック (_barFillImage.color = _currentColor、拍の進行に応じて
+            // 金/橙/赤に切り替わる既存の「動き」) は一切変更しない — BevelSprite はグレースケールの
+            // テクスチャを Image.color で乗算 tint する設計なので、単に色を差し替えるだけで
+            // 従来どおりの動的カラーの上にベベルの質感が乗る。
+            var barBg = UIFactory.FillImage(root, "BeatBarBg", UIFactory.BevelSprite(0, 64, 0.55f, 1f), Image.Type.Simple);
+            barBg.color = UITheme.WithAlpha(UITheme.Background, 0.95f); // 凹んだトラック地 (上暗下明で「くぼみ」感)
+            barBg.raycastTarget = false;
             RectTransform barRt = (RectTransform)barBg.transform;
             UIFactory.Place(barRt, 0.5f, 0.28f, 0.6f, 0.08f);
 
-            widget._barFillImage = UIFactory.ColorRect(barRt, "Fill", UITheme.Available);
+            widget._barFillImage = UIFactory.FillImage(barRt, "Fill", UIFactory.BevelSprite(0, 64, 1f, 0.5f), Image.Type.Simple);
+            widget._barFillImage.color = UITheme.Available; // Render() が拍ごとに上書きする初期値
+            widget._barFillImage.raycastTarget = false;
             widget._barFill = (RectTransform)widget._barFillImage.transform;
             // fill はバー内で左詰め: anchorMax.x を進行率で動かす (固定 px を使わない伸縮)
             widget._barFill.anchorMin = Vector2.zero;
             widget._barFill.anchorMax = Vector2.one;
             widget._barFill.offsetMin = Vector2.zero;
             widget._barFill.offsetMax = Vector2.zero;
+
+            // 枠 (HD-2D、2026-07-06): ゴールデンロッドの細い縁取りでゲージの輪郭を強調。
+            // BorderTrim のデフォルト比率 (thicknessRatioH=0.02) はこのバーの実ピクセル高 (~29px) だと
+            // 上下 0.6px 相当でサブピクセル化し見えなくなる (レビュー指摘)。このバーは横長 (幅>>高さ)
+            // なので、上下比率を高さ向けに引き上げ・左右比率をわずかに太らせて、四辺がほぼ均等な
+            // 太さ (実測 ~2px 相当) に見えるよう個別調整する。
+            UIFactory.BorderTrim(barRt, "BeatBarBorder", UITheme.Accent, 0.5f,
+                thicknessRatioH: 0.07f, thicknessRatioV: 0.0045f);
 
             // ターン進行ドット行 (Swift: Turn indicator dots。円→矩形の簡略化は Phase 4 で解消)
             widget._dotsRow = UIFactory.Panel(root, "TurnDots");

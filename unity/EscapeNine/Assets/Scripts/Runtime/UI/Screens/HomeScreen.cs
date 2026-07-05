@@ -58,6 +58,12 @@ namespace EscapeNine.Runtime.UI
         private const float TitleShadowDx = 0.004f;
         private const float TitleShadowDy = 0.006f;
 
+        // HD-2D (2026-07-06): タイトルをロゴ化する一環で一回り大きくする (110→122)。
+        // 高さ比率もフォントサイズ増に合わせて拡張 (0.06→0.068)。フロート演出 (TitleFloatRoutine) 側の
+        // Place() 呼び出しもこの定数を使うよう揃える (でないとフロートのたびに旧サイズへ戻ってしまう)。
+        private const int TitleFontSize = 122;
+        private const float TitleHeightRatio = 0.068f;
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private TextMeshProUGUI _dbgFloorValueLabel;    // 開始階層の現在値
         private TextMeshProUGUI _dbgBpmValueLabel;      // BPMオーバーライドの現在値
@@ -163,23 +169,77 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildTitleSection(RectTransform parent)
         {
+            // HD-2D (2026-07-06): タイトルを「看板/ロゴ」に格上げする一環でグローを追加。
+            // 手続き生成の SoftShadowSprite を暖色(ゴールド)で薄く敷き、本体より一回り大きく・中心は
+            // 同じ位置に置く。シェーダー/フォント機能に依存しない確実な「輝き」表現 (DotGothic16 の
+            // 動的生成フォントで TMP のアウトライン/underlay が効かない場合でも、このレイヤーだけで
+            // 最低限の立体感は確保できる保険を兼ねる)。
+            var titleGlow = UIFactory.FillImage(parent, "TitleGlow", UIFactory.SoftShadowSprite(40, 128, 46));
+            titleGlow.color = UITheme.WithAlpha(UITheme.GoldText, 0.28f);
+            titleGlow.raycastTarget = false;
+            UIFactory.Place((RectTransform)titleGlow.transform, 0.5f, TitleBaseCy, 1.04f, TitleHeightRatio + 0.05f);
+
             // 影 (奥行き): 本体よりわずかに右下・暗色の複製を先に敷いてから本体を重ねる
             // (シェーダー不要の疑似ドロップシャドウ。HD-2D、2026-07-06 追加)。
-            var titleShadow = UIFactory.Label(parent, "TitleShadow", "ESCAPE NINE", 110,
-                UITheme.WithAlpha(Color.black, 0.35f), TextAnchor.MiddleCenter, FontStyle.Bold);
+            var titleShadow = UIFactory.Label(parent, "TitleShadow", "ESCAPE NINE", TitleFontSize,
+                UITheme.WithAlpha(Color.black, 0.4f), TextAnchor.MiddleCenter, FontStyle.Bold);
             _titleShadowRt = (RectTransform)titleShadow.transform;
-            UIFactory.Place(_titleShadowRt, 0.5f + TitleShadowDx, TitleBaseCy - TitleShadowDy, 0.94f, 0.06f);
+            UIFactory.Place(_titleShadowRt, 0.5f + TitleShadowDx, TitleBaseCy - TitleShadowDy, 0.94f, TitleHeightRatio);
 
-            // グラデーション / グロー / シマー演出は Phase 4 (juice) 送り。
-            // 色は Swift の available (ゴールド) を採用。ごく緩い上下フロートのみ追加 (演出用、拍非同期)。
-            var title = UIFactory.Label(parent, "TitleLabel", "ESCAPE NINE", 110, UITheme.Available,
+            // 本体: メタリックゴールドの縦グラデ (TMP のメッシュ頂点カラー機能。シェーダーに依存せず
+            // 確実に効く) + 太めの暗色アウトライン (TMP マテリアルのシェーダー機能。DotGothic16 の
+            // 動的生成フォントが対応するかは実機確認が必要なため HasProperty で防御し、非対応でも
+            // 例外や警告を出さず「効かないだけ」に留める。代替の立体感は上のグロー/影レイヤーが担保する)。
+            var title = UIFactory.Label(parent, "TitleLabel", "ESCAPE NINE", TitleFontSize, UITheme.Available,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             _titleLabelRt = (RectTransform)title.transform;
-            UIFactory.Place(_titleLabelRt, 0.5f, TitleBaseCy, 0.94f, 0.06f);
+            UIFactory.Place(_titleLabelRt, 0.5f, TitleBaseCy, 0.94f, TitleHeightRatio);
+            ApplyTitleGoldGradientAndOutline(title);
 
             var subtitle = UIFactory.Label(parent, "SubtitleLabel", "Endless Dungeon", 52,
                 UITheme.WithAlpha(UITheme.TextColor, 0.8f));
             UIFactory.Place((RectTransform)subtitle.transform, 0.5f, 0.862f, 0.8f, 0.03f);
+
+            BuildTitleDivider(parent);
+        }
+
+        /// <summary>
+        /// タイトルの金グラデ+アウトライン (HD-2D、2026-07-06)。enableVertexGradient は TMP のメッシュ
+        /// 頂点カラーのみで完結する機能のためシェーダーに依存せず確実に効く。アウトラインはマテリアルの
+        /// シェーダー機能 (_OutlineWidth/_OutlineColor) 依存のため、HasProperty で防御した上で設定する。
+        /// title.fontMaterial (fontSharedMaterial ではない) を使うことで、このラベル1個体だけに
+        /// マテリアルのインスタンスを複製させ、他の全 TMP テキスト (共有 FontAsset 経由) へ
+        /// 副作用が及ばないようにする。
+        /// </summary>
+        private static void ApplyTitleGoldGradientAndOutline(TextMeshProUGUI title)
+        {
+            // colorGradient は color と乗算されるため、意図した色をそのまま出すには白にしておく。
+            title.color = Color.white;
+            title.enableVertexGradient = true;
+            title.colorGradient = new VertexGradient(UITheme.TitleGradientTop, UITheme.TitleGradientTop,
+                UITheme.TitleGradientBottom, UITheme.TitleGradientBottom);
+
+            Material mat = title.fontMaterial;
+            if (mat != null && mat.HasProperty(ShaderUtilities.ID_OutlineWidth))
+            {
+                mat.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.22f);
+                mat.SetColor(ShaderUtilities.ID_OutlineColor, UITheme.TitleOutline);
+            }
+        }
+
+        /// <summary>タイトル下の装飾区切り (二重線 + 中央の小さな菱形)。HD-2D ロゴ化の一部 (2026-07-06)。</summary>
+        private static void BuildTitleDivider(RectTransform parent)
+        {
+            var lineTop = UIFactory.ColorRect(parent, "TitleDividerTop", UITheme.WithAlpha(UITheme.Accent, 0.6f));
+            UIFactory.Place((RectTransform)lineTop.transform, 0.5f, 0.840f, 0.30f, 0.0028f);
+
+            var lineBottom = UIFactory.ColorRect(parent, "TitleDividerBottom", UITheme.WithAlpha(UITheme.Accent, 0.35f));
+            UIFactory.Place((RectTransform)lineBottom.transform, 0.5f, 0.834f, 0.20f, 0.0018f);
+
+            var diamond = UIFactory.ColorRect(parent, "TitleDividerDiamond", UITheme.WithAlpha(UITheme.GoldText, 0.85f));
+            var diamondRt = (RectTransform)diamond.transform;
+            UIFactory.Place(diamondRt, 0.5f, 0.837f, 0.016f, 0.007f);
+            diamondRt.localRotation = Quaternion.Euler(0f, 0f, 45f);
         }
 
         // MARK: - Character Section (Swift 版 HomeView には無い。タスク要件「キャラ表示」による意図的追加)
@@ -289,18 +349,18 @@ namespace EscapeNine.Runtime.UI
                 {
                     t += 0.08f;
                     float offsetY = Mathf.Sin(t * 0.6f) * 0.0016f;
-                    if (_titleLabelRt != null) UIFactory.Place(_titleLabelRt, 0.5f, TitleBaseCy + offsetY, 0.94f, 0.06f);
+                    if (_titleLabelRt != null) UIFactory.Place(_titleLabelRt, 0.5f, TitleBaseCy + offsetY, 0.94f, TitleHeightRatio);
                     if (_titleShadowRt != null)
                     {
-                        UIFactory.Place(_titleShadowRt, 0.5f + TitleShadowDx, TitleBaseCy - TitleShadowDy + offsetY, 0.94f, 0.06f);
+                        UIFactory.Place(_titleShadowRt, 0.5f + TitleShadowDx, TitleBaseCy - TitleShadowDy + offsetY, 0.94f, TitleHeightRatio);
                     }
                 }
                 else
                 {
-                    if (_titleLabelRt != null) UIFactory.Place(_titleLabelRt, 0.5f, TitleBaseCy, 0.94f, 0.06f);
+                    if (_titleLabelRt != null) UIFactory.Place(_titleLabelRt, 0.5f, TitleBaseCy, 0.94f, TitleHeightRatio);
                     if (_titleShadowRt != null)
                     {
-                        UIFactory.Place(_titleShadowRt, 0.5f + TitleShadowDx, TitleBaseCy - TitleShadowDy, 0.94f, 0.06f);
+                        UIFactory.Place(_titleShadowRt, 0.5f + TitleShadowDx, TitleBaseCy - TitleShadowDy, 0.94f, TitleHeightRatio);
                     }
                 }
                 yield return wait;
@@ -319,11 +379,18 @@ namespace EscapeNine.Runtime.UI
             // 新: 6行 gap=0.052 (約30%、クリアランス0.015)。並び順は Swift 正本どおり維持。
             const float gap = 0.052f;
 
-            // 1. 冒険を始める (primary: 明色背景 + 濃色文字。glow/pulse は Phase 4 送り)
+            // 1. 冒険を始める (primary: 明色背景 + 濃色文字)。HD-2D (2026-07-06): 主役感を一段強めるため
+            // 背後にゴールドの柔らかいグロー + 前面にゴールドの縁取りを追加 (金基調そのものは変えない)。
+            var playGlow = UIFactory.FillImage(parent, "PlayGlow", UIFactory.SoftShadowSprite(40, 128, 40));
+            playGlow.color = UITheme.WithAlpha(UITheme.GoldText, 0.22f);
+            playGlow.raycastTarget = false;
+            UIFactory.Place((RectTransform)playGlow.transform, 0.5f, 0.685f, w + 0.07f, 0.06f + 0.035f);
+
             Button play = CreateElevatedButton(parent, "PlayButton", "冒険を始める", 60,
                 UITheme.Main, UITheme.Background, 0.5f, 0.685f, w, 0.06f, TriggerPlay);
             var playLabel = play.GetComponentInChildren<TextMeshProUGUI>();
             if (playLabel != null) playLabel.fontStyle = FontStyles.Bold;
+            UIFactory.BorderTrim(play.transform, "PlayBorder", UITheme.GoldText, 0.7f);
 
             // 2. デイリーチャレンジ (Swift: highestFloor >= 10 のときだけ表示。可視制御は RefreshDynamic)
             BuildDailyChallengeButton(parent, w);
@@ -358,11 +425,19 @@ namespace EscapeNine.Runtime.UI
                 () => NavigateTo(ScreenId.MetaShop));
         }
 
+        /// <summary>
+        /// HD-2D (2026-07-06) 実機確認で判明した最優先の修正: サブボタンの塗りが背景 (#2c1810) と
+        /// ほぼ同じ暗さの UITheme.BackgroundSecondary (#3d2817) だったため、ボタンが背景に埋もれて
+        /// 見えなくなっていた。塗りを明確に明るい UITheme.ButtonFill に差し替え、さらに
+        /// EmbossTrim (上のハイライト線 + 下の影線 + ゴールデンロッドの縁取り) で「彫られた木の看板」風の
+        /// 質感を足す。押下時の影縮みフィードバック (CreateElevatedButton 内) はそのまま維持される。
+        /// </summary>
         private void CreateSecondaryButton(RectTransform parent, string name, string label,
             float cx, float cy, float w, float h, System.Action onClick)
         {
-            CreateElevatedButton(parent, name, label, 54, UITheme.BackgroundSecondary, UITheme.TextColor,
+            Button btn = CreateElevatedButton(parent, name, label, 54, UITheme.ButtonFill, UITheme.TextColor,
                 cx, cy, w, h, onClick);
+            UIFactory.EmbossTrim(btn.transform, name + "Emboss", UITheme.ButtonHighlightLine, UITheme.Accent);
         }
 
         /// <summary>
@@ -416,8 +491,10 @@ namespace EscapeNine.Runtime.UI
             RectTransform card = UIFactory.Card(parent, "DailyChallengeCard", out RectTransform shadow);
             UIFactory.Place(card, 0.5f, 0.617f, w, 0.05f);
 
+            // HD-2D (2026-07-06): 塗りを ButtonFill に (旧 BackgroundSecondary は背景と同化して見えなく
+            // なる問題があった。CreateSecondaryButton と同じ修正、詳細はそちらのコメント参照)。
             var btn = UIFactory.TextButton(card, "DailyChallengeButton", "デイリーチャレンジ", 48,
-                UITheme.BackgroundSecondary, UITheme.GoldText, () =>
+                UITheme.ButtonFill, UITheme.GoldText, () =>
                 {
                     App.I.Audio.PlaySfx("button_tap");
                     App.I.Router.Show(ScreenId.DailyChallenge);
@@ -444,6 +521,8 @@ namespace EscapeNine.Runtime.UI
             var badgeText = UIFactory.Label((RectTransform)_dailyNewBadge.transform, "NewBadgeLabel", "NEW", 26,
                 Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)badgeText.transform, 0.5f, 0.5f, 1f, 1f);
+
+            UIFactory.EmbossTrim(rt, "DailyEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
         }
 
         /// <summary>デイリーチャレンジボタンの完了状態表示。Swift: HomeView.swift:212-243 の isCompleted 分岐。</summary>
