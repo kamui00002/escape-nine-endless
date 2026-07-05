@@ -52,13 +52,22 @@ namespace EscapeNine.Core
         public const int MaxRelicsPerRun = 4;
 
         /// <summary>
+        /// レリック機能自体を解放する最小クリア済み階層 (RELIC_COHERENCE_AUDIT.md §4「レリック自体を
+        /// 階層10クリア後に解放」)。この階層をクリアするまではドラフトを一切提示しない
+        /// (= 階層10クリア後の最初のドラフトから解放)。序盤の体験を守る初回クリア特例
+        /// (clearedFloor &lt;= 1 は常に true) より優先して評価する。
+        /// </summary>
+        public const int RelicUnlockFloor = 10;
+
+        /// <summary>
         /// 階層クリア時にドラフトを提示すべきか判定する。GameController (本番) と
         /// unity/verify/Sim (バランスシミュレーション) の両方から呼ばれる共通ロジック。
         ///
         /// 判定ルール:
+        /// - クリア済み階層がまだ解放階層 (relicUnlockFloor) 未満なら、常に false。
         /// - 所持数が上限に達していたら、常に false (以後そのランではドラフト提示しない)。
         /// - 序盤の体験 (最初のクリアで必ず1個もらえる) を守るため、初回クリア (clearedFloor &lt;= 1) は
-        ///   上限未達なら常に true。
+        ///   上限未達なら常に true (ただし解放階層のゲートを通過している場合のみ)。
         /// - それ以外は「clearedFloor が draftInterval の倍数」のときのみ true。
         /// </summary>
         /// <param name="clearedFloor">
@@ -71,13 +80,19 @@ namespace EscapeNine.Core
         /// 定数を書き換えずに一時的な値を明示的に渡して複数組を比較する。
         /// </param>
         /// <param name="maxRelicsPerRun">省略時は本番既定値 (MaxRelicsPerRun)。用途は draftInterval と同様。</param>
+        /// <param name="relicUnlockFloor">
+        /// 省略時は本番既定値 (RelicUnlockFloor)。draftInterval/maxRelicsPerRun と同様、テストや
+        /// 将来の実験モードのみ明示的な値を渡す。
+        /// </param>
         /// <remarks>draftInterval は 1 以上を前提とする (0 を渡すと clearedFloor >= 2 で0除算)。</remarks>
         public static bool ShouldOfferDraft(
             int clearedFloor,
             int ownedRelicCount,
             int draftInterval = DraftInterval,
-            int maxRelicsPerRun = MaxRelicsPerRun)
+            int maxRelicsPerRun = MaxRelicsPerRun,
+            int relicUnlockFloor = RelicUnlockFloor)
         {
+            if (clearedFloor < relicUnlockFloor) return false;
             if (ownedRelicCount >= maxRelicsPerRun) return false;
             if (clearedFloor <= 1) return true;
             return clearedFloor % draftInterval == 0;

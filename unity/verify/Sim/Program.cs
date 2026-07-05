@@ -501,11 +501,14 @@ namespace EscapeNine.Sim
             }
             if (candidates.Count == 0) return false;
 
-            // 文脈の弱点タグ: 盗賊=ThiefRescue / Hard選択=HardAICounter / 次階層41+=LateGame
+            // 文脈の弱点タグ: 盗賊=ThiefRescue / Hard選択=HardAICounter / 次階層41+=RequiresDisappear
+            // (RELIC_COHERENCE_AUDIT.md §3の是正で LateGame は RequiresFog/RequiresDisappear に分割された。
+            // ここは分割前の「次階層41+」判定をそのまま踏襲するリネームのみで、ヒューリスティック自体は
+            // 変更しない — Sim はバランス調整専用ツールであり本タスクのスコープ外のため。)
             RelicTag contextTags = RelicTag.None;
             if (s.CurrentCharacter.Type == CharacterType.Thief) contextTags |= RelicTag.ThiefRescue;
             if (s.SelectedAILevel == AILevel.Hard) contextTags |= RelicTag.HardAICounter;
-            if (s.CurrentFloor + 1 >= GameConfig.DisappearStartFloor) contextTags |= RelicTag.LateGame;
+            if (s.CurrentFloor + 1 >= GameConfig.DisappearStartFloor) contextTags |= RelicTag.RequiresDisappear;
 
             var best = candidates[0];
             int bestScore = TagMatchCount(best.Tags, contextTags);

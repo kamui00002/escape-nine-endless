@@ -16,17 +16,25 @@ namespace EscapeNine.Core
         Legendary
     }
 
-    /// <summary>弱点タグ。§2.2。1つのレリックが複数タグを持ちうるため [Flags]。</summary>
+    /// <summary>
+    /// 弱点タグ。§2.2。1つのレリックが複数タグを持ちうるため [Flags]。
+    ///
+    /// RELIC_COHERENCE_AUDIT.md §2-D/§3 の是正: 旧 `LateGame` は「霧依存」「マス消失依存」「階層非依存の
+    /// 汎用強化 (#16 刻の猶予)」の3用途が混在しており、文脈連動ドラフト (RelicDraftService.ComputeWeight)
+    /// のハード除外基盤にできなかった。`RequiresFog` / `RequiresDisappear` へ分割し、階層非依存のものは
+    /// `General` 等の既存タグへ寄せる (`LateGame` 自体は廃止)。
+    /// </summary>
     [Flags]
     public enum RelicTag
     {
         None = 0,
-        ThiefRescue = 1 << 0,   // 盗賊救済
-        HardAICounter = 1 << 1, // Hard AI対抗
-        LateGame = 1 << 2,      // 終盤対策 (階層41+/61+)
-        General = 1 << 3,       // 汎用強化
-        Safety = 1 << 4,        // セーフティネット
-        Score = 1 << 5          // スコア/コンボ系
+        ThiefRescue = 1 << 0,      // 盗賊救済
+        HardAICounter = 1 << 1,    // Hard AI対抗
+        General = 1 << 3,          // 汎用強化
+        Safety = 1 << 4,           // セーフティネット
+        Score = 1 << 5,            // スコア/コンボ系
+        RequiresFog = 1 << 6,      // 霧ルール依存 (Floor.GetSpecialRule が Fog/FogDisappear の階層でのみ意味を持つ)
+        RequiresDisappear = 1 << 7 // マス消失ルール依存 (Floor.GetSpecialRule が Disappear/FogDisappear の階層でのみ意味を持つ)
     }
 
     /// <summary>

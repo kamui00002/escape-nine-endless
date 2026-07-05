@@ -452,16 +452,24 @@ namespace EscapeNine.Runtime
         private void OfferRelicDraft(bool guaranteeRarePlus)
         {
             if (Session.DailyChallengeMode) return; // 二重防御 (呼び出し側でも判定済み)
-            // 上限判定はドラフト取得数のみ (スターターパークは枠を消費しない §3.2)。
+            // 上限判定はドラフト取得数のみ (スターターパークは枠を消費しない §3.2)。ここは従来通り
+            // 「直前にクリアした階層」(Session.CurrentFloor) を渡す — RelicConfig.ShouldOfferDraft の
+            // clearedFloor 契約と一致させる (RELIC_COHERENCE_AUDIT.md §4 は floor 引数の基準を混同しない
+            // よう注意喚起している)。
             if (!RelicConfig.ShouldOfferDraft(Session.CurrentFloor, _draftAcquiredCount)) return;
 
             int draftCount = Session.Relics.DraftCandidateBonusFloorsRemaining > 0 ? 4 : 3;
+            // RELIC_COHERENCE_AUDIT.md §2-J/§4: 重み付け・RequiresFog/RequiresDisappear のハード除外は
+            // 「クリア済み階層」ではなく「次に入る階層」を基準にする必要がある。深淵ルート
+            // (_pendingRouteChoice == Abyss) は次階層の特殊ルールを1段階前倒しするため、その前倒しを
+            // 反映した実効値を ResolveDraftFloor で解決する。
+            int draftFloor = ResolveDraftFloor(Session.CurrentFloor + 1, _pendingRouteChoice);
             var candidates = _relicDraftService.DraftCandidates(
                 _ownedRelicIds,
                 Session.CurrentCharacter.Type,
                 count: draftCount,
                 selectedAI: Session.SelectedAILevel,
-                floor: Session.CurrentFloor);
+                floor: draftFloor);
             if (Session.Relics.DraftCandidateBonusFloorsRemaining > 0)
             {
                 Session.Relics.DraftCandidateBonusFloorsRemaining--;
@@ -479,6 +487,29 @@ namespace EscapeNine.Runtime
                 OnRelicDraftOffered?.Invoke();
             }
             // candidates.Count == 0 (プール完全枯渇) はドラフト非提示のまま次階層へ進む。
+        }
+
+        /// <summary>
+        /// レリックドラフトの重み付け・フィルタ (RelicDraftService.ComputeWeight の RequiresFog/
+        /// RequiresDisappear ハード除外) に渡す floor 値を解決する (RELIC_COHERENCE_AUDIT.md §2-J)。
+        /// nextFloor (次に入る階層) の自然な特殊ルールに、深淵ルートの1段階前倒し
+        /// (RouteFloorOverride.ApplyToSpecialRule) を適用したうえで、Core側シグネチャ
+        /// (DraftCandidates の floor:int) を変えずに渡せるよう、前倒し後のルールに対応する
+        /// 代表階層 (各ルールの開始階層) へ変換する。前倒しが効かない場合は nextFloor をそのまま返す。
+        /// </summary>
+        private static int ResolveDraftFloor(int nextFloor, RouteChoice pendingRoute)
+        {
+            SpecialRule natural = Floor.GetSpecialRule(nextFloor);
+            SpecialRule effective = RouteFloorOverride.For(pendingRoute).ApplyToSpecialRule(natural);
+            if (effective == natural) return nextFloor;
+
+            switch (effective)
+            {
+                case SpecialRule.Fog: return GameConfig.FogStartFloor;
+                case SpecialRule.Disappear: return GameConfig.DisappearStartFloor;
+                case SpecialRule.FogDisappear: return GameConfig.CombinedRulesStartFloor;
+                default: return nextFloor;
+            }
         }
 
         /// <summary>

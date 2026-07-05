@@ -98,14 +98,14 @@ namespace EscapeNine.Tests.EditMode
         [Test]
         public void Relic07_GroundingCharm()
         {
-            AssertMeta(RelicCatalog.GroundingCharmId, RelicRarity.Uncommon, RelicTag.LateGame);
+            AssertMeta(RelicCatalog.GroundingCharmId, RelicRarity.Uncommon, RelicTag.RequiresDisappear);
             Assert.AreEqual(1, Apply(RelicCatalog.GroundingCharmId).DisappearCellReduction);
         }
 
         [Test]
         public void Relic08_LanternRing_Stackable3()
         {
-            AssertMeta(RelicCatalog.LanternRingId, RelicRarity.Common, RelicTag.LateGame, stackLimit: 3);
+            AssertMeta(RelicCatalog.LanternRingId, RelicRarity.Common, RelicTag.RequiresFog, stackLimit: 3);
             Assert.AreEqual(1, Apply(RelicCatalog.LanternRingId).FogVisibilityRadiusBonus);
         }
 
@@ -126,7 +126,7 @@ namespace EscapeNine.Tests.EditMode
         [Test]
         public void Relic11_ShadowPassage()
         {
-            AssertMeta(RelicCatalog.ShadowPassageId, RelicRarity.Rare, RelicTag.LateGame | RelicTag.Safety);
+            AssertMeta(RelicCatalog.ShadowPassageId, RelicRarity.Rare, RelicTag.RequiresDisappear | RelicTag.Safety);
             Assert.AreEqual(1, Apply(RelicCatalog.ShadowPassageId).DisappearForgivenessPerFloor);
         }
 
@@ -163,7 +163,8 @@ namespace EscapeNine.Tests.EditMode
         [Test]
         public void Relic16_GraceOfTime()
         {
-            AssertMeta(RelicCatalog.GraceOfTimeId, RelicRarity.Rare, RelicTag.LateGame);
+            // RELIC_COHERENCE_AUDIT.md §2-D: 効果は階層非依存の汎用強化なので LateGame ではなく General。
+            AssertMeta(RelicCatalog.GraceOfTimeId, RelicRarity.Rare, RelicTag.General);
             Assert.AreEqual(1, Apply(RelicCatalog.GraceOfTimeId).TurnCountdownBonus);
         }
 
@@ -187,8 +188,9 @@ namespace EscapeNine.Tests.EditMode
             // §2.2 の全タグがプール内に代表を持つこと (重み付けの効き先が存在する保証)。
             foreach (RelicTag tag in new[]
                      {
-                         RelicTag.ThiefRescue, RelicTag.HardAICounter, RelicTag.LateGame,
-                         RelicTag.General, RelicTag.Safety, RelicTag.Score
+                         RelicTag.ThiefRescue, RelicTag.HardAICounter,
+                         RelicTag.General, RelicTag.Safety, RelicTag.Score,
+                         RelicTag.RequiresFog, RelicTag.RequiresDisappear
                      })
             {
                 bool found = false;

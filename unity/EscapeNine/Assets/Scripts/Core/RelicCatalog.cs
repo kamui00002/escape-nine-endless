@@ -65,23 +65,27 @@ namespace EscapeNine.Core
                 stackLimit: 1,
                 applyDelta: e => e.TurnCountReduction += 1),
 
-            // #7 地固めの護符 (Uncommon, LateGame) — マス消失の発生数 -1 (最低0、階層41+で有効)。
+            // #7 地固めの護符 (Uncommon, RequiresDisappear) — マス消失の発生数 -1 (最低0、階層41+で有効)。
+            // RELIC_COHERENCE_AUDIT.md §2-A: マス消失ルールが無い階層でドラフト候補から完全除外するため
+            // 旧 LateGame から RequiresDisappear へ変更 (RelicDraftService.ComputeWeight で0除外)。
             new RelicDefinition(
                 GroundingCharmId,
                 "地固めの護符",
                 "マス消失の発生数-1 (最低0)",
                 RelicRarity.Uncommon,
-                RelicTag.LateGame,
+                RelicTag.RequiresDisappear,
                 stackLimit: 1,
                 applyDelta: e => e.DisappearCellReduction += 1),
 
-            // #8 灯火の指輪 (Common, スタック可・上限3, LateGame) — 霧の視界半径+1マス (階層21+で有効)。
+            // #8 灯火の指輪 (Common, スタック可・上限3, RequiresFog) — 霧の視界半径+1マス (階層21+で有効)。
+            // RELIC_COHERENCE_AUDIT.md §2-C: 霧が無い階層 (41-60含む) で候補から完全除外するため
+            // 旧 LateGame から RequiresFog へ変更。
             new RelicDefinition(
                 LanternRingId,
                 "灯火の指輪",
                 "霧の視界半径+1マス",
                 RelicRarity.Common,
-                RelicTag.LateGame,
+                RelicTag.RequiresFog,
                 stackLimit: 3,
                 applyDelta: e => e.FogVisibilityRadiusBonus += 1),
 
@@ -158,13 +162,14 @@ namespace EscapeNine.Core
                 stackLimit: 1,
                 applyDelta: e => e.NeutralizeHardPrediction = true),
 
-            // #11 影の抜け道 (Rare, LateGame/Safety) — 1階層につき1回、消失マスへの進入による敗北を無効化する。
+            // #11 影の抜け道 (Rare, RequiresDisappear/Safety) — 1階層につき1回、消失マスへの進入による敗北を無効化する。
+            // RELIC_COHERENCE_AUDIT.md §2-B: #7と同じ理由で RequiresDisappear へ変更。
             new RelicDefinition(
                 ShadowPassageId,
                 "影の抜け道",
                 "1階層につき1回、消失マスへの進入による敗北を無効化する",
                 RelicRarity.Rare,
-                RelicTag.LateGame | RelicTag.Safety,
+                RelicTag.RequiresDisappear | RelicTag.Safety,
                 stackLimit: 1,
                 applyDelta: e => e.DisappearForgivenessPerFloor += 1),
 
@@ -203,14 +208,17 @@ namespace EscapeNine.Core
                     e.ComboThresholdBonusMultiplier += 0.5;
                 }),
 
-            // #16 刻の猶予 (Rare, LateGame, Tier2) — 1ターンの締切拍数+1。
+            // #16 刻の猶予 (Rare, General, Tier2) — 1ターンの締切拍数+1。
             // TurnCountdownBonus は Runtime専用フック (Core は保持のみ、§2.4)。
+            // RELIC_COHERENCE_AUDIT.md §2-D: 効果は階層非依存の汎用強化であり霧/消失ルールと無関係なため、
+            // 旧 LateGame (誤タグ付け。文脈連動フィルタを実装すると序盤に出なくなる誤ロックの原因だった)
+            // から General へ変更。
             new RelicDefinition(
                 GraceOfTimeId,
                 "刻の猶予",
                 "1ターンの締切拍数+1",
                 RelicRarity.Rare,
-                RelicTag.LateGame,
+                RelicTag.General,
                 stackLimit: 1,
                 applyDelta: e => e.TurnCountdownBonus += 1),
 

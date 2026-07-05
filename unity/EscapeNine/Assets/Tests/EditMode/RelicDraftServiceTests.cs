@@ -59,11 +59,19 @@ namespace EscapeNine.Tests.EditMode
             Assert.AreEqual("c", result[1].Id, "roll=0.99 は累積重み末尾の Rare を引く");
         }
 
+        // これらのプール機構テスト (重複禁止/所持済み除外/スタック上限) は、RELIC_COHERENCE_AUDIT.md 是正
+        // (ThiefRescue の非盗賊0除外、RequiresFog/RequiresDisappear の階層ゲート) の影響を受けないよう、
+        // 意図的に character=Thief かつ floor=61 (霧+マス消失が両方発動=全タグのハード除外条件を満たす)
+        // を使う。これにより18種全てが weight>0 になり、元の「フルカタログ前提」の個数アサーションを
+        // そのまま維持できる (盗賊自身はThiefRescueで除外されず、floor61+はRequiresFog/Disappear双方満たす)。
+        private const int FullPoolFloor = 61;
+        private const CharacterType FullPoolCharacter = CharacterType.Thief;
+
         [Test]
         public void DraftCandidates_NoDuplicatesWithinSingleDraft()
         {
             var service = new RelicDraftService(new FakeRandom());
-            var result = service.DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize);
+            var result = service.DraftCandidates(new List<string>(), FullPoolCharacter, count: CatalogSize, floor: FullPoolFloor);
 
             var seen = new HashSet<string>();
             foreach (var def in result)
@@ -78,7 +86,7 @@ namespace EscapeNine.Tests.EditMode
         {
             var owned = new List<string> { RelicCatalog.VeteranStanceId }; // stackLimit=1
             var service = new RelicDraftService(new FakeRandom());
-            var result = service.DraftCandidates(owned, CharacterType.Hero, count: CatalogSize);
+            var result = service.DraftCandidates(owned, FullPoolCharacter, count: CatalogSize, floor: FullPoolFloor);
 
             Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.VeteranStanceId), "スタック不可レリックは1回所持したら候補から除外される");
             Assert.AreEqual(CatalogSize - 1, result.Count, "残り17種は引き続き候補になる");
@@ -90,12 +98,12 @@ namespace EscapeNine.Tests.EditMode
             // #8 灯火の指輪 (lantern_ring) は stackLimit=3
             var owned2 = new List<string> { RelicCatalog.LanternRingId, RelicCatalog.LanternRingId };
             var serviceBelowCap = new RelicDraftService(new FakeRandom());
-            var resultBelowCap = serviceBelowCap.DraftCandidates(owned2, CharacterType.Hero, count: CatalogSize);
+            var resultBelowCap = serviceBelowCap.DraftCandidates(owned2, FullPoolCharacter, count: CatalogSize, floor: FullPoolFloor);
             Assert.IsTrue(resultBelowCap.Exists(d => d.Id == RelicCatalog.LanternRingId), "2個所持 (上限3未満) ではまだ候補に入る");
 
             var owned3 = new List<string> { RelicCatalog.LanternRingId, RelicCatalog.LanternRingId, RelicCatalog.LanternRingId };
             var serviceAtCap = new RelicDraftService(new FakeRandom());
-            var resultAtCap = serviceAtCap.DraftCandidates(owned3, CharacterType.Hero, count: CatalogSize);
+            var resultAtCap = serviceAtCap.DraftCandidates(owned3, FullPoolCharacter, count: CatalogSize, floor: FullPoolFloor);
             Assert.IsFalse(resultAtCap.Exists(d => d.Id == RelicCatalog.LanternRingId), "3個所持 (上限到達) では候補から除外される");
             Assert.AreEqual(CatalogSize - 1, resultAtCap.Count);
         }
@@ -152,17 +160,22 @@ namespace EscapeNine.Tests.EditMode
         public void DraftCandidates_WizardNeverSeesHardAICounterRelics()
         {
             // §2.2 原則5 の明示ルール: character == 魔法使い × HardAICounter は重み0 = 候補から完全除外。
-            // 全件 (count=18) 要求しても HardAICounter タグ付き3種 (#2, #9, #17) は決して現れない。
+            // floor=61 (霧+マス消失が両方発動) で RequiresFog/RequiresDisappear のゲートを外し、
+            // 魔法使い固有の除外だけを見る。魔法使いは非盗賊でもあるため、HardAICounter 3種
+            // (#2, #9, #17) に加えて ThiefRescue 系 (#1, #3。#2はHardAICounterと重複) も除外され、
+            // 計5種を除いた13種のみが候補になる (RELIC_COHERENCE_AUDIT.md §2-E 是正の副次効果)。
             var service = new RelicDraftService(new FakeRandom());
-            var result = service.DraftCandidates(new List<string>(), CharacterType.Wizard, count: CatalogSize);
+            var result = service.DraftCandidates(new List<string>(), CharacterType.Wizard, count: CatalogSize, floor: FullPoolFloor);
 
-            Assert.AreEqual(CatalogSize - 3, result.Count, "HardAICounter 3種を除いた15種のみが候補になる");
+            Assert.AreEqual(CatalogSize - 5, result.Count, "ThiefRescue2種+HardAICounter3種を除いた13種のみが候補になる");
             foreach (var def in result)
             {
                 Assert.AreEqual(RelicTag.None, def.Tags & RelicTag.HardAICounter,
                     $"{def.Id} は HardAICounter タグ付きなのに魔法使いの候補に現れた");
             }
+            Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.ShadowFootworkId), "#1 影の軽業は非盗賊除外 (魔法使いも対象)");
             Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.AfterimageVeilId), "#2 残像のヴェールは魔法使い除外");
+            Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.ShadowCloneArtId), "#3 影分身の型は非盗賊除外 (魔法使いも対象)");
             Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.BewilderingDustId), "#9 幻惑の粉は魔法使い除外 (§2.2 明示ルール)");
             Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.HeartboundPactId), "#17 心話の絆は魔法使い除外");
         }
@@ -170,17 +183,22 @@ namespace EscapeNine.Tests.EditMode
         [Test]
         public void DraftCandidates_NonWizard_CanSeeHardAICounterRelics()
         {
-            // 除外は魔法使い限定であることの対照検証 (勇者は全18種が候補になる)。
+            // 除外は魔法使い限定であることの対照検証。勇者は非盗賊のため ThiefRescue 系3種
+            // (#1/#2/#3) は除外されるが、HardAICounter 系 (#9等) は候補に入る。
             var service = new RelicDraftService(new FakeRandom());
-            var result = service.DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize);
+            var result = service.DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize, floor: FullPoolFloor);
 
-            Assert.AreEqual(CatalogSize, result.Count);
+            Assert.AreEqual(CatalogSize - 3, result.Count, "ThiefRescue系3種を除いた15種が候補になる");
             Assert.IsTrue(result.Exists(d => d.Id == RelicCatalog.BewilderingDustId), "#9 幻惑の粉は魔法使い以外なら候補に入る");
         }
 
         /// <summary>
         /// §2.2 の重み表をテスト側で独立に再計算するミラー実装 (実装ロジック検証用の仕様の写し)。
         /// 実装 (RelicDraftService.ComputeWeight) と定数がズレたら分布テストが落ちる。
+        ///
+        /// RELIC_COHERENCE_AUDIT.md §3/§4 是正の反映: 旧 LateGame の floor 倍率ブーストは廃止し、
+        /// RequiresFog/RequiresDisappear は「対象ルールが発動していない floor では0」のハード除外に、
+        /// ThiefRescue は「非盗賊は0」(旧×0.15を撤廃) に、#17心話の絆は「エルフは0」に変更した。
         /// </summary>
         private static double SpecWeight(RelicDefinition def, CharacterType character, AILevel ai, int floor)
         {
@@ -193,16 +211,26 @@ namespace EscapeNine.Tests.EditMode
                 case RelicRarity.Epic: w = 6; break;
                 default: w = 1; break; // Legendary
             }
-            if ((def.Tags & RelicTag.ThiefRescue) != 0) w *= character == CharacterType.Thief ? 3.0 : 0.15;
+            if ((def.Tags & RelicTag.ThiefRescue) != 0)
+            {
+                if (character != CharacterType.Thief) return 0;
+                w *= 3.0;
+            }
             if ((def.Tags & RelicTag.HardAICounter) != 0)
             {
                 if (character == CharacterType.Wizard) return 0;
                 if (ai == AILevel.Hard) w *= 2.5;
             }
-            if ((def.Tags & RelicTag.LateGame) != 0)
+            if (def.Id == RelicCatalog.HeartboundPactId && character == CharacterType.Elf) return 0;
+            if ((def.Tags & RelicTag.RequiresFog) != 0)
             {
-                if (floor >= 61) w *= 2.5;
-                else if (floor >= 41) w *= 2.0;
+                SpecialRule rule = Floor.GetSpecialRule(floor);
+                if (rule != SpecialRule.Fog && rule != SpecialRule.FogDisappear) return 0;
+            }
+            if ((def.Tags & RelicTag.RequiresDisappear) != 0)
+            {
+                SpecialRule rule = Floor.GetSpecialRule(floor);
+                if (rule != SpecialRule.Disappear && rule != SpecialRule.FogDisappear) return 0;
             }
             if ((def.Tags & RelicTag.General) != 0 && character == CharacterType.Wizard) w *= 0.5;
             if ((def.Tags & RelicTag.Safety) != 0
@@ -254,8 +282,9 @@ namespace EscapeNine.Tests.EditMode
         [Test]
         public void DraftCandidates_ThiefSeesThiefRescueRelicsFarMoreOften()
         {
-            // §2.2: ThiefRescue は盗賊 ×3.0 / 他キャラ ×0.15。
-            // 期待確率 (仕様から計算): 盗賊 ≈ 207/565 ≈ 36.6% / 勇者 ≈ 10.35/368.35 ≈ 2.8%
+            // RELIC_COHERENCE_AUDIT.md §2-E 是正: ThiefRescue は盗賊 ×3.0 / 他キャラは完全除外 (0)。
+            // 旧×0.15 (常に0.15の確率で非盗賊にも提示) は撤廃した (効果がSkillType.Diagonal専用のため
+            // 非盗賊には常に無価値、§2-E)。
             const int trials = 10000;
             var thiefCounts = SampleSingleDraws(CharacterType.Thief, AILevel.Normal, 1, trials, seed: 1234);
             var heroCounts = SampleSingleDraws(CharacterType.Hero, AILevel.Normal, 1, trials, seed: 1234);
@@ -269,7 +298,55 @@ namespace EscapeNine.Tests.EditMode
             double heroFreq = (double)ThiefRescueHits(heroCounts) / trials;
 
             Assert.Greater(thiefFreq, 0.30, "盗賊は ThiefRescue 系を約36.6%で引くはず (優遇 ×3.0)");
-            Assert.Less(heroFreq, 0.06, "勇者は ThiefRescue 系を約2.8%でしか引かないはず (抑制 ×0.15)");
+            Assert.AreEqual(0, heroFreq, "勇者は ThiefRescue 系が完全除外され0%のはず (非盗賊への0.15倍出現は撤廃)");
+        }
+
+        [Test]
+        public void DraftCandidates_ThiefRescueRelics_NeverAppearForNonThief()
+        {
+            // RELIC_COHERENCE_AUDIT.md §2-E: 盗賊専用 (#1 影の軽業 / #2 残像のヴェール / #3 影分身の型) は
+            // 非盗賊キャラのドラフト候補から完全除外される (旧実装は×0.15で提示していた)。
+            var result = new RelicDraftService(new FakeRandom())
+                .DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize);
+
+            Assert.IsFalse(result.Exists(d => (d.Tags & RelicTag.ThiefRescue) != 0),
+                "勇者にはThiefRescueタグ付きレリックが一切候補に出ないはず");
+            Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.ShadowFootworkId));
+            Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.AfterimageVeilId));
+            Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.ShadowCloneArtId));
+        }
+
+        [Test]
+        public void DraftCandidates_ThiefRescueRelics_AvailableForThief()
+        {
+            var result = new RelicDraftService(new FakeRandom())
+                .DraftCandidates(new List<string>(), CharacterType.Thief, count: CatalogSize);
+
+            Assert.IsTrue(result.Exists(d => d.Id == RelicCatalog.ShadowFootworkId));
+            Assert.IsTrue(result.Exists(d => d.Id == RelicCatalog.AfterimageVeilId));
+            Assert.IsTrue(result.Exists(d => d.Id == RelicCatalog.ShadowCloneArtId));
+        }
+
+        [Test]
+        public void DraftCandidates_HeartboundPact_ExcludedForElf()
+        {
+            // RELIC_COHERENCE_AUDIT.md §2-F: エルフは既に拘束スキル(Bind)持ちだが
+            // GameSession.BindEnemy() は Bind分岐で必ずreturnし PseudoBindCharges 分岐に
+            // 絶対に落ちないため、#17心話の絆はエルフには常に無価値。ドラフト候補から完全除外する。
+            var result = new RelicDraftService(new FakeRandom())
+                .DraftCandidates(new List<string>(), CharacterType.Elf, count: CatalogSize);
+
+            Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.HeartboundPactId),
+                "エルフには心話の絆が一切候補に出ないはず");
+        }
+
+        [Test]
+        public void DraftCandidates_HeartboundPact_AvailableForNonElfNonWizard()
+        {
+            var result = new RelicDraftService(new FakeRandom())
+                .DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize);
+
+            Assert.IsTrue(result.Exists(d => d.Id == RelicCatalog.HeartboundPactId));
         }
 
         [Test]
@@ -292,24 +369,73 @@ namespace EscapeNine.Tests.EditMode
                 $"Hard選択時はHardAICounter系の出現頻度が明確に上がるはず (hard={hardFreq:F3}, normal={normalFreq:F3})");
         }
 
+        // MARK: - RELIC_COHERENCE_AUDIT.md §3/§4: RequiresFog/RequiresDisappear のハード除外
+        // (旧 LateGame の floor 倍率ブーストを廃止し、仕組みが発動していない floor では0除外にした)
+
         [Test]
-        public void DraftCandidates_LateFloors_BoostLateGameRelics()
+        public void DraftCandidates_RequiresDisappearRelics_ExcludedWhenDisappearRuleInactive()
         {
-            // §2.2: floor >= 41 → LateGame ×2.0 / floor >= 61 → ×2.5
-            const int trials = 10000;
-            var earlyCounts = SampleSingleDraws(CharacterType.Hero, AILevel.Normal, 1, trials, seed: 555);
-            var lateCounts = SampleSingleDraws(CharacterType.Hero, AILevel.Normal, 61, trials, seed: 555);
+            // #7 地固めの護符 / #11 影の抜け道: マス消失ルール (Disappear/FogDisappear) が
+            // 発動していない階層 (1-40) では候補から完全除外される (RELIC_COHERENCE_AUDIT.md §2-A/B)。
+            foreach (int floor in new[] { 1, 20, 21, 40 }) // None(1-20) / Fog(21-40) = いずれも消失なし
+            {
+                var result = new RelicDraftService(new FakeRandom())
+                    .DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize, floor: floor);
+                Assert.IsFalse(result.Exists(d => (d.Tags & RelicTag.RequiresDisappear) != 0),
+                    $"階層{floor}(マス消失なし)ではRequiresDisappearタグは一切候補に出ないはず");
+            }
+        }
 
-            int LateGameHits(Dictionary<string, int> counts) =>
-                RelicCatalog.All
-                    .Where(d => (d.Tags & RelicTag.LateGame) != 0)
-                    .Sum(d => counts.TryGetValue(d.Id, out var c) ? c : 0);
+        [Test]
+        public void DraftCandidates_RequiresDisappearRelics_AvailableWhenDisappearRuleActive()
+        {
+            foreach (int floor in new[] { 41, 60, 61, 100 }) // Disappear(41-60) / FogDisappear(61-100)
+            {
+                var result = new RelicDraftService(new FakeRandom())
+                    .DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize, floor: floor);
+                Assert.IsTrue(result.Exists(d => (d.Tags & RelicTag.RequiresDisappear) != 0),
+                    $"階層{floor}(マス消失あり)ではRequiresDisappearタグが候補になり得るはず");
+            }
+        }
 
-            double earlyFreq = (double)LateGameHits(earlyCounts) / trials;
-            double lateFreq = (double)LateGameHits(lateCounts) / trials;
+        [Test]
+        public void DraftCandidates_RequiresFogRelics_ExcludedWhenFogRuleInactive()
+        {
+            // #8 灯火の指輪: 霧ルール (Fog/FogDisappear) が発動していない階層では候補から完全除外される。
+            // 階層41-60 (マス消失のみ・霧なし) を含むのが重要 (RELIC_COHERENCE_AUDIT.md §2-C の
+            // 「霧無効期間に重みが上がる」二重の矛盾が再発していないことの確認)。
+            foreach (int floor in new[] { 1, 20, 41, 60 }) // None(1-20) / Disappear(41-60) = いずれも霧なし
+            {
+                var result = new RelicDraftService(new FakeRandom())
+                    .DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize, floor: floor);
+                Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.LanternRingId),
+                    $"階層{floor}(霧なし)では灯火の指輪は候補に出ないはず");
+            }
+        }
 
-            Assert.Greater(lateFreq, earlyFreq * 1.5,
-                $"階層61+ではLateGame系の出現頻度が明確に上がるはず (late={lateFreq:F3}, early={earlyFreq:F3})");
+        [Test]
+        public void DraftCandidates_RequiresFogRelics_AvailableWhenFogRuleActive()
+        {
+            foreach (int floor in new[] { 21, 40, 61, 100 }) // Fog(21-40) / FogDisappear(61-100)
+            {
+                var result = new RelicDraftService(new FakeRandom())
+                    .DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize, floor: floor);
+                Assert.IsTrue(result.Exists(d => d.Id == RelicCatalog.LanternRingId),
+                    $"階層{floor}(霧あり)では灯火の指輪が候補になり得るはず");
+            }
+        }
+
+        [Test]
+        public void DraftCandidates_GraceOfTime_AvailableFromFloorOne()
+        {
+            // RELIC_COHERENCE_AUDIT.md §2-D: #16刻の猶予は効果が階層非依存の汎用強化のため、
+            // 旧LateGameタグの誤ロック (文脈連動フィルタ導入で序盤に出なくなる問題) を
+            // Generalタグへの是正で解消したことを確認する (誤ロックしていない)。
+            var result = new RelicDraftService(new FakeRandom())
+                .DraftCandidates(new List<string>(), CharacterType.Hero, count: CatalogSize, floor: 1);
+
+            Assert.IsTrue(result.Exists(d => d.Id == RelicCatalog.GraceOfTimeId),
+                "刻の猶予は階層1から候補に出るはず");
         }
     }
 }

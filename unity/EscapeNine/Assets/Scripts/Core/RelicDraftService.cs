@@ -42,7 +42,11 @@ namespace EscapeNine.Core
         /// <param name="character">ドラフト対象キャラクター (弱点タグ重み付けに使用)。</param>
         /// <param name="count">提示する候補数 (既定3。#18 蒐集家の目所持中は呼び出し側が4を渡す)。</param>
         /// <param name="selectedAI">プレイヤーが選択したAI難易度 (既定Normal、HardAICounterタグの重み付けに使用)。</param>
-        /// <param name="floor">現在の階層 (既定1、LateGameタグの重み付けに使用)。</param>
+        /// <param name="floor">
+        /// レリック抽選対象の「次に入る階層」(既定1、RequiresFog/RequiresDisappearタグの
+        /// ハード除外判定に Floor.GetSpecialRule(floor) 経由で使用。RELIC_COHERENCE_AUDIT.md §2-J)。
+        /// 呼び出し側 (GameController.OfferRelicDraft) は「直前にクリアした階層」ではなくこちらを渡すこと。
+        /// </param>
         public List<RelicDefinition> DraftCandidates(
             IReadOnlyList<string> ownedIds,
             CharacterType character,
@@ -97,6 +101,14 @@ namespace EscapeNine.Core
         /// <summary>
         /// ドラフト候補の重み。§2.2 の重み付け表と1:1対応。
         /// 戻り値が0以下の場合、呼び出し側 (DraftCandidates) が候補から除外する。
+        ///
+        /// RELIC_COHERENCE_AUDIT.md §3/§4 是正 (ハード除外の追加):
+        /// 「仕組みが発動していない/無意味な階層・キャラでは候補から完全除外 (0.0)」という
+        /// 既存の魔法使い×HardAICounter除外 (§2.2原則5) と同じ作法を、以下にも適用する。
+        /// - RequiresFog/RequiresDisappear: 対象の特殊ルールが発動していない floor では0
+        /// - ThiefRescue: 盗賊以外は0 (旧×0.15は撤廃。効果がSkillType.Diagonal限定のため常に無価値)
+        /// - #17 心話の絆: エルフは0 (GameSession.BindEnemy() が Bind分岐で必ずreturnし
+        ///   PseudoBindCharges 分岐に絶対に落ちないため、エルフには常に無価値)
         /// </summary>
         private static double ComputeWeight(RelicDefinition def, CharacterType character, AILevel selectedAI, int floor)
         {
@@ -105,7 +117,8 @@ namespace EscapeNine.Core
 
             if ((tags & RelicTag.ThiefRescue) != 0)
             {
-                weight *= character == CharacterType.Thief ? 3.0 : 0.15;
+                if (character != CharacterType.Thief) return 0.0;
+                weight *= 3.0;
             }
 
             if ((tags & RelicTag.HardAICounter) != 0)
@@ -122,10 +135,23 @@ namespace EscapeNine.Core
                 }
             }
 
-            if ((tags & RelicTag.LateGame) != 0)
+            if (def.Id == RelicCatalog.HeartboundPactId && character == CharacterType.Elf)
             {
-                if (floor >= GameConfig.CombinedRulesStartFloor) weight *= 2.5;
-                else if (floor >= GameConfig.DisappearStartFloor) weight *= 2.0;
+                // #17 心話の絆はエルフに常に無価値 (RELIC_COHERENCE_AUDIT.md §2-F)。
+                // タグ (HardAICounter|General) 単位では表現できない個別ルールのため Id で分岐する。
+                return 0.0;
+            }
+
+            if ((tags & RelicTag.RequiresFog) != 0)
+            {
+                SpecialRule rule = Floor.GetSpecialRule(floor);
+                if (rule != SpecialRule.Fog && rule != SpecialRule.FogDisappear) return 0.0;
+            }
+
+            if ((tags & RelicTag.RequiresDisappear) != 0)
+            {
+                SpecialRule rule = Floor.GetSpecialRule(floor);
+                if (rule != SpecialRule.Disappear && rule != SpecialRule.FogDisappear) return 0.0;
             }
 
             if ((tags & RelicTag.General) != 0 && character == CharacterType.Wizard)

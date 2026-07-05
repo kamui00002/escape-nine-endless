@@ -31,6 +31,9 @@ namespace EscapeNine.Runtime
         private const string IsSfxEnabledKey = "isSFXEnabled";
         private const string HasSeenTutorialKey = "hasSeenTutorial";
         private const string HasSeenTutorialV11Key = "hasSeenTutorialV1_1";
+        // Phase 5c: レリック解放時の一度きりの説明オーバーレイ (RELIC_COHERENCE_AUDIT.md §4)。
+        // Swift正本には対応なし (Unity固有拡張)。
+        private const string HasSeenRelicIntroKey = "hasSeenRelicIntro";
         private const string OneTapRetryEnabledKey = "oneTapRetryEnabled";
         private const string HapticsEnabledKey = "hapticsEnabled"; // Swift: HapticsHelper.storageKey
         private const string ReduceMotionEnabledKey = "reduceMotionEnabled"; // Phase 4 (juice): Swift 正本に対応キー無し。Unity 独自の演出軽減設定
@@ -82,6 +85,14 @@ namespace EscapeNine.Runtime
 
         public bool HasSeenTutorial { get; set; }
         public bool HasSeenTutorialV11 { get; set; }
+
+        /// <summary>
+        /// レリック解放時 (階層10クリア後の初回ドラフト直前) の一度きりの説明オーバーレイを
+        /// 既に見たか。RELIC_COHERENCE_AUDIT.md §4「レリック自体を階層10クリア後に解放」の
+        /// UX 要件。Swift正本には対応なし (Unity固有拡張)。
+        /// </summary>
+        public bool HasSeenRelicIntro { get; set; }
+
         public bool OneTapRetryEnabled { get; set; } = true;
         public bool HapticsEnabled { get; set; } = true;
 
@@ -171,6 +182,7 @@ namespace EscapeNine.Runtime
             IsSfxEnabled = GetBool(IsSfxEnabledKey, true);
             HasSeenTutorial = GetBool(HasSeenTutorialKey, false);
             HasSeenTutorialV11 = GetBool(HasSeenTutorialV11Key, false);
+            HasSeenRelicIntro = GetBool(HasSeenRelicIntroKey, false);
             OneTapRetryEnabled = GetBool(OneTapRetryEnabledKey, true);
             HapticsEnabled = GetBool(HapticsEnabledKey, true);
             ReduceMotionEnabled = GetBool(ReduceMotionEnabledKey, false);
@@ -238,6 +250,7 @@ namespace EscapeNine.Runtime
             SetBool(IsSfxEnabledKey, IsSfxEnabled);
             SetBool(HasSeenTutorialKey, HasSeenTutorial);
             SetBool(HasSeenTutorialV11Key, HasSeenTutorialV11);
+            SetBool(HasSeenRelicIntroKey, HasSeenRelicIntro);
             SetBool(OneTapRetryEnabledKey, OneTapRetryEnabled);
             SetBool(HapticsEnabledKey, HapticsEnabled);
             SetBool(ReduceMotionEnabledKey, ReduceMotionEnabled);
