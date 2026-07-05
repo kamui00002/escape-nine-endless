@@ -203,8 +203,9 @@ namespace EscapeNine.Runtime.UI
         /// <summary>生成済み Sprite のキャッシュ (RoundedSprite/SoftShadowSprite/ButtonBevelSprite 共用)。</summary>
         private static readonly Dictionary<string, Sprite> _depthSpriteCache = new Dictionary<string, Sprite>();
 
-        /// <summary>Card() が使う既定の角丸半径 (texel = キャンバス単位、PPU=1 のため)。</summary>
-        private const int DefaultCardCornerRadiusPx = 26;
+        /// <summary>Card() が使う既定の角丸半径。0 = 角丸なしの四角（オーナー指定: 角丸でなく四角のまま立体に）。
+        /// 立体感は落ち影(SoftShadow)＋上明下暗グラデ＋上辺ハイライトで出す（角の丸みには依存しない）。</summary>
+        private const int DefaultCardCornerRadiusPx = 0;
 
         // ---- Card() の影オフセット定数 (通常状態 / 押下状態で共用。CardShadowPress 側も同じ値を参照) ----
         private const float ShadowRestDx = 0.014f;
@@ -289,7 +290,7 @@ namespace EscapeNine.Runtime.UI
         /// 「上からの光」を感じる立体感が乗る。VerticalGradientSprite と役割が違う (こちらは
         /// 角丸マスクと明暗を 1 枚に焼き込み、TextButton の単一 Image という既存構造を変えずに使える)。
         /// </summary>
-        private static Sprite ButtonBevelSprite(int cornerRadiusPx = 22, int sizePx = 64)
+        private static Sprite ButtonBevelSprite(int cornerRadiusPx = 0, int sizePx = 64)
         {
             string key = "Bevel_" + cornerRadiusPx + "_" + sizePx;
             if (_depthSpriteCache.TryGetValue(key, out Sprite cached)) return cached;
