@@ -49,7 +49,19 @@ namespace EscapeNine.Runtime.Stage
         private const float OrbitDegrees = 20f;
         private const float OrbitDuration = 0.8f;
 
+        // ---- デバイス傾きパララックス (2026-07-06 オーナー案: iPhone を左右に傾けると盤面ジオラマが
+        // 盤面中心まわりに回り、"箱を横から覗き込む" 3D 効果。前後傾きは端末の持ち角の個人差で
+        // 基準がブレるため v1 は左右(accel.x)のみ。MotionEnabled=false なら LateUpdate 最終ゲートで無効) ----
+        // 2026-07-06 第2版: ±6° は繊細すぎて「変わらない」と指摘 → はっきり分かる ±16° へ増強。
+        // 併せてカメラ位置を傾き方向へ僅かに平行移動 (視差) させ、回転だけより「3D で覗き込む」感を強める。
+        private const float TiltMaxYawDegrees = 16f;   // 左右傾きで盤面中心まわりに最大 ±16° ヨー
+        private const float TiltMaxSway = 0.55f;        // 併せてカメラを右方向へ最大 ±0.55 ユニット平行移動 (視差)
+        private const float TiltSmoothing = 9f;         // 目標へ寄せる速さ (大=機敏 / 小=ゆったり)。フレームレート非依存
+
         private Camera _cam;
+
+        // 傾き: 平滑化した現在のヨー角 (度、Input.acceleration.x 由来、毎フレーム再構築で drift しない)
+        private float _tiltYaw;
 
         // 圧迫ズーム: 現在値/目標値と補間進捗 (階層に紐づく持続状態、OnDisable でも保持する)
         private float _zoomCurrentDelta;
@@ -175,6 +187,21 @@ namespace EscapeNine.Runtime.Stage
                 var orbit = Quaternion.AngleAxis(_orbitYawDelta, Vector3.up);
                 _cam.transform.position = orbit * _cam.transform.position;
                 _cam.transform.rotation = orbit * _cam.transform.rotation;
+            }
+
+            // デバイス傾きパララックス: 左右傾き(accel.x)を盤面中心まわりのヨーへ平滑化して適用。
+            // accel.x は縦持ち直立で ~0、左右に傾けると ±1 へ (基準補正不要)。符号は「傾けた側から覗く」感。
+            // エディタ(accel=0)では無反応=実機専用の演出。毎フレーム基準姿勢から作り直すので drift しない。
+            float targetYaw = Mathf.Clamp(-Input.acceleration.x, -1f, 1f) * TiltMaxYawDegrees;
+            _tiltYaw = Mathf.Lerp(_tiltYaw, targetYaw, 1f - Mathf.Exp(-TiltSmoothing * Time.unscaledDeltaTime));
+            if (Mathf.Abs(_tiltYaw) > 0.0001f)
+            {
+                var tilt = Quaternion.AngleAxis(_tiltYaw, Vector3.up);
+                _cam.transform.position = tilt * _cam.transform.position;
+                _cam.transform.rotation = tilt * _cam.transform.rotation;
+                // 視差: 回転に加えカメラをローカル右方向へ平行移動して「覗き込み」感を強める
+                float swayFrac = _tiltYaw / TiltMaxYawDegrees; // [-1,1]
+                _cam.transform.position += _cam.transform.right * (swayFrac * TiltMaxSway);
             }
 
             // インパルス (position に加算)

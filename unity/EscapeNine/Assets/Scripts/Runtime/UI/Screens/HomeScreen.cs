@@ -269,9 +269,11 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildBackgroundParallax(Transform parent)
         {
-            // 遠景: ダンジョン奥の縦グラデ (既存テーマ2色の組み合わせのみ、新規の彩度を足さない)
+            // 遠景: ダンジョン奥の縦グラデ。2026-07-06 第2版: 前景ボタンとのコントラストを稼ぐため
+            // 上端を Background(#2c1810)、下端を BackgroundDeep(#170c06) と全体的に暗く落とす
+            // (旧: BackgroundSecondary→Background だと木目が明るすぎてボタンが埋もれた)。
             _bgFar = (RectTransform)UIFactory.FillImage(parent, "BgFar",
-                UIFactory.VerticalGradientSprite(UITheme.BackgroundSecondary, UITheme.Background, 128)).transform;
+                UIFactory.VerticalGradientSprite(UITheme.Background, UITheme.BackgroundDeep, 128)).transform;
             UIFactory.Place(_bgFar, 0.5f, 0.5f, 1.06f, 1.06f);
 
             // 中景: 石柱シルエット + 篝火の暖色グロー (盤面 StageLights の暖色ライティング感と統一)

@@ -71,10 +71,22 @@ namespace EscapeNine.Runtime.UI
         /// ため BackgroundSecondary より明確に明るい暖色にした。TextButton の BevelSprite (旧
         /// ButtonBevelSprite) が上明下暗のベベルを自動で焼き込むため、この1色を渡すだけで
         /// 「上が明るく下がやや暗い」木目調のグラデ塗りになる。</summary>
-        public static readonly Color ButtonFill = Hex("#6b4a30");
+        public static readonly Color ButtonFill = Hex("#a67c47");
 
-        /// <summary>buttonHighlightLine #9a7550: ボタン上辺のハイライト線色 (エンボス表現)。</summary>
-        public static readonly Color ButtonHighlightLine = Hex("#9a7550");
+        /// <summary>buttonHighlightLine #d0a56a: ボタン上辺のハイライト線色 (エンボス表現)。
+        /// 2026-07-06 第2版: 「まだ変化が弱い」指摘を受け、塗り(#6b4a30→#a67c47)・ハイライトとも
+        /// 大幅に明るくして背景の木目からはっきり浮くようにした (背景側も BgFar を暗く調整)。</summary>
+        public static readonly Color ButtonHighlightLine = Hex("#d0a56a");
+
+        /// <summary>backgroundDeep #170c06: パララックス背景 BgFar の下端色。既存 Background より暗くして
+        /// 前景の明るいボタン/タイトルとのコントラストを稼ぐ (2026-07-06 第2版)。</summary>
+        public static readonly Color BackgroundDeep = Hex("#170c06");
+
+        /// <summary>panelFillTop/Bottom: ゲームHUDの計器パネル(BPMInfo 等)の塗り。既定の
+        /// BackgroundSecondary→Background だと暗い盤面背景と同化して「変わらない」ため、金属/石の
+        /// 計器らしく一段明るい暖色グラデにする (2026-07-06 第2版、ホームボタンと同じコントラスト方針)。</summary>
+        public static readonly Color PanelFillTop = Hex("#5c4631");
+        public static readonly Color PanelFillBottom = Hex("#382919");
 
         /// <summary>titleGradientTop #ffe27a: タイトルロゴの金グラデ上端 (明るいメタリックゴールド)。</summary>
         public static readonly Color TitleGradientTop = Hex("#ffe27a");

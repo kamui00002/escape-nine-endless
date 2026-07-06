@@ -36,7 +36,8 @@ namespace EscapeNine.Runtime.UI
             // (呼び出し側コメント参照) のため、以下の BuildColumn/BuildDivider をそのまま子として重ねる
             // だけで、Card 内部のグラデ/上辺ハイライトが (TextButton のような不透明な全面カバーが無いため)
             // 自然に透けて見える。色は既定 (BackgroundSecondary→Background) のまま = 微グラデ狙い。
-            Rect = UIFactory.Card(parent, "BPMInfo", out _);
+            // 塗りは金属/石の計器らしく一段明るい暖色グラデ (既定の暗色だと盤面背景と同化するため)。
+            Rect = UIFactory.Card(parent, "BPMInfo", out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
 
             _floorValue = BuildColumn(Rect, "Floor", "階層", 0.18f, UITheme.Available);
             BuildDivider(Rect, "Divider1", 0.345f);
@@ -45,7 +46,7 @@ namespace EscapeNine.Runtime.UI
             _speedValue = BuildColumn(Rect, "Speed", "速度", 0.82f, UITheme.Success);
 
             // 計器パネルらしい縁取り (HD-2D、2026-07-06): ゴールデンロッドの細い枠を全周に。
-            UIFactory.BorderTrim(Rect, "BPMInfoBorder", UITheme.Accent, 0.55f);
+            UIFactory.BorderTrim(Rect, "BPMInfoBorder", UITheme.Accent, 0.72f);
         }
 
         /// <summary>階層と BPM を反映する。速度レベルは BPM から導出 (Swift: speedLevel/speedColor)。</summary>
