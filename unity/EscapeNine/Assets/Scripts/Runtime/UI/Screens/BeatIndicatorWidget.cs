@@ -34,8 +34,7 @@ namespace EscapeNine.Runtime.UI
         public static readonly Color SwiftOrange = new Color(1f, 0.584f, 0f);
 
         private TextMeshProUGUI _countLabel;
-        private RectTransform _barFill;
-        private Image _barFillImage;
+        private Image _ringFillImage; // 拍進行の円形リング (Radial360 Filled、数字の周りを回る)
         private RectTransform _dotsRow;
 
         private Image[] _dots = Array.Empty<Image>();
@@ -65,35 +64,32 @@ namespace EscapeNine.Runtime.UI
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)widget._countLabel.transform, 0.5f, 0.66f, 0.5f, 0.62f);
 
-            // 拍進行ゲージ (Swift: プログレスリングの代替バー)。HD-2D (2026-07-06): 「枠付きゲージ」化
-            // (凹んだトラック + 上明下暗の tintable ベベルフィル + 縁取り)。Render() が毎回
-            // 差し替える動的な色ロジック (_barFillImage.color = _currentColor、拍の進行に応じて
-            // 金/橙/赤に切り替わる既存の「動き」) は一切変更しない — BevelSprite はグレースケールの
-            // テクスチャを Image.color で乗算 tint する設計なので、単に色を差し替えるだけで
-            // 従来どおりの動的カラーの上にベベルの質感が乗る。
-            var barBg = UIFactory.FillImage(root, "BeatBarBg", UIFactory.BevelSprite(0, 64, 0.55f, 1f), Image.Type.Simple);
-            barBg.color = UITheme.WithAlpha(UITheme.Background, 0.95f); // 凹んだトラック地 (上暗下明で「くぼみ」感)
-            barBg.raycastTarget = false;
-            RectTransform barRt = (RectTransform)barBg.transform;
-            UIFactory.Place(barRt, 0.5f, 0.28f, 0.6f, 0.08f);
+            // 拍進行の円形リング (Swift 正本 Circle.trim の移植、2026-07-06 オーナー要望で横バーから復元)。
+            // 数字 (_countLabel) の周りを、次の拍までの残りに応じてぐるりと減っていくリングで囲む。
+            // 円形スプライトは UIFactory.RingSprite() で手続き生成 (built-in 円形不安定問題を回避)。
+            // preserveAspect=true で親矩形の縦横比に関わらず常に真円。数字より背面に置くため label より先に生成。
+            // 背面: 薄い全周トラック (残量が減ってもリング位置が分かる下地)
+            var ringTrack = UIFactory.FillImage(root, "BeatRingTrack",
+                UIFactory.RingSprite(128, 0.48f, 0.40f), Image.Type.Simple);
+            ringTrack.color = UITheme.WithAlpha(UITheme.Accent, 0.18f);
+            ringTrack.preserveAspect = true;
+            ringTrack.raycastTarget = false;
+            UIFactory.Place((RectTransform)ringTrack.transform, 0.5f, 0.66f, 0.66f, 0.62f);
 
-            widget._barFillImage = UIFactory.FillImage(barRt, "Fill", UIFactory.BevelSprite(0, 64, 1f, 0.5f), Image.Type.Simple);
-            widget._barFillImage.color = UITheme.Available; // Render() が拍ごとに上書きする初期値
-            widget._barFillImage.raycastTarget = false;
-            widget._barFill = (RectTransform)widget._barFillImage.transform;
-            // fill はバー内で左詰め: anchorMax.x を進行率で動かす (固定 px を使わない伸縮)
-            widget._barFill.anchorMin = Vector2.zero;
-            widget._barFill.anchorMax = Vector2.one;
-            widget._barFill.offsetMin = Vector2.zero;
-            widget._barFill.offsetMax = Vector2.zero;
+            // 前面: 進行リング (Radial360 の Filled。fillAmount を Update が拍位相で駆動、色は Render が拍色に)
+            widget._ringFillImage = UIFactory.FillImage(root, "BeatRingFill",
+                UIFactory.RingSprite(128, 0.48f, 0.40f), Image.Type.Filled);
+            widget._ringFillImage.fillMethod = Image.FillMethod.Radial360;
+            widget._ringFillImage.fillOrigin = (int)Image.Origin360.Top; // 12時から
+            widget._ringFillImage.fillClockwise = true;
+            widget._ringFillImage.fillAmount = 1f;
+            widget._ringFillImage.color = UITheme.Available; // Render() が拍ごとに上書きする初期値
+            widget._ringFillImage.preserveAspect = true;
+            widget._ringFillImage.raycastTarget = false;
+            UIFactory.Place((RectTransform)widget._ringFillImage.transform, 0.5f, 0.66f, 0.66f, 0.62f);
 
-            // 枠 (HD-2D、2026-07-06): ゴールデンロッドの細い縁取りでゲージの輪郭を強調。
-            // BorderTrim のデフォルト比率 (thicknessRatioH=0.02) はこのバーの実ピクセル高 (~29px) だと
-            // 上下 0.6px 相当でサブピクセル化し見えなくなる (レビュー指摘)。このバーは横長 (幅>>高さ)
-            // なので、上下比率を高さ向けに引き上げ・左右比率をわずかに太らせて、四辺がほぼ均等な
-            // 太さ (実測 ~2px 相当) に見えるよう個別調整する。
-            UIFactory.BorderTrim(barRt, "BeatBarBorder", UITheme.Accent, 0.5f,
-                thicknessRatioH: 0.07f, thicknessRatioV: 0.0045f);
+            // 数字はリングより前面に (リングの穴の中で確実に読めるように)。dots はこの後生成され最前面。
+            widget._countLabel.transform.SetAsLastSibling();
 
             // ターン進行ドット行 (Swift: Turn indicator dots。円→矩形の簡略化は Phase 4 で解消)
             widget._dotsRow = UIFactory.Panel(root, "TurnDots");
@@ -124,7 +120,7 @@ namespace EscapeNine.Runtime.UI
             _currentColor = ColorFor(countdown);
             _countLabel.text = Mathf.Max(countdown, 0).ToString();
             _countLabel.color = _currentColor;
-            _barFillImage.color = _currentColor;
+            _ringFillImage.color = _currentColor;
 
             if (maxTurns != _builtMaxTurns) RebuildDots(maxTurns);
 
@@ -195,9 +191,8 @@ namespace EscapeNine.Runtime.UI
                 }
             }
 
-            _barFill.anchorMax = new Vector2(Mathf.Clamp01(progress), 1f);
-            _barFill.offsetMin = Vector2.zero;
-            _barFill.offsetMax = Vector2.zero;
+            // 円形リングを「次の拍までの残り」で満→空へ。拍が来るたび満タンに戻り、ぐるりと減っていく。
+            _ringFillImage.fillAmount = Mathf.Clamp01(progress);
         }
     }
 }

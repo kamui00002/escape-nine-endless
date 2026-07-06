@@ -309,6 +309,58 @@ namespace EscapeNine.Runtime.UI
         }
 
         /// <summary>
+        /// 円環 (アヌラス) の白スプライトを生成する (キャッシュ)。Image.Type.Filled + Radial360 と
+        /// 組み合わせてカウントダウンの円形プログレスリングに使う (Swift Circle.trim の移植。円形
+        /// スプライトを手続き生成することで「built-in 円形スプライトが実行時に不安定」問題を回避)。
+        /// outerFrac/innerFrac はテクスチャ半径に対する外周/内周の比率 (0..0.5)。
+        /// </summary>
+        public static Sprite RingSprite(int sizePx = 128, float outerFrac = 0.48f, float innerFrac = 0.40f)
+        {
+            string key = "Ring_" + sizePx + "_" + outerFrac + "_" + innerFrac;
+            if (_depthSpriteCache.TryGetValue(key, out Sprite cached)) return cached;
+
+            Texture2D tex = GenerateRingTexture(sizePx, outerFrac, innerFrac);
+            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),
+                new Vector2(0.5f, 0.5f), 1f, 0, SpriteMeshType.FullRect);
+            _depthSpriteCache[key] = sprite;
+            return sprite;
+        }
+
+        /// <summary>円環アルファマスク (内周〜外周の間だけ不透明、境界は 1.5px の AA)。RGB は白。</summary>
+        private static Texture2D GenerateRingTexture(int sizePx, float outerFrac, float innerFrac)
+        {
+            int size = Mathf.Max(16, sizePx);
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+
+            var pixels = new Color32[size * size];
+            float c = (size - 1) * 0.5f;
+            float outer = outerFrac * size;
+            float inner = innerFrac * size;
+            const float aa = 1.5f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - c;
+                    float dy = y - c;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float aIn = Mathf.Clamp01((d - (inner - aa)) / (2f * aa));   // 内周: 0→1
+                    float aOut = 1f - Mathf.Clamp01((d - (outer - aa)) / (2f * aa)); // 外周: 1→0
+                    float alpha = Mathf.Clamp01(Mathf.Min(aIn, aOut));
+                    byte a = (byte)Mathf.RoundToInt(alpha * 255f);
+                    pixels[y * size + x] = new Color32(255, 255, 255, a);
+                }
+            }
+
+            tex.SetPixels32(pixels);
+            tex.Apply(false, false);
+            return tex;
+        }
+
+        /// <summary>
         /// 角丸矩形の signed-distance ベースアルファマスクを焼き込んだテクスチャを生成する。
         /// feather (px) の分だけ境界を smoothstep でぼかす (RoundedSprite は 2px = AA 目的のみ、
         /// SoftShadowSprite は 20px 前後 = 本格的なぼかし)。topBrightness/bottomBrightness で
