@@ -778,6 +778,13 @@ namespace EscapeNine.Runtime
             switch (_phase)
             {
                 case Phase.Playing:
+                    // GO! 直後の入力ブロック中 (IsGameStartCountdownActive = GameStartGoDisplaySeconds 0.5秒) は
+                    // プレイヤーがまだ動けない (RequestMove がブロックされる) ため、ターンカウントダウンを進めない。
+                    // これを入れないと GO! 直後の 1〜2 拍がブロック中に消費され、最初のターンの「実際に動ける窓」が
+                    // 削られる (2026-07-08 iOS実機ログで確定: floor1/BPM70 でも可動窓が約1.3秒しかなく時間切れ)。
+                    // 入力解除後は通常どおり毎拍 1 減算 = 最初のターンも他ターンと同じ full 3 拍 (floor1 で約2.5秒) になる。
+                    if (IsGameStartCountdownActive) break;
+
                     // Swift: onBeat() — turnCountdown を減らし、0 でアクセント音 + 締切処理
                     TurnCountdown--;
                     bool isDeadline = TurnCountdown <= 0;
