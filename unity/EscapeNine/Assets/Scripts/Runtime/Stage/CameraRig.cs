@@ -52,10 +52,10 @@ namespace EscapeNine.Runtime.Stage
         // ---- デバイス傾きパララックス (2026-07-06 オーナー案: iPhone を左右に傾けると盤面ジオラマが
         // 盤面中心まわりに回り、"箱を横から覗き込む" 3D 効果。前後傾きは端末の持ち角の個人差で
         // 基準がブレるため v1 は左右(accel.x)のみ。MotionEnabled=false なら LateUpdate 最終ゲートで無効) ----
-        // 2026-07-06 第2版: ±6°→±16°。2026-07-07 第3版: 実機で「もう少し派手でも」との要望で ±24° + 視差増強。
-        // 併せてカメラ位置を傾き方向へ平行移動 (視差) させ、回転だけより「3D で覗き込む」ダイナミック感を強める。
-        private const float TiltMaxYawDegrees = 24f;   // 左右傾きで盤面中心まわりに最大 ±24° ヨー
-        private const float TiltMaxSway = 0.95f;        // 併せてカメラを右方向へ最大 ±0.95 ユニット平行移動 (視差)
+        // 2026-07-06 ±6°→±16°。2026-07-07 第3版 ±24°→ 第4版 ±34° (実機で「もっと派手に」との重ねての要望)。
+        // 併せてカメラ位置を傾き方向へ大きく平行移動 (視差) させ、回転だけより「3D で覗き込む」ダイナミック感を強める。
+        private const float TiltMaxYawDegrees = 34f;   // 左右傾きで盤面中心まわりに最大 ±34° ヨー
+        private const float TiltMaxSway = 1.5f;         // 併せてカメラを右方向へ最大 ±1.5 ユニット平行移動 (視差)
         private const float TiltSmoothing = 9f;         // 目標へ寄せる速さ (大=機敏 / 小=ゆったり)。フレームレート非依存
 
         private Camera _cam;
