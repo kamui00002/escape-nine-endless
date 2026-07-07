@@ -52,16 +52,24 @@ namespace EscapeNine.Runtime.Stage
         // ---- デバイス傾きパララックス (2026-07-06 オーナー案: iPhone を左右に傾けると盤面ジオラマが
         // 盤面中心まわりに回り、"箱を横から覗き込む" 3D 効果。前後傾きは端末の持ち角の個人差で
         // 基準がブレるため v1 は左右(accel.x)のみ。MotionEnabled=false なら LateUpdate 最終ゲートで無効) ----
-        // 2026-07-06 ±6°→±16°。2026-07-07 第3版 ±24°→ 第4版 ±34° (実機で「もっと派手に」との重ねての要望)。
-        // 併せてカメラ位置を傾き方向へ大きく平行移動 (視差) させ、回転だけより「3D で覗き込む」ダイナミック感を強める。
-        private const float TiltMaxYawDegrees = 34f;   // 左右傾きで盤面中心まわりに最大 ±34° ヨー
-        private const float TiltMaxSway = 1.5f;         // 併せてカメラを右方向へ最大 ±1.5 ユニット平行移動 (視差)
+        // 2026-07-06 ±6°→±16°→±24°→±34°。2026-07-07 第5版: 重ねての「もっと派手に」で、ヨーを更に上げると
+        // マスが画面端で切れるため、代わりに前後傾き(ピッチ)を足して2軸化=「箱を覗き込む」立体感を増強。
+        private const float TiltMaxYawDegrees = 38f;   // 左右傾きで盤面中心まわりに最大 ±38° ヨー
+        private const float TiltMaxSway = 1.7f;         // 併せてカメラを右方向へ最大 ±1.7 ユニット平行移動 (視差)
+        private const float TiltMaxPitchDegrees = 18f; // 前後傾きで盤面中心まわりに最大 ±18° ピッチ (上下の覗き込み)
+        private const float PitchGain = 1.5f;           // accel.z の変化に対するピッチ感度 (基準からの差分に乗算)
         private const float TiltSmoothing = 9f;         // 目標へ寄せる速さ (大=機敏 / 小=ゆったり)。フレームレート非依存
 
         private Camera _cam;
 
         // 傾き: 平滑化した現在のヨー角 (度、Input.acceleration.x 由来、毎フレーム再構築で drift しない)
         private float _tiltYaw;
+
+        // ピッチ (前後傾き): accel.z は端末の持ち角で基準がブレるため、盤面表示開始時の値を neutral として
+        // 一度だけ取り込み (差分で「傾け始めた角度」を 0 とする)。以後は固定基準からの差分＝ヨーと同じ hold-to-peek。
+        private float _tiltPitch;
+        private float _pitchBaseline;
+        private bool _pitchInit;
 
         // 圧迫ズーム: 現在値/目標値と補間進捗 (階層に紐づく持続状態、OnDisable でも保持する)
         private float _zoomCurrentDelta;
@@ -93,6 +101,10 @@ namespace EscapeNine.Runtime.Stage
 
             if (_orbitRoutine != null) { StopCoroutine(_orbitRoutine); _orbitRoutine = null; }
             _orbitYawDelta = 0f;
+
+            // ピッチ基準を取り直す (次に盤面を表示した時の持ち角を新たな neutral にする)。
+            _pitchInit = false;
+            _tiltPitch = 0f;
         }
 
         // ---- 公開 API (3 機能) ----
@@ -202,6 +214,19 @@ namespace EscapeNine.Runtime.Stage
                 // 視差: 回転に加えカメラをローカル右方向へ平行移動して「覗き込み」感を強める
                 float swayFrac = _tiltYaw / TiltMaxYawDegrees; // [-1,1]
                 _cam.transform.position += _cam.transform.right * (swayFrac * TiltMaxSway);
+            }
+
+            // 前後傾き(ピッチ): 盤面表示開始時の accel.z を neutral として一度取り込み、以後その差分で
+            // 上下の覗き込み。ヨーの後に (post-yaw の) カメラ右軸まわりに原点中心で回すことで、
+            // 「箱を上/下から覗き込む」2軸目の立体感を出す。
+            if (!_pitchInit) { _pitchBaseline = Input.acceleration.z; _pitchInit = true; }
+            float targetPitch = Mathf.Clamp((Input.acceleration.z - _pitchBaseline) * PitchGain, -1f, 1f) * TiltMaxPitchDegrees;
+            _tiltPitch = Mathf.Lerp(_tiltPitch, targetPitch, 1f - Mathf.Exp(-TiltSmoothing * Time.unscaledDeltaTime));
+            if (Mathf.Abs(_tiltPitch) > 0.0001f)
+            {
+                var pitch = Quaternion.AngleAxis(_tiltPitch, _cam.transform.right);
+                _cam.transform.position = pitch * _cam.transform.position;
+                _cam.transform.rotation = pitch * _cam.transform.rotation;
             }
 
             // インパルス (position に加算)
