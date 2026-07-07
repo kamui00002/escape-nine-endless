@@ -53,8 +53,7 @@ namespace EscapeNine.Runtime.UI
                 root.offsetMax = Vector2.zero;
             }
 
-            var bg = UIFactory.ColorRect(transform, "Background", UITheme.Background);
-            UIFactory.Place((RectTransform)bg.transform, 0.5f, 0.5f, 1f, 1f);
+            UIFactory.SimpleDepthBackground(transform);
 
             var safe = UIFactory.Panel(transform, "SafeArea");
             safe.gameObject.AddComponent<SafeAreaFitter>();
@@ -80,9 +79,8 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildHeader(RectTransform parent)
         {
-            var back = UIFactory.TextButton(parent, "BackButton", "< 戻る", 36,
-                UITheme.BackgroundSecondary, UITheme.TextColor, OnBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.14f, 0.955f, 0.22f, 0.045f);
+            UIFactory.SecondaryButton(parent, "BackButton", "< 戻る", 0.14f, 0.955f, 0.22f, 0.045f,
+                OnBackTapped, 36);
 
             var title = UIFactory.Label(parent, "TitleLabel", "デイリーチャレンジ", 54, UITheme.GoldText,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -103,9 +101,10 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildCompletedBadge(RectTransform parent)
         {
-            _completedBadge = UIFactory.Panel(parent, "CompletedBadge", UITheme.WithAlpha(UITheme.Success, 0.15f));
+            // HD-2D (2026-07-07): フラット塗り+手動ボーダーから Card(PanelFill) + BorderTrim へ。
+            _completedBadge = UIFactory.Card(parent, "CompletedBadge", out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(_completedBadge, 0.5f, 0.775f, 0.7f, 0.05f);
-            AddBorder(_completedBadge, UITheme.WithAlpha(UITheme.Success, 0.5f), 0.008f, 0.05f);
+            UIFactory.BorderTrim(_completedBadge, "CompletedBadgeBorder", UITheme.Success, 0.5f, 0.05f, 0.008f);
 
             _completedFloorLabel = UIFactory.Label(_completedBadge, "Label", "", 34, UITheme.Success,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -129,8 +128,10 @@ namespace EscapeNine.Runtime.UI
             for (int i = 0; i < MaxConditionRows; i++)
             {
                 float cy = 0.62f - rowGap * i;
-                var row = UIFactory.Panel(parent, "ConditionRow" + i, UITheme.BackgroundSecondary);
+                // HD-2D (2026-07-07): フラット塗りから Card(PanelFill) + BorderTrim へ。
+                var row = UIFactory.Card(parent, "ConditionRow" + i, out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
                 UIFactory.Place(row, 0.5f, cy, 0.86f, rowH);
+                UIFactory.BorderTrim(row, "ConditionRow" + i + "Border", UITheme.Accent, 0.4f);
                 var label = UIFactory.Label(row, "Label", "", 36, UITheme.TextColor, TextAnchor.MiddleLeft);
                 UIFactory.Place((RectTransform)label.transform, 0.5f, 0.5f, 0.88f, 0.8f);
                 _conditionRows[i] = row;
@@ -142,16 +143,17 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildActionButtons(RectTransform parent)
         {
-            var action = UIFactory.TextButton(parent, "ActionButton", "チャレンジ開始", 52,
-                UITheme.Available, UITheme.Background, OnActionTapped);
-            UIFactory.Place((RectTransform)action.transform, 0.5f, 0.30f, 0.62f, 0.06f);
+            // HD-2D (2026-07-07): 完了/未完了で色を動的に塗り替える (RefreshAll) ため、塗りを固定する
+            // SecondaryButton ではなく ElevatedButton (Card 化のみ、色は渡した値のまま維持) を使う。
+            var action = UIFactory.ElevatedButton(parent, "ActionButton", "チャレンジ開始", 52,
+                UITheme.Available, UITheme.Background, 0.5f, 0.30f, 0.62f, 0.06f, OnActionTapped);
+            UIFactory.EmbossTrim(action.transform, "ActionEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             _actionButtonImage = action.GetComponent<Image>();
             _actionButtonLabel = action.GetComponentInChildren<TextMeshProUGUI>();
             if (_actionButtonLabel != null) _actionButtonLabel.fontStyle = FontStyles.Bold;
 
-            var back = UIFactory.TextButton(parent, "BackBottomButton", "戻る", 48,
-                UITheme.BackgroundSecondary, UITheme.TextColor, OnBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.5f, 0.215f, 0.62f, 0.05f);
+            UIFactory.SecondaryButton(parent, "BackBottomButton", "戻る", 0.5f, 0.215f, 0.62f, 0.05f,
+                OnBackTapped, 48);
         }
 
         /// <summary>
@@ -208,16 +210,8 @@ namespace EscapeNine.Runtime.UI
             _actionButtonLabel.color = completed ? UITheme.TextColor : UITheme.Background;
         }
 
-        // MARK: - Border / Toast (HomeScreen / ResultScreen と同型の簡易実装をこの画面にも複製。
+        // MARK: - Toast (HomeScreen / ResultScreen と同型の簡易実装をこの画面にも複製。
         // クラス間の共有シンボルを作らないため意図的に private 複製している)
-
-        private static void AddBorder(RectTransform target, Color color, float tx, float ty)
-        {
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(target, "BorderTop", color).transform, 0.5f, 1f, 1f, ty);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(target, "BorderBottom", color).transform, 0.5f, 0f, 1f, ty);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(target, "BorderLeft", color).transform, 0f, 0.5f, tx, 1f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(target, "BorderRight", color).transform, 1f, 0.5f, tx, 1f);
-        }
 
         private void BuildToast(RectTransform parent)
         {

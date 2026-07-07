@@ -557,6 +557,66 @@ namespace EscapeNine.Runtime.UI
             BorderTrim(parent, name, borderColor, borderAlpha, borderThicknessRatioH, borderThicknessRatioV);
         }
 
+        // ================================================================
+        // HD-2D 横展開ヘルパー (2026-07-07 追加)
+        // HomeScreen.CreateElevatedButton/CreateSecondaryButton (2026-07-06) と同じ発想を
+        // Home/Game 以外の画面からも呼べるよう UIFactory へ集約する (UIFactory 一元集約方針)。
+        // Home/Game 側の既存 private ヘルパーは確認済みのため無変更で残す (意図的に未統合)。
+        // ================================================================
+
+        /// <summary>
+        /// Card (影+角丸グラデ) で包んだ TextButton を生成する。HomeScreen.CreateElevatedButton と
+        /// 機能的に同一 (色を自由に指定できる版)。状態で色を変える呼び出し元 (選択中/所持済み等) は
+        /// 返り値の Button から GetComponent&lt;Image&gt;() で直接色を書き換えられる
+        /// (TextButton() 自身が Image を持つため、Card ラップの有無で契約は変わらない)。
+        /// </summary>
+        public static Button ElevatedButton(Transform parent, string name, string label, int fontSize,
+            Color bg, Color fg, float cx, float cy, float w, float h, Action onClick)
+        {
+            RectTransform card = Card(parent, name + "Card", out RectTransform shadow);
+            Place(card, cx, cy, w, h);
+
+            Button btn = TextButton(card, name, label, fontSize, bg, fg, onClick);
+            Place((RectTransform)btn.transform, 0.5f, 0.5f, 1f, 1f);
+            AttachCardPressFeedback(btn.gameObject, shadow);
+
+            return btn;
+        }
+
+        /// <summary>
+        /// ElevatedButton + EmbossTrim をセットにした「サブボタン」。塗り (ButtonFill) と縁取り
+        /// (ButtonHighlightLine/Accent) は Home のサブボタンと完全に揃えるため引数化しない
+        /// (画面ごとに色がバラけると「彫られた木の看板」の統一感が崩れるため)。状態で色を変えたい
+        /// 呼び出し元は ElevatedButton を直接使うこと。
+        /// </summary>
+        public static Button SecondaryButton(Transform parent, string name, string label,
+            float cx, float cy, float w, float h, Action onClick, int fontSize = 54)
+        {
+            Button btn = ElevatedButton(parent, name, label, fontSize, UITheme.ButtonFill, UITheme.TextColor,
+                cx, cy, w, h, onClick);
+            EmbossTrim(btn.transform, name + "Emboss", UITheme.ButtonHighlightLine, UITheme.Accent);
+            return btn;
+        }
+
+        /// <summary>
+        /// 単色 ColorRect 一枚だけだった画面背景に最低限の奥行きを足す軽量版 (HD-2D 横展開、
+        /// 2026-07-07)。Home の3層パララックス (BuildBackgroundParallax) ほど重い演出は他画面には
+        /// 過剰なため、縦グラデ (Background→BackgroundDeep) + 下端ヴィネットの2層のみを敷く。
+        /// 呼び出し側の既存 "Background" ColorRect 生成 1 行をこれに差し替えるだけで使える。
+        /// </summary>
+        public static void SimpleDepthBackground(Transform parent, string namePrefix = "Bg")
+        {
+            var grad = FillImage(parent, namePrefix + "Gradient",
+                VerticalGradientSprite(UITheme.Background, UITheme.BackgroundDeep, 128));
+            grad.raycastTarget = false;
+            Place((RectTransform)grad.transform, 0.5f, 0.5f, 1f, 1f);
+
+            var vignette = FillImage(parent, namePrefix + "Vignette",
+                VerticalGradientSprite(new Color(0f, 0f, 0f, 0f), new Color(0f, 0f, 0f, 0.40f), 64));
+            vignette.raycastTarget = false;
+            Place((RectTransform)vignette.transform, 0.5f, 0.075f, 1f, 0.16f);
+        }
+
         // ---- 内部実装 ----
 
         /// <summary>

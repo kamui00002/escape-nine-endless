@@ -51,8 +51,7 @@ namespace EscapeNine.Runtime.UI
                 root.offsetMax = Vector2.zero;
             }
 
-            var bg = UIFactory.ColorRect(transform, "Background", UITheme.Background);
-            UIFactory.Place((RectTransform)bg.transform, 0.5f, 0.5f, 1f, 1f);
+            UIFactory.SimpleDepthBackground(transform);
 
             var safe = UIFactory.Panel(transform, "SafeArea");
             safe.gameObject.AddComponent<SafeAreaFitter>();
@@ -71,9 +70,8 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildHeader(RectTransform parent)
         {
-            var back = UIFactory.TextButton(parent, "BackButton", "< 戻る", 36,
-                UITheme.BackgroundSecondary, UITheme.TextColor, OnBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.12f, 0.955f, 0.18f, 0.045f);
+            UIFactory.SecondaryButton(parent, "BackButton", "< 戻る", 0.12f, 0.955f, 0.18f, 0.045f,
+                OnBackTapped, 36);
 
             var title = UIFactory.Label(parent, "TitleLabel", "実績", 64, UITheme.TextColor,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -160,9 +158,17 @@ namespace EscapeNine.Runtime.UI
         /// <summary>実績行 (Swift: AchievementRow)。ロック中は全体を減光する。</summary>
         private void BuildRow(RectTransform parent, int index, Achievement achievement, bool isUnlocked, float cy, float h)
         {
-            var row = UIFactory.Panel(parent, "Row" + index,
-                UITheme.WithAlpha(UITheme.BackgroundSecondary, isUnlocked ? 1f : 0.5f));
+            // HD-2D (2026-07-07): フラット塗りから Card(PanelFill) + BorderTrim へ (行は RebuildRows の
+            // たびに全破棄→再構築されるため Card 化しても Image 動的書換えの契約は壊れない)。
+            // 解除済みは success 色の縁取りで status ラベルとの一貫性を出し、未解除は CanvasGroup で減光する。
+            var row = UIFactory.Card(parent, "Row" + index, out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(row, 0.5f, cy, 0.94f, h);
+            if (!isUnlocked)
+            {
+                row.gameObject.AddComponent<CanvasGroup>().alpha = 0.5f;
+            }
+            UIFactory.BorderTrim(row, "Row" + index + "Border",
+                isUnlocked ? UITheme.Success : UITheme.Accent, isUnlocked ? 0.6f : 0.3f);
 
             var title = UIFactory.Label(row, "Title", achievement.Title(), 40,
                 isUnlocked ? UITheme.TextColor : UITheme.WithAlpha(UITheme.TextColor, 0.5f),

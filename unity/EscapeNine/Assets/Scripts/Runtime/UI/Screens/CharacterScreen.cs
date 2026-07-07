@@ -85,9 +85,9 @@ namespace EscapeNine.Runtime.UI
                 root.offsetMax = Vector2.zero;
             }
 
-            // 背景はノッチ下まで全面 (Swift: Color(hex: background).ignoresSafeArea())
-            var bg = UIFactory.ColorRect(transform, "Background", UITheme.Background);
-            UIFactory.Place((RectTransform)bg.transform, 0.5f, 0.5f, 1f, 1f);
+            // 背景はノッチ下まで全面 (Swift: Color(hex: background).ignoresSafeArea())。
+            // HD-2D (2026-07-07): 単色から縦グラデ+下端ヴィネットの軽量版へ。
+            UIFactory.SimpleDepthBackground(transform);
 
             var safe = UIFactory.Panel(transform, "SafeArea");
             safe.gameObject.AddComponent<SafeAreaFitter>();
@@ -113,9 +113,8 @@ namespace EscapeNine.Runtime.UI
             // 「キャラクター選択」は他画面より幅広 (0.6) のため、既定の cx=0.12/幅 0.18 だと
             // 右端 (0.21) がタイトル左端 (0.5-0.3=0.2) に食い込む。幅は変えず (テキスト折返し回避)
             // 位置だけ左へ振る。
-            var back = UIFactory.TextButton(parent, "BackButton", "< 戻る", 34,
-                UITheme.Background, UITheme.TextColor, OnBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.10f, 0.965f, 0.18f, 0.042f);
+            UIFactory.SecondaryButton(parent, "BackButton", "< 戻る", 0.10f, 0.965f, 0.18f, 0.042f,
+                OnBackTapped, 34);
 
             var title = UIFactory.Label(parent, "TitleLabel", "キャラクター選択", 50, UITheme.TextColor,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -194,7 +193,11 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place(border, 0.5f, cy, 0.92f, h);
             w.Border = border.GetComponent<Image>();
 
-            var card = UIFactory.Panel(border, "Body", UITheme.BackgroundSecondary);
+            // HD-2D (2026-07-07): 塗りを PanelFillTop/Bottom の縦グラデに。border 側の選択色反転
+            // トリック (RefreshCards が w.Border.color を書き換え) はそのまま維持するため触らない。
+            var cardImg = UIFactory.FillImage(border, "Body",
+                UIFactory.VerticalGradientSprite(UITheme.PanelFillTop, UITheme.PanelFillBottom, 64));
+            var card = (RectTransform)cardImg.transform;
             UIFactory.Place(card, 0.5f, 0.5f, 0.992f, 0.988f);
 
             // --- ヘッダー行: 名前 + 選択中バッジ + (未解放時) 価格 ---
@@ -260,6 +263,9 @@ namespace EscapeNine.Runtime.UI
             w.ActionButton = UIFactory.TextButton(card, "ActionButton", "", 40,
                 UITheme.Background, UITheme.TextColor, () => OnCardActionTapped(type));
             UIFactory.Place((RectTransform)w.ActionButton.transform, 0.5f, 0.145f, 0.92f, 0.11f);
+            // HD-2D (2026-07-07): 選択中/購入/解放条件の3状態で色を動的に塗り替える (RefreshCards) ため
+            // Card 二重掛けはせず EmbossTrim のみ足す。
+            UIFactory.EmbossTrim(w.ActionButton.transform, "ActionEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             w.ActionBg = w.ActionButton.GetComponent<Image>();
             w.ActionLabel = w.ActionButton.GetComponentInChildren<TextMeshProUGUI>();
 

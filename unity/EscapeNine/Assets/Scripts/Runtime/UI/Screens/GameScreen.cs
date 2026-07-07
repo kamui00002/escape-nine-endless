@@ -420,8 +420,11 @@ namespace EscapeNine.Runtime.UI
             _skillButtonLabel.fontStyle = FontStyles.Bold;
             _skillButton.gameObject.SetActive(false);
 
-            var ruleRoot = UIFactory.Panel(parent, "SpecialRule", UITheme.BackgroundSecondary);
+            // HD-2D (2026-07-07): フラット塗りから Card(PanelFill) + BorderTrim へ (Warning 色の縁取りで
+            // 「注意を促す帯」であることを示す。SetActive のみで色は動的に書き換えないため Card 化は安全)。
+            var ruleRoot = UIFactory.Card(parent, "SpecialRule", out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(ruleRoot, 0.5f, 0.106f, 0.86f, 0.036f);
+            UIFactory.BorderTrim(ruleRoot, "SpecialRuleBorder", UITheme.Warning, 0.5f);
             _specialRuleRoot = ruleRoot.gameObject;
             _specialRuleLabel = UIFactory.Label(ruleRoot, "Label", "", 32, UITheme.Warning);
             UIFactory.Place((RectTransform)_specialRuleLabel.transform, 0.5f, 0.5f, 1f, 1f);
@@ -600,14 +603,19 @@ namespace EscapeNine.Runtime.UI
                 UIFactory.Place((RectTransform)frame.transform, 0.5f, 0.5f, 1f, 1f);
                 _relicCardFrames[index] = frame;
 
-                var inner = UIFactory.Panel(slot, "Inner", UITheme.BackgroundSecondary);
+                // HD-2D (2026-07-07): 塗りを PanelFillTop/Bottom の縦グラデに (旧 BackgroundSecondary の
+                // フラット塗りだと「カードらしさ」が薄かった)。Frame 側のレアリティ色反転トリック
+                // (ShowRelicDraft が _relicCardFrames[i].color を書き換え) はそのまま維持するため触らない。
+                var innerImg = UIFactory.FillImage(slot, "Inner",
+                    UIFactory.VerticalGradientSprite(UITheme.PanelFillTop, UITheme.PanelFillBottom, 64));
+                var inner = (RectTransform)innerImg.transform;
                 UIFactory.Place(inner, 0.5f, 0.5f, 0.965f, 0.90f); // 既定 inset (Common 相当)。実際の値は ShowRelicDraft が候補のレアリティで再設定する
                 var btn = inner.gameObject.AddComponent<Button>();
-                btn.targetGraphic = inner.GetComponent<Image>();
+                btn.targetGraphic = innerImg;
                 btn.transition = Selectable.Transition.ColorTint;
                 btn.navigation = new Navigation { mode = Navigation.Mode.None }; // TextButton と同じ理由 (レビューC2)
                 btn.onClick.AddListener(() => HandleRelicCardTapped(index));
-                _relicCardInnerImages[index] = inner.GetComponent<Image>();
+                _relicCardInnerImages[index] = innerImg;
 
                 var nameLabel = UIFactory.Label(inner, "Name", "", 38, UITheme.TextColor,
                     TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -629,11 +637,11 @@ namespace EscapeNine.Runtime.UI
         /// <summary>スキル回復通知 (Swift: skillResetNotification)。10 階層ごとの回復時に 2 秒表示。</summary>
         private void BuildSkillResetToast()
         {
-            var toast = UIFactory.Panel(transform, "SkillResetToast", UITheme.BackgroundSecondary);
+            // HD-2D (2026-07-07): フラット塗りから Card(PanelFill) へ。Card 内部は全レイヤーが
+            // raycastTarget=false で統一されている (UIFactory.Card 実装参照) ため、旧来の
+            // 「通知はタップを遮らない」ための GetComponent<Image>() 明示 off は不要になる。
+            var toast = UIFactory.Card(transform, "SkillResetToast", out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(toast, 0.5f, 0.80f, 0.56f, 0.045f);
-            // 通知はタップを遮らない (Swift も操作を妨げない)
-            var img = toast.GetComponent<Image>();
-            if (img != null) img.raycastTarget = false;
 
             // 上下の成功色ライン (Swift: stroke(success, 2pt) の簡易表現)
             var top = UIFactory.ColorRect(toast, "LineTop", UITheme.Success);
@@ -678,23 +686,25 @@ namespace EscapeNine.Runtime.UI
             for (int i = 0; i < SelectableAiLevels.Length; i++)
             {
                 AILevel level = SelectableAiLevels[i]; // クロージャ用固定
-                var btn = UIFactory.TextButton(overlay, "Ai" + level, level.RawValue(), 40,
-                    UITheme.BackgroundSecondary, UITheme.TextColor, () => HandleAiLevelSelected(level));
                 float cx = areaLeft + slotWidth * (i + 0.5f);
-                UIFactory.Place((RectTransform)btn.transform, cx, 0.49f, slotWidth * 0.88f, 0.045f);
+                // HD-2D (2026-07-07): 選択中の Bg/Label を動的に塗り替えるため (HandleAiLevelSelected 参照)
+                // 塗りを固定する SecondaryButton ではなく ElevatedButton (Card 化のみ) を使う。
+                var btn = UIFactory.ElevatedButton(overlay, "Ai" + level, level.RawValue(), 40,
+                    UITheme.BackgroundSecondary, UITheme.TextColor, cx, 0.49f, slotWidth * 0.88f, 0.045f,
+                    () => HandleAiLevelSelected(level));
+                UIFactory.EmbossTrim(btn.transform, "Ai" + level + "Emboss", UITheme.ButtonHighlightLine, UITheme.Accent);
                 _aiButtonImages[i] = btn.GetComponent<Image>();
                 _aiButtonLabels[i] = btn.GetComponentInChildren<TextMeshProUGUI>();
             }
 
-            var start = UIFactory.TextButton(overlay, "StartButton", "冒険を始める", 56,
-                UITheme.Main, UITheme.Background, HandlePregameStart);
-            UIFactory.Place((RectTransform)start.transform, 0.5f, 0.375f, 0.62f, 0.06f);
+            var start = UIFactory.ElevatedButton(overlay, "StartButton", "冒険を始める", 56,
+                UITheme.Main, UITheme.Background, 0.5f, 0.375f, 0.62f, 0.06f, HandlePregameStart);
             var startLabel = start.GetComponentInChildren<TextMeshProUGUI>();
             if (startLabel != null) startLabel.fontStyle = FontStyles.Bold;
+            UIFactory.BorderTrim(start.transform, "StartButtonBorder", UITheme.GoldText, 0.7f);
 
-            var back = UIFactory.TextButton(overlay, "BackButton", "戻る", 48,
-                UITheme.BackgroundSecondary, UITheme.TextColor, HandlePregameBack);
-            UIFactory.Place((RectTransform)back.transform, 0.5f, 0.295f, 0.62f, 0.05f);
+            UIFactory.SecondaryButton(overlay, "BackButton", "戻る", 0.5f, 0.295f, 0.62f, 0.05f,
+                HandlePregameBack, 48);
 
             _pregameOverlay.SetActive(false);
         }
@@ -710,15 +720,16 @@ namespace EscapeNine.Runtime.UI
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Place((RectTransform)title.transform, 0.5f, 0.62f, 0.9f, 0.07f);
 
-            var resume = UIFactory.TextButton(overlay, "ResumeButton", "再開", 54,
-                UITheme.Main, UITheme.Background, HandleResumeTapped);
-            UIFactory.Place((RectTransform)resume.transform, 0.5f, 0.50f, 0.50f, 0.06f);
+            // HD-2D (2026-07-07): 主要アクションは Home の Play ボタンと同じ Card+縁取りで主役感を、
+            // 「終了」はサブボタンと同じ質感に統一する。
+            var resume = UIFactory.ElevatedButton(overlay, "ResumeButton", "再開", 54,
+                UITheme.Main, UITheme.Background, 0.5f, 0.50f, 0.50f, 0.06f, HandleResumeTapped);
             var resumeLabel = resume.GetComponentInChildren<TextMeshProUGUI>();
             if (resumeLabel != null) resumeLabel.fontStyle = FontStyles.Bold;
+            UIFactory.BorderTrim(resume.transform, "ResumeButtonBorder", UITheme.GoldText, 0.7f);
 
-            var quit = UIFactory.TextButton(overlay, "QuitButton", "終了", 48,
-                UITheme.BackgroundSecondary, UITheme.TextColor, HandleQuitTapped);
-            UIFactory.Place((RectTransform)quit.transform, 0.5f, 0.42f, 0.55f, 0.055f);
+            UIFactory.SecondaryButton(overlay, "QuitButton", "終了", 0.5f, 0.42f, 0.55f, 0.055f,
+                HandleQuitTapped, 48);
 
             _pausedOverlay.SetActive(false);
         }

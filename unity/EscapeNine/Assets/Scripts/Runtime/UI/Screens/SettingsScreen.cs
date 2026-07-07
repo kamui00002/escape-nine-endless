@@ -100,9 +100,9 @@ namespace EscapeNine.Runtime.UI
                 root.offsetMax = Vector2.zero;
             }
 
-            // 背景はノッチ下まで全面 (Swift: GameBackground)
-            var bg = UIFactory.ColorRect(transform, "Background", UITheme.Background);
-            UIFactory.Place((RectTransform)bg.transform, 0.5f, 0.5f, 1f, 1f);
+            // 背景はノッチ下まで全面 (Swift: GameBackground)。HD-2D (2026-07-07): 単色から
+            // 縦グラデ+下端ヴィネットの軽量版へ。
+            UIFactory.SimpleDepthBackground(transform);
 
             var safe = UIFactory.Panel(transform, "SafeArea");
             safe.gameObject.AddComponent<SafeAreaFitter>();
@@ -129,9 +129,9 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildHeader(RectTransform parent)
         {
-            var back = UIFactory.TextButton(parent, "BackButton", "← 戻る", 36,
-                UITheme.BackgroundSecondary, UITheme.TextColor, OnBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.12f, 0.955f, 0.18f, 0.045f);
+            // HD-2D (2026-07-07): Home のサブボタンと同じ質感に統一。
+            UIFactory.SecondaryButton(parent, "BackButton", "← 戻る", 0.12f, 0.955f, 0.18f, 0.045f,
+                OnBackTapped, 36);
 
             var title = UIFactory.Label(parent, "TitleLabel", "設定", 64, UITheme.TextColor,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -216,9 +216,13 @@ namespace EscapeNine.Runtime.UI
 
         private AiSegment BuildAiSegment(RectTransform card, string name, string label, AILevel level, float cx)
         {
+            // HD-2D (2026-07-07): 選択状態で Bg/Label を動的に塗り替えるため (RefreshDynamic 参照)
+            // 塗りを固定する SecondaryButton ではなく EmbossTrim のみを足す (既にカード内部なので
+            // Card による二重の影は付けない。ShopScreen.PriceButton と同じ判断)。
             var btn = UIFactory.TextButton(card, name, label, 34,
                 UITheme.Background, UITheme.TextColor, () => SelectAiLevel(level));
             UIFactory.Place((RectTransform)btn.transform, cx, 0.12f, 0.26f, 0.14f);
+            UIFactory.EmbossTrim(btn.transform, name + "Emboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             return new AiSegment
             {
                 Level = level,
@@ -264,6 +268,8 @@ namespace EscapeNine.Runtime.UI
             var btn = UIFactory.TextButton(card, name, label, 34,
                 UITheme.Background, UITheme.TextColor, () => SelectQualityTier(tier));
             UIFactory.Place((RectTransform)btn.transform, cx, 0.12f, 0.26f, 0.14f);
+            // HD-2D (2026-07-07): BuildAiSegment と同じ理由で EmbossTrim のみ (Card 二重掛けなし)。
+            UIFactory.EmbossTrim(btn.transform, name + "Emboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             return new QualitySegment
             {
                 Tier = tier,
@@ -302,6 +308,9 @@ namespace EscapeNine.Runtime.UI
                     App.I.Router.Show(ScreenId.Tutorial);
                 });
             UIFactory.Place((RectTransform)btn.transform, 0.5f, 0.36f, 0.88f, 0.44f);
+            // HD-2D (2026-07-07): Home の Play ボタンと同じくゴールドの縁取りで主役感を足す
+            // (カード内部のため Card の二重掛けはしない)。
+            UIFactory.BorderTrim(btn.transform, "ShowTutorialBorder", UITheme.GoldText, 0.7f);
         }
 
         // MARK: - Card 5: アプリについて (Swift: aboutSection + タスク要件の URL/バージョン)
@@ -331,13 +340,17 @@ namespace EscapeNine.Runtime.UI
 
             CreateDivider(card, 0.47f);
 
+            // HD-2D (2026-07-07): 塗りをカード背景から浮くよう ButtonFill に変更 + EmbossTrim
+            // (カード内部のため Card 二重掛けはしない。Home サブボタンと同じ根本原因の修正)。
             var privacy = UIFactory.TextButton(card, "PrivacyButton", "プライバシーポリシー", 34,
-                UITheme.Background, UITheme.TextColor, () => OpenUrl(PrivacyPolicyUrl));
+                UITheme.ButtonFill, UITheme.TextColor, () => OpenUrl(PrivacyPolicyUrl));
             UIFactory.Place((RectTransform)privacy.transform, 0.5f, 0.35f, 0.88f, 0.14f);
+            UIFactory.EmbossTrim(privacy.transform, "PrivacyEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
 
             var support = UIFactory.TextButton(card, "SupportButton", "サポート (GitHub)", 34,
-                UITheme.Background, UITheme.TextColor, () => OpenUrl(SupportUrl));
+                UITheme.ButtonFill, UITheme.TextColor, () => OpenUrl(SupportUrl));
             UIFactory.Place((RectTransform)support.transform, 0.5f, 0.16f, 0.88f, 0.14f);
+            UIFactory.EmbossTrim(support.transform, "SupportEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
         }
 
         private void OpenUrl(string url)
@@ -372,13 +385,16 @@ namespace EscapeNine.Runtime.UI
             var buy = UIFactory.TextButton(card, "AdBuyButton", "購入する", 32,
                 UITheme.Available, UITheme.Background, OnBuyAdRemovalTapped);
             UIFactory.Place((RectTransform)buy.transform, 0.84f, 0.63f, 0.24f, 0.16f);
+            UIFactory.EmbossTrim(buy.transform, "AdBuyEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             _adBuyButton = buy.gameObject;
 
             CreateDivider(card, 0.46f);
 
+            // HD-2D (2026-07-07): 塗りを ButtonFill に (カード内部のため Card 二重掛けはしない)。
             var restore = UIFactory.TextButton(card, "RestoreButton", "購入を復元", 34,
-                UITheme.Background, UITheme.TextColor, OnRestorePurchasesTapped);
+                UITheme.ButtonFill, UITheme.TextColor, OnRestorePurchasesTapped);
             UIFactory.Place((RectTransform)restore.transform, 0.5f, 0.30f, 0.88f, 0.18f);
+            UIFactory.EmbossTrim(restore.transform, "RestoreEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
 
             _purchaseStatusLabel = UIFactory.Label(card, "PurchaseStatus", "", 26,
                 UITheme.WithAlpha(UITheme.Warning, 0.9f));
@@ -556,16 +572,13 @@ namespace EscapeNine.Runtime.UI
             _cursor -= SectionGap / ContentHeightRatio;
             float h = heightVp / ContentHeightRatio;
 
-            var card = UIFactory.Panel(_content, name, UITheme.WithAlpha(UITheme.BackgroundSecondary, 0.92f));
+            // HD-2D (2026-07-07): フラット塗り+手動4辺ボーダーから Card(PanelFill) + BorderTrim へ
+            // (BPMInfoWidget と同じ「枠付き計器パネル」の質感。枠色は元の GridBorder を維持)。
+            var card = UIFactory.Card(_content, name, out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(card, 0.5f, _cursor - h * 0.5f, 0.92f, h);
             _cursor -= h;
 
-            // 枠線 (Swift: GameCard の gridBorder ストローク)。角丸は uGUI 標準では不可のため直線 4 辺。
-            var border = UITheme.WithAlpha(UITheme.GridBorder, 0.5f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderT", border).transform, 0.5f, 1f, 1f, 0.015f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderB", border).transform, 0.5f, 0f, 1f, 0.015f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderL", border).transform, 0f, 0.5f, 0.006f, 1f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderR", border).transform, 1f, 0.5f, 0.006f, 1f);
+            UIFactory.BorderTrim(card, name + "Border", UITheme.GridBorder, 0.5f, 0.015f, 0.006f);
 
             var t = UIFactory.Label(card, "CardTitle", title, 38, UITheme.GoldText,
                 TextAnchor.MiddleLeft, FontStyle.Bold);
@@ -617,6 +630,8 @@ namespace EscapeNine.Runtime.UI
             var btn = UIFactory.TextButton(card, name + "Toggle", "", 32,
                 UITheme.Background, UITheme.TextColor, onTap);
             UIFactory.Place((RectTransform)btn.transform, 0.84f, rowCy - 0.025f, 0.22f, 0.12f);
+            // HD-2D (2026-07-07): ON/OFF で動的に塗り替えるため Card 二重掛けはせず EmbossTrim のみ。
+            UIFactory.EmbossTrim(btn.transform, name + "ToggleEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
 
             toggleBg = btn.GetComponent<Image>();
             toggleLabel = btn.GetComponentInChildren<TextMeshProUGUI>();

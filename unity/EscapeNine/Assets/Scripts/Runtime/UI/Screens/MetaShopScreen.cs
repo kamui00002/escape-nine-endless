@@ -93,8 +93,7 @@ namespace EscapeNine.Runtime.UI
                 root.offsetMax = Vector2.zero;
             }
 
-            var bg = UIFactory.ColorRect(transform, "Background", UITheme.Background);
-            UIFactory.Place((RectTransform)bg.transform, 0.5f, 0.5f, 1f, 1f);
+            UIFactory.SimpleDepthBackground(transform);
 
             var safe = UIFactory.Panel(transform, "SafeArea");
             safe.gameObject.AddComponent<SafeAreaFitter>();
@@ -123,9 +122,8 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildHeader(RectTransform parent)
         {
-            var back = UIFactory.TextButton(parent, "BackButton", "< 戻る", 36,
-                UITheme.BackgroundSecondary, UITheme.TextColor, OnBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.12f, 0.955f, 0.18f, 0.045f);
+            UIFactory.SecondaryButton(parent, "BackButton", "< 戻る", 0.12f, 0.955f, 0.18f, 0.045f,
+                OnBackTapped, 36);
 
             var title = UIFactory.Label(parent, "TitleLabel", "遺物庫", 64, UITheme.TextColor,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -172,8 +170,10 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildFutureSection(RectTransform parent)
         {
-            var panel = UIFactory.Panel(parent, "FutureSection", UITheme.WithAlpha(UITheme.BackgroundSecondary, 0.5f));
+            // HD-2D (2026-07-07): フラット塗りから Card(PanelFill) + BorderTrim へ。
+            var panel = UIFactory.Card(parent, "FutureSection", out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(panel, 0.5f, 0.095f, 0.94f, 0.13f);
+            UIFactory.BorderTrim(panel, "FutureSectionBorder", UITheme.Accent, 0.3f);
 
             var label = UIFactory.Label(panel, "FutureLabel",
                 "コスメティック・レリックプール拡張・追加キャラクター (近日追加)", 24,
@@ -229,13 +229,26 @@ namespace EscapeNine.Runtime.UI
         /// <summary>レリック行。未解放は「解放 (残光N)」ボタン、解放済みは「装備/解除」トグル。</summary>
         private void BuildRelicRow(RectTransform parent, int index, RelicDefinition def, bool unlocked, bool equipped, float cy, float h)
         {
-            var row = UIFactory.Panel(parent, "Row" + index,
-                UITheme.WithAlpha(UITheme.BackgroundSecondary, unlocked ? 1f : 0.55f));
+            // HD-2D (2026-07-07): フラット塗りの行から Card(PanelFill) へ。行は RefreshAll のたびに
+            // 全破棄→再構築されるため (RebuildRows 参照)、Image を後から動的に塗り替えるコードは
+            // どこにも無い = Card 化しても契約は壊れない。レアリティ色を BorderTrim の縁取りに使い
+            // 「カードらしさ」を強調する (タスク要件)。未解放時の減光は CanvasGroup.alpha で表現する
+            // (Card 内部のグラデ/影/ハイライトの複数レイヤーを一括で暗くするため、単一 Image.color の
+            // アルファ操作では代替できない)。
+            var row = UIFactory.Card(parent, "Row" + index, out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(row, 0.5f, cy, 0.94f, h);
+            if (!unlocked)
+            {
+                row.gameObject.AddComponent<CanvasGroup>().alpha = 0.55f;
+            }
+
+            Color rarityColor = RarityColor(def.Rarity);
+            UIFactory.BorderTrim(row, "Row" + index + "Border", rarityColor, unlocked ? 0.75f : 0.4f);
 
             if (equipped)
             {
-                // 装備中の行は枠だけ強調 (Swift 系画面が使う success 色を踏襲)
+                // 装備中の行は上辺だけ success 色で上書き強調 (BorderTrim のレアリティ縁取りより手前に
+                // 生成することで、同じ上辺位置でも success 色が勝つ)
                 var border = UIFactory.ColorRect(row, "EquippedBorder", UITheme.Success);
                 UIFactory.Place((RectTransform)border.transform, 0.5f, 0.98f, 1f, 0.02f);
             }
@@ -268,22 +281,27 @@ namespace EscapeNine.Runtime.UI
             int cost = UnlockCost(def.Rarity);
             bool affordable = App.I.Player.MetaCurrency >= cost;
 
+            // HD-2D (2026-07-07): 塗りを ButtonFill に (行が Card 化されたため Card 二重掛けはせず
+            // EmbossTrim のみ足す)。afford/not-afford の意味は文字色 (fg) 側が担うため塗り変更の影響はない。
             var btn = UIFactory.TextButton(row, "UnlockButton", $"解放\n残光{cost}", 22,
-                UITheme.Background, affordable ? UITheme.Available : UITheme.WithAlpha(UITheme.TextColor, 0.35f),
+                UITheme.ButtonFill, affordable ? UITheme.Available : UITheme.WithAlpha(UITheme.TextColor, 0.35f),
                 () => OnUnlockTapped(def.Id, cost));
             UIFactory.Place((RectTransform)btn.transform, 0.865f, 0.5f, 0.22f, 0.72f);
+            UIFactory.EmbossTrim(btn.transform, "UnlockEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             btn.interactable = affordable; // 残高不足時はタップしても反応しない (二重防御。TryUnlockRelic 側でも判定)
         }
 
         private void BuildEquipToggleButton(RectTransform row, RelicDefinition def, bool equipped)
         {
             string label = equipped ? "解除" : "装備";
-            Color bg = equipped ? UITheme.Success : UITheme.Background;
+            // HD-2D (2026-07-07): 未装備時の塗りを Background → ButtonFill に (行の Card 化に伴い視認性確保)。
+            Color bg = equipped ? UITheme.Success : UITheme.ButtonFill;
             Color fg = equipped ? UITheme.Background : UITheme.TextColor;
 
             var btn = UIFactory.TextButton(row, "EquipButton", label, 28, bg, fg,
                 () => OnEquipTapped(def.Id, equipped));
             UIFactory.Place((RectTransform)btn.transform, 0.865f, 0.5f, 0.22f, 0.6f);
+            UIFactory.EmbossTrim(btn.transform, "EquipEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
         }
 
         private static string RarityText(RelicRarity rarity)

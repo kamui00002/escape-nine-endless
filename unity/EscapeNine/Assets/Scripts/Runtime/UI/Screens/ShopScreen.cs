@@ -72,8 +72,7 @@ namespace EscapeNine.Runtime.UI
                 root.offsetMax = Vector2.zero;
             }
 
-            var bg = UIFactory.ColorRect(transform, "Background", UITheme.Background);
-            UIFactory.Place((RectTransform)bg.transform, 0.5f, 0.5f, 1f, 1f);
+            UIFactory.SimpleDepthBackground(transform);
 
             var safe = UIFactory.Panel(transform, "SafeArea");
             safe.gameObject.AddComponent<SafeAreaFitter>();
@@ -113,9 +112,9 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place((RectTransform)band.transform, 0.5f, 0.965f, 1f, 0.07f);
 
             // 戻る (Swift: chevron.left → SF Symbol 不可のため "<" テキスト。dismiss() = Home へ)
-            var back = UIFactory.TextButton(parent, "BackButton", "< 戻る", 34,
-                UITheme.Background, UITheme.TextColor, OnBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.12f, 0.965f, 0.18f, 0.042f);
+            // HD-2D (2026-07-07): Home のサブボタンと同じ質感 (ButtonFill 塗り + EmbossTrim) に統一。
+            UIFactory.SecondaryButton(parent, "BackButton", "< 戻る", 0.12f, 0.965f, 0.18f, 0.042f,
+                OnBackTapped, 34);
 
             var title = UIFactory.Label(parent, "TitleLabel", "ショップ", 50, UITheme.TextColor,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -159,7 +158,12 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place(border, 0.5f, cy, 0.92f, 0.095f);
             w.Border = border.GetComponent<Image>();
 
-            var body = UIFactory.Panel(border, "Body", UITheme.BackgroundSecondary);
+            // HD-2D (2026-07-07): 塗りを PanelFillTop/Bottom の縦グラデに (旧 BackgroundSecondary の
+            // フラット塗りだと計器/カードらしい立体感が無かった)。border 側の色反転トリック (购入済み/
+            // 未購入で GridBorder⇔Success を切替、RefreshItems 参照) はそのまま維持するため触らない。
+            var bodyImg = UIFactory.FillImage(border, "Body",
+                UIFactory.VerticalGradientSprite(UITheme.PanelFillTop, UITheme.PanelFillBottom, 64));
+            var body = (RectTransform)bodyImg.transform;
             UIFactory.Place(body, 0.5f, 0.5f, 0.994f, 0.97f);
 
             // --- アイコン (左端。Swift: 絵文字 36pt + background 0.5 の角丸ボックス) ---
@@ -193,6 +197,9 @@ namespace EscapeNine.Runtime.UI
             var priceButton = UIFactory.TextButton(body, "PriceButton", price, 36,
                 UITheme.Available, Color.white, () => OnPurchaseTapped(productId));
             UIFactory.Place((RectTransform)priceButton.transform, 0.86f, 0.5f, 0.20f, 0.52f);
+            // HD-2D (2026-07-07): 既に body カード内部にあり二重の影は過剰なため Card 化はせず、
+            // EmbossTrim のみで「彫られた木の看板」の質感を軽く足す (他ボタンとの統一感)。
+            UIFactory.EmbossTrim(priceButton.transform, "PriceEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             w.PriceButtonRoot = priceButton.gameObject;
 
             var badge = UIFactory.ColorRect(body, "PurchasedBadge", UITheme.WithAlpha(UITheme.Success, 0.15f));
@@ -208,9 +215,9 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildRestoreButton(RectTransform parent)
         {
-            var restore = UIFactory.TextButton(parent, "RestoreButton", "購入を復元", 34,
-                UITheme.BackgroundSecondary, UITheme.WithAlpha(UITheme.TextColor, 0.7f), OnRestoreTapped);
-            UIFactory.Place((RectTransform)restore.transform, 0.5f, 0.30f, 0.92f, 0.055f);
+            // HD-2D (2026-07-07): Home のサブボタンと同じ質感に統一。
+            UIFactory.SecondaryButton(parent, "RestoreButton", "購入を復元", 0.5f, 0.30f, 0.92f, 0.055f,
+                OnRestoreTapped, 34);
         }
 
         // MARK: - トースト

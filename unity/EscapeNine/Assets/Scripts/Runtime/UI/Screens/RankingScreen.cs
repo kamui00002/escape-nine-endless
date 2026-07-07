@@ -67,10 +67,8 @@ namespace EscapeNine.Runtime.UI
                 root.offsetMax = Vector2.zero;
             }
 
-            // 背景 (Swift: background → backgroundSecondary の縦グラデーション。
-            // グラデーションは Phase 4/juice 送りで単色に簡略化)
-            var bg = UIFactory.ColorRect(transform, "Background", UITheme.Background);
-            UIFactory.Place((RectTransform)bg.transform, 0.5f, 0.5f, 1f, 1f);
+            // 背景 (HD-2D、2026-07-07: 単色 ColorRect から縦グラデ+下端ヴィネットの軽量版へ)
+            UIFactory.SimpleDepthBackground(transform);
 
             var safe = UIFactory.Panel(transform, "SafeArea");
             safe.gameObject.AddComponent<SafeAreaFitter>();
@@ -93,9 +91,9 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildHeader(RectTransform parent)
         {
-            var back = UIFactory.TextButton(parent, "BackButton", "← 戻る", 36,
-                UITheme.BackgroundSecondary, UITheme.TextColor, OnBackTapped);
-            UIFactory.Place((RectTransform)back.transform, 0.12f, 0.955f, 0.18f, 0.045f);
+            // HD-2D (2026-07-07): Home のサブボタンと同じ質感に統一。
+            UIFactory.SecondaryButton(parent, "BackButton", "← 戻る", 0.12f, 0.955f, 0.18f, 0.045f,
+                OnBackTapped, 36);
 
             var title = UIFactory.Label(parent, "TitleLabel", "ランキング", 64, UITheme.TextColor,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -113,15 +111,11 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildMyRecordCard(RectTransform parent)
         {
-            var card = UIFactory.Panel(parent, "MyRecordCard", UITheme.WithAlpha(UITheme.BackgroundSecondary, 0.95f));
+            // HD-2D (2026-07-07): フラット塗り+手動4辺ボーダーから Card(PanelFill) + BorderTrim へ。
+            // 枠線色は元の Available (Swift: available→main グラデの簡略単色) を踏襲する。
+            var card = UIFactory.Card(parent, "MyRecordCard", out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(card, 0.5f, 0.855f, 0.92f, 0.13f);
-
-            // 枠線 (Swift: available→main のグラデーションストローク → 単色 4 辺に簡略化)
-            var border = UITheme.WithAlpha(UITheme.Available, 0.5f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderT", border).transform, 0.5f, 1f, 1f, 0.03f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderB", border).transform, 0.5f, 0f, 1f, 0.03f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderL", border).transform, 0f, 0.5f, 0.008f, 1f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderR", border).transform, 1f, 0.5f, 0.008f, 1f);
+            UIFactory.BorderTrim(card, "MyRecordCardBorder", UITheme.Available, 0.5f);
 
             var caption = UIFactory.Label(card, "Caption", "あなたの記録", 32,
                 UITheme.WithAlpha(UITheme.TextColor, 0.7f));
@@ -140,15 +134,19 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildTabs(RectTransform parent)
         {
-            var local = UIFactory.TextButton(parent, "TabLocal", "プレイ履歴", 36,
-                UITheme.Background, UITheme.TextColor, () => SelectTab(Tab.Local));
-            UIFactory.Place((RectTransform)local.transform, 0.29f, 0.765f, 0.42f, 0.045f);
+            // HD-2D (2026-07-07): Card で浮かせ + Emboss で質感統一。選択状態で背景/文字色を動的に
+            // 塗り替える (ApplyTabVisual) ため、塗りを ButtonFill 固定にする SecondaryButton ではなく
+            // ElevatedButton (色を渡せる版) を使う。TextButton 自身の Image は Card ラップの有無に
+            // 関わらず返り値の Button 直下にあるため、GetComponent<Image>() での動的着色は維持される。
+            var local = UIFactory.ElevatedButton(parent, "TabLocal", "プレイ履歴", 36,
+                UITheme.Background, UITheme.TextColor, 0.29f, 0.765f, 0.42f, 0.045f, () => SelectTab(Tab.Local));
+            UIFactory.EmbossTrim(local.transform, "TabLocalEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             _tabLocalBg = local.GetComponent<Image>();
             _tabLocalLabel = local.GetComponentInChildren<TextMeshProUGUI>();
 
-            var cloud = UIFactory.TextButton(parent, "TabCloud", "クラウド", 36,
-                UITheme.Background, UITheme.TextColor, () => SelectTab(Tab.Cloud));
-            UIFactory.Place((RectTransform)cloud.transform, 0.71f, 0.765f, 0.42f, 0.045f);
+            var cloud = UIFactory.ElevatedButton(parent, "TabCloud", "クラウド", 36,
+                UITheme.Background, UITheme.TextColor, 0.71f, 0.765f, 0.42f, 0.045f, () => SelectTab(Tab.Cloud));
+            UIFactory.EmbossTrim(cloud.transform, "TabCloudEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             _tabCloudBg = cloud.GetComponent<Image>();
             _tabCloudLabel = cloud.GetComponentInChildren<TextMeshProUGUI>();
         }
@@ -275,8 +273,11 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildRow(RectTransform parent, int index, RankingEntry entry, float cy, float h)
         {
-            var row = UIFactory.Panel(parent, "Row" + index, UITheme.WithAlpha(UITheme.BackgroundSecondary, 0.95f));
+            // HD-2D (2026-07-07): フラット塗りの行パネルから Card(PanelFill) + BorderTrim へ
+            // (BPMInfoWidget と同じ「枠付き計器パネル」の質感)。
+            var row = UIFactory.Card(parent, "Row" + index, out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(row, 0.5f, cy, 0.94f, h);
+            UIFactory.BorderTrim(row, "Row" + index + "Border", UITheme.Accent, 0.4f);
 
             // 順位 (Swift: 1位 available / 2位 textSecondary / 3位 main / それ以外 text 0.7。
             // このパレットでは available と textSecondary が同じ #ffd700 だが、Swift の対応を忠実に保つ)

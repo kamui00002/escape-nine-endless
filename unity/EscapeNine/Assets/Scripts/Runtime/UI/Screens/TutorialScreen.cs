@@ -111,9 +111,9 @@ namespace EscapeNine.Runtime.UI
                 root.offsetMax = Vector2.zero;
             }
 
-            // 背景はノッチ下まで全面 (Swift: Color(hex: GameColors.background).ignoresSafeArea())
-            var bg = UIFactory.ColorRect(transform, "Background", UITheme.Background);
-            UIFactory.Place((RectTransform)bg.transform, 0.5f, 0.5f, 1f, 1f);
+            // 背景はノッチ下まで全面 (Swift: Color(hex: GameColors.background).ignoresSafeArea())。
+            // HD-2D (2026-07-07): 単色から縦グラデ+下端ヴィネットの軽量版へ。
+            UIFactory.SimpleDepthBackground(transform);
 
             // コンテンツはセーフエリア内 (SwiftUI では自動処理されていた部分)
             var safe = UIFactory.Panel(transform, "SafeArea");
@@ -244,7 +244,11 @@ namespace EscapeNine.Runtime.UI
                 // 位置は ShowPage() の UpdateDots() で毎回 Place し直す (現在ページだけ幅が変わるため)
             }
 
-            // スキップ (Swift: skipButton = 右上 xmark.circle.fill。常設)
+            // スキップ (Swift: skipButton = 右上 xmark.circle.fill。常設)。
+            // HD-2D (2026-07-07): 意図的に他ボタンの Card/Emboss 統一から除外する。閉じるボタンは
+            // Prev/Next (チュートリアル進行) より目立たせない方が良い UX 判断であり、Home のサブボタン
+            // 修正の動機 (背景に埋もれて押せない) はここでは当てはまらない (× アイコンは形状自体で
+            // 十分視認できる)。
             var skip = UIFactory.TextButton(parent, "SkipButton", "×", 64,
                 UITheme.WithAlpha(UITheme.BackgroundSecondary, 0.6f),
                 UITheme.WithAlpha(UITheme.TextColor, 0.6f), OnSkipTapped);
@@ -255,10 +259,11 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildInstructionCard(RectTransform parent)
         {
-            var card = UIFactory.Panel(parent, "InstructionCard",
-                UITheme.WithAlpha(UITheme.BackgroundSecondary, 0.85f));
+            // HD-2D (2026-07-07): フラット塗り+手動ボーダーから Card(PanelFill) + BorderTrim へ
+            // (BPMInfoWidget と同じ「枠付き計器パネル」の質感)。
+            var card = UIFactory.Card(parent, "InstructionCard", out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
             UIFactory.Place(card, 0.5f, 0.868f, 0.92f, 0.145f);
-            AddCardBorder(card); // Swift: stroke(accent.opacity(0.4))
+            UIFactory.BorderTrim(card, "InstructionCardBorder", UITheme.Accent, 0.4f, 0.015f, 0.006f); // Swift: stroke(accent.opacity(0.4))
 
             // "STEP n / 6" (Swift: "Step \(n) / \(total)" — textSecondary = GoldText)
             _stepCaptionLabel = UIFactory.Label(card, "StepCaption", "", 34, UITheme.GoldText,
@@ -272,16 +277,6 @@ namespace EscapeNine.Runtime.UI
             _subtitleLabel = UIFactory.Label(card, "SubtitleLabel", "", 38,
                 UITheme.WithAlpha(UITheme.TextColor, 0.85f));
             UIFactory.Place((RectTransform)_subtitleLabel.transform, 0.5f, 0.22f, 0.92f, 0.40f);
-        }
-
-        /// <summary>カードのアクセント色細枠 (ResultScreen の AddCardBorder と同じ簡易表現)。</summary>
-        private static void AddCardBorder(RectTransform card)
-        {
-            Color border = UITheme.WithAlpha(UITheme.Accent, 0.4f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderTop", border).transform, 0.5f, 1f, 1f, 0.015f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderBottom", border).transform, 0.5f, 0f, 1f, 0.015f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderLeft", border).transform, 0f, 0.5f, 0.006f, 1f);
-            UIFactory.Place((RectTransform)UIFactory.ColorRect(card, "BorderRight", border).transform, 1f, 0.5f, 0.006f, 1f);
         }
 
         // MARK: - 盤面エリア
@@ -324,16 +319,21 @@ namespace EscapeNine.Runtime.UI
 
         private void BuildNavButtons(RectTransform parent)
         {
-            // 前へ (Swift 正本には無いが、6 ページ構成の読み返し用にタスク要件で追加)
-            var prev = UIFactory.TextButton(parent, "PrevButton", "前へ", 54,
-                UITheme.BackgroundSecondary, UITheme.TextColor, OnPrevTapped);
-            UIFactory.Place((RectTransform)prev.transform, 0.28f, 0.115f, 0.42f, 0.06f);
-            _prevButtonRoot = prev.gameObject;
+            // 前へ (Swift 正本には無いが、6 ページ構成の読み返し用にタスク要件で追加)。
+            // HD-2D (2026-07-07): Home のサブボタンと同じ質感に統一。
+            var prev = UIFactory.SecondaryButton(parent, "PrevButton", "前へ", 0.28f, 0.115f, 0.42f, 0.06f,
+                OnPrevTapped, 54);
+            // HD-2D (2026-07-07): SecondaryButton は内側の Button を返すため、SetActive(false) を
+            // そのまま Button に対して行うと Card (影+パネル) だけが実体なく浮いて残ってしまう。
+            // Card ルート (Button の親) を隠す対象にする (HomeScreen.BuildDailyChallengeButton と同じ対策)。
+            _prevButtonRoot = prev.transform.parent.gameObject;
 
-            // 次へ / はじめる (Swift: nextButton = accent 背景 + background 色文字)
-            _nextButton = UIFactory.TextButton(parent, "NextButton", "次へ", 54,
-                UITheme.Accent, UITheme.Background, OnNextTapped);
-            UIFactory.Place((RectTransform)_nextButton.transform, 0.72f, 0.115f, 0.42f, 0.06f);
+            // 次へ / はじめる (Swift: nextButton = accent 背景 + background 色文字)。ShowPage() が
+            // 有効/無効で色を動的に塗り替えるため (_nextButtonImage.color 参照)、塗りを固定する
+            // SecondaryButton ではなく ElevatedButton (Card 化のみ) を使う。
+            _nextButton = UIFactory.ElevatedButton(parent, "NextButton", "次へ", 54,
+                UITheme.Accent, UITheme.Background, 0.72f, 0.115f, 0.42f, 0.06f, OnNextTapped);
+            UIFactory.EmbossTrim(_nextButton.transform, "NextEmboss", UITheme.ButtonHighlightLine, UITheme.Accent);
             _nextButtonImage = _nextButton.GetComponent<Image>();
             _nextButtonLabel = _nextButton.GetComponentInChildren<TextMeshProUGUI>();
             if (_nextButtonLabel != null) _nextButtonLabel.fontStyle = FontStyles.Bold;
