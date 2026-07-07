@@ -65,11 +65,14 @@ namespace EscapeNine.Runtime.Stage
         // 傾き: 平滑化した現在のヨー角 (度、Input.acceleration.x 由来、毎フレーム再構築で drift しない)
         private float _tiltYaw;
 
-        // ピッチ (前後傾き): accel.z は端末の持ち角で基準がブレるため、盤面表示開始時の値を neutral として
-        // 一度だけ取り込み (差分で「傾け始めた角度」を 0 とする)。以後は固定基準からの差分＝ヨーと同じ hold-to-peek。
         private float _tiltPitch;
+
+        // 傾きの neutral 基準 (accel の x=左右 / z=前後)。「縦持ち直立なら accel.x=0」を前提にすると、
+        // 実際は皆スマホを少し傾けて持つため常時オフセット (= 右にずっと傾く) が出る。そこで盤面表示開始時の
+        // 「その人の持ち角」を一度だけ取り込んで 0 とし、以後その差分で駆動する (yaw/pitch 共通、hold-to-peek)。
+        private float _yawBaseline;
         private float _pitchBaseline;
-        private bool _pitchInit;
+        private bool _tiltCalibrated;
 
         // 圧迫ズーム: 現在値/目標値と補間進捗 (階層に紐づく持続状態、OnDisable でも保持する)
         private float _zoomCurrentDelta;
@@ -102,8 +105,9 @@ namespace EscapeNine.Runtime.Stage
             if (_orbitRoutine != null) { StopCoroutine(_orbitRoutine); _orbitRoutine = null; }
             _orbitYawDelta = 0f;
 
-            // ピッチ基準を取り直す (次に盤面を表示した時の持ち角を新たな neutral にする)。
-            _pitchInit = false;
+            // 傾き基準を取り直す (次に盤面を表示した時の持ち角を新たな neutral にする)。
+            _tiltCalibrated = false;
+            _tiltYaw = 0f;
             _tiltPitch = 0f;
         }
 
@@ -202,9 +206,16 @@ namespace EscapeNine.Runtime.Stage
             }
 
             // デバイス傾きパララックス: 左右傾き(accel.x)を盤面中心まわりのヨーへ平滑化して適用。
-            // accel.x は縦持ち直立で ~0、左右に傾けると ±1 へ (基準補正不要)。符号は「傾けた側から覗く」感。
+            // 盤面表示開始時の accel を neutral として一度取り込み (yaw=x / pitch=z を同時)、以後その差分で駆動。
+            // これで「持ち角ぶんの常時オフセット (= 右にずっと傾く)」を打ち消す。符号は「傾けた側から覗く」感。
             // エディタ(accel=0)では無反応=実機専用の演出。毎フレーム基準姿勢から作り直すので drift しない。
-            float targetYaw = Mathf.Clamp(-Input.acceleration.x, -1f, 1f) * TiltMaxYawDegrees;
+            if (!_tiltCalibrated)
+            {
+                _yawBaseline = Input.acceleration.x;
+                _pitchBaseline = Input.acceleration.z;
+                _tiltCalibrated = true;
+            }
+            float targetYaw = Mathf.Clamp(-(Input.acceleration.x - _yawBaseline), -1f, 1f) * TiltMaxYawDegrees;
             _tiltYaw = Mathf.Lerp(_tiltYaw, targetYaw, 1f - Mathf.Exp(-TiltSmoothing * Time.unscaledDeltaTime));
             if (Mathf.Abs(_tiltYaw) > 0.0001f)
             {
@@ -219,7 +230,6 @@ namespace EscapeNine.Runtime.Stage
             // 前後傾き(ピッチ): 盤面表示開始時の accel.z を neutral として一度取り込み、以後その差分で
             // 上下の覗き込み。ヨーの後に (post-yaw の) カメラ右軸まわりに原点中心で回すことで、
             // 「箱を上/下から覗き込む」2軸目の立体感を出す。
-            if (!_pitchInit) { _pitchBaseline = Input.acceleration.z; _pitchInit = true; }
             float targetPitch = Mathf.Clamp((Input.acceleration.z - _pitchBaseline) * PitchGain, -1f, 1f) * TiltMaxPitchDegrees;
             _tiltPitch = Mathf.Lerp(_tiltPitch, targetPitch, 1f - Mathf.Exp(-TiltSmoothing * Time.unscaledDeltaTime));
             if (Mathf.Abs(_tiltPitch) > 0.0001f)
