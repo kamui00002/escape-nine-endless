@@ -294,35 +294,45 @@ namespace EscapeNine.Runtime.UI
         // MARK: - 操作ハンドラ
 
         /// <summary>
-        /// 購入スタブ。
-        /// TODO(Phase 3): Unity IAP と接続する。
+        /// 購入。IIapService (Phase 3 groundwork) 経由で行う。
         ///   Swift 正本: PurchaseManager.purchaseCharacter / purchaseAdRemoval →
         ///   StoreKitService.purchase (決済・レシート検証・Keychain 保存)。
-        ///   購入 UI (.purchaseAlert() / .purchaseLoadingOverlay()) も Phase 3 で移植する。
+        ///   本物 SDK 未導入の間は StubIapService が Editor/DevBuild でのみ擬似成功させる
+        ///   (Release では常に失敗、success=true は Editor/DevBuild でしか起こらない)。
+        ///   購入 UI (.purchaseAlert() / .purchaseLoadingOverlay()) は Phase 3 (実 SDK 導入) で移植する。
         /// </summary>
         private void OnPurchaseTapped(string productId)
         {
             App.I.Audio.PlaySfx("button_tap");
-#if UNITY_EDITOR
-            // Editor では即時反映して購入後フロー (バッジ切替 / キャラ解放) をデバッグ可能にする
-            App.I.Player.AddPurchasedProduct(productId); // キャラ解放 / 広告削除フラグも内部で反映
-            RefreshItems();
-            ShowToast("(デバッグ) 購入処理を完了しました");
-#else
-            ShowToast("購入機能は準備中です。アップデートをお待ちください");
-#endif
+            App.I.Iap.Purchase(productId, success =>
+            {
+                if (success)
+                {
+                    RefreshItems();
+                    ShowToast("(デバッグ) 購入処理を完了しました");
+                }
+                else
+                {
+                    ShowToast("購入機能は準備中です。アップデートをお待ちください");
+                }
+            });
         }
 
         /// <summary>
-        /// 復元スタブ。
-        /// TODO(Phase 3): Unity IAP のレシート復元 (Swift: purchaseManager.restorePurchases =
-        ///   AppStore.sync + Transaction.currentEntitlements 走査) と接続する。
-        ///   現状はローカル PlayerPrefs 保存のみで「復元」の対象が存在しないため常に案内トースト。
+        /// 購入の復元。IIapService.Restore 経由で行う。
+        ///   Swift 正本: purchaseManager.restorePurchases (AppStore.sync +
+        ///   Transaction.currentEntitlements 走査)。
+        ///   現状 (StubIapService) はローカル PlayerPrefs 保存のみで「復元」の対象が存在しないため
+        ///   常に no-op → 案内トースト。
         /// </summary>
         private void OnRestoreTapped()
         {
             App.I.Audio.PlaySfx("button_tap");
-            ShowToast("購入の復元は準備中です");
+            App.I.Iap.Restore(() =>
+            {
+                RefreshItems();
+                ShowToast("購入の復元は準備中です");
+            });
         }
     }
 }

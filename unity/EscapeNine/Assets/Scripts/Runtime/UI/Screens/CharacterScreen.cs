@@ -431,26 +431,32 @@ namespace EscapeNine.Runtime.UI
         }
 
         /// <summary>
-        /// 購入スタブ。
-        /// TODO(Phase 3): Unity IAP (StoreKit 相当) と接続する。
+        /// 購入。IIapService (Phase 3 groundwork) 経由で行う。
         ///   Swift 正本: PurchaseManager.purchaseCharacter → StoreKitService.purchase →
         ///   成功時に unlockCharacter + selectCharacter。決済検証・購入 UI(ローディング/アラート) も
-        ///   Phase 3 で移植する (Swift: .purchaseAlert() / .purchaseLoadingOverlay())。
+        ///   Phase 3 (実 SDK 導入) で移植する (Swift: .purchaseAlert() / .purchaseLoadingOverlay())。
+        ///   本物 SDK 未導入の間は StubIapService が Editor/DevBuild でのみ擬似成功させる
+        ///   (success=true は Editor/DevBuild でしか起こらないため、実機 Release では常に準備中表示)。
         /// </summary>
         private void PurchaseCharacterStub(CharacterType type)
         {
-#if UNITY_EDITOR
-            // Editor では即時解放して購入後フロー (解放 → 選択 → 表示更新) をデバッグ可能にする
             string productId = ProductIdFor(type);
             if (string.IsNullOrEmpty(productId)) return;
-            App.I.Player.AddPurchasedProduct(productId); // キャラ解放も内部で行われる
-            App.I.Player.SelectCharacter(type);
-            RefreshCards();
-            ShowToast("(デバッグ) 購入して選択しました");
-#else
-            // 実機では準備中トーストのみ (誤課金の期待を持たせないための明示メッセージ)
-            ShowToast("購入機能は準備中です。アップデートをお待ちください");
-#endif
+
+            App.I.Iap.Purchase(productId, success =>
+            {
+                if (success)
+                {
+                    App.I.Player.SelectCharacter(type);
+                    RefreshCards();
+                    ShowToast("(デバッグ) 購入して選択しました");
+                }
+                else
+                {
+                    // 実機では準備中トーストのみ (誤課金の期待を持たせないための明示メッセージ)
+                    ShowToast("購入機能は準備中です。アップデートをお待ちください");
+                }
+            });
         }
 
         /// <summary>有料キャラ → StoreKit 商品 ID の対応 (Swift: ProductID)。無料キャラは null。</summary>

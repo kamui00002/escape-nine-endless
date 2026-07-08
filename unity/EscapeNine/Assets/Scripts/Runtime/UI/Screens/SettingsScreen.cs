@@ -401,23 +401,40 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place((RectTransform)_purchaseStatusLabel.transform, 0.5f, 0.09f, 0.9f, 0.10f);
         }
 
-        /// <summary>広告削除の購入 (Phase 3 スタブ)。Swift: purchaseManager.purchaseAdRemoval()</summary>
+        /// <summary>
+        /// 広告削除の購入。IIapService (Phase 3 groundwork) 経由で行う。
+        /// Swift: purchaseManager.purchaseAdRemoval()
+        /// 本物 SDK 未導入の間は StubIapService が Editor/DevBuild でのみ擬似成功させる。
+        /// </summary>
         private void OnBuyAdRemovalTapped()
         {
             App.I.Audio.PlaySfx("button_tap");
-            // TODO(Phase 3): Unity IAP で ProductRemoveAds を決済し、成功時に
-            //                PlayerState.AddPurchasedProduct(PlayerState.ProductRemoveAds) を呼ぶ。
-            _purchaseStatusLabel.text = "課金は Phase 3 (IAP 導入) で対応予定です";
-            Debug.Log("[SettingsScreen] 広告削除の購入は Phase 3 (IAP) で実装予定");
+            App.I.Iap.Purchase(PlayerState.ProductRemoveAds, success =>
+            {
+                if (success)
+                {
+                    RefreshDynamic();
+                    _purchaseStatusLabel.text = "(デバッグ) 購入処理を完了しました";
+                }
+                else
+                {
+                    _purchaseStatusLabel.text = "課金は Phase 3 (IAP 導入) で対応予定です";
+                }
+            });
         }
 
-        /// <summary>購入の復元 (Phase 3 スタブ)。Swift: purchaseManager.restorePurchases()</summary>
+        /// <summary>
+        /// 購入の復元。IIapService.Restore 経由で行う。Swift: purchaseManager.restorePurchases()
+        /// 現状 (StubIapService) は復元対象のトランザクションが存在しないため常に no-op。
+        /// </summary>
         private void OnRestorePurchasesTapped()
         {
             App.I.Audio.PlaySfx("button_tap");
-            // TODO(Phase 3): Unity IAP の RestoreTransactions → PlayerState.AddPurchasedProduct 反映。
-            _purchaseStatusLabel.text = "購入の復元は Phase 3 (IAP 導入) で対応予定です";
-            Debug.Log("[SettingsScreen] 購入の復元は Phase 3 (IAP) で実装予定");
+            App.I.Iap.Restore(() =>
+            {
+                RefreshDynamic();
+                _purchaseStatusLabel.text = "購入の復元は Phase 3 (IAP 導入) で対応予定です";
+            });
         }
 
         // MARK: - イベントハンドラ (トグル / セグメント / スライダー)
