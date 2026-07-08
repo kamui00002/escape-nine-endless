@@ -133,6 +133,51 @@ namespace EscapeNine.EditorTools
             }
         }
 
+        /// <summary>
+        /// iOS シミュレータ用: 物理端末が手元に無い時に Mac 上のシミュレータで自動 UI テストするための
+        /// Xcode プロジェクトを Builds/ios-sim/ に生成する。実機用 (BuildIOS) との違いは SDK を
+        /// SimulatorSDK にする点のみ。署名は不要 (シミュレータは未署名 .app を起動できる)。
+        /// 結果は build-ios-sim-result.txt に書く。ネイティブ端末専用プラグインが増えたら
+        /// シミュレータビルドは失敗し得る (その時は実機ビルドに戻す)。
+        /// CLI: Unity -batchmode -quit -projectPath <P> -executeMethod EscapeNine.EditorTools.BuildScripts.BuildIOSSimulator
+        /// </summary>
+        [MenuItem("EscapeNine/Build iOS Simulator (Xcode project)")]
+        public static void BuildIOSSimulator()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string resultMarkerPath = Path.Combine(projectRoot, "build-ios-sim-result.txt");
+            if (File.Exists(resultMarkerPath)) File.Delete(resultMarkerPath);
+
+            string outputPath = Path.Combine(projectRoot, "Builds", "ios-sim");
+
+            try
+            {
+                UrpBootstrap.EnsureConfigured();
+                ApplyIosPlayerSettings();
+                PlayerSettings.iOS.sdkVersion = iOSSdkVersion.SimulatorSDK; // ← 実機用との唯一の差
+
+                if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.iOS)
+                {
+                    EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.iOS, BuildTarget.iOS);
+                }
+
+                var options = new BuildPlayerOptions
+                {
+                    scenes = new[] { ScenePath },
+                    locationPathName = outputPath,
+                    target = BuildTarget.iOS,
+                    options = BuildOptions.None,
+                };
+
+                BuildReport report = BuildPipeline.BuildPlayer(options);
+                WriteResultMarker(resultMarkerPath, report, outputPath);
+            }
+            catch (Exception e)
+            {
+                WriteExceptionMarker(resultMarkerPath, outputPath, e);
+            }
+        }
+
         /// <summary>iOS 専用 PlayerSettings (Bundle ID / 署名チーム / 縦向き / 最小 iOS)。macOS には影響しない。</summary>
         private static void ApplyIosPlayerSettings()
         {
@@ -140,6 +185,9 @@ namespace EscapeNine.EditorTools
             PlayerSettings.iOS.appleDeveloperTeamID = IosTeamId;
             PlayerSettings.iOS.appleEnableAutomaticSigning = true; // Xcode 自動署名
             PlayerSettings.iOS.targetOSVersionString = IosMinVersion;
+            // 実機ビルドは常に Device SDK。BuildIOSSimulator が SimulatorSDK に切替え得るため、
+            // 直後に実機ビルドしても取り残しでシミュレータ SDK のままにならないよう明示的に戻す。
+            PlayerSettings.iOS.sdkVersion = iOSSdkVersion.DeviceSDK;
 
             // 縦向き固定 (本作は縦持ち専用。回転で 3D 舞台のフレーミングが崩れるのを防ぐ)。
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
