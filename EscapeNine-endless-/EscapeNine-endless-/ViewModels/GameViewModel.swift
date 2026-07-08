@@ -956,15 +956,17 @@ class GameViewModel: ObservableObject {
             }
         }
 
-        // 実績チェック（勝利時のみ）
-        if result == .win {
+        // 実績チェック（勝利・敗北の両方）。旧実装は勝利時のみで、階層到達実績 (floor10/25/50/75/100) が
+        // 「死んだら付かない」= 100階クリアしない限りほぼ永久に取れないバグだった。checkAchievements は
+        // gameWon で「階層到達(勝敗問わず)/勝利限定」を分岐済みなので、敗北時も死亡階層に応じて解除される。
+        if result == .win || result == .lose {
             let skillUsed = skillUsageCount > 0
             let currentBPM = stageManager.getBPM(for: currentFloor)
             AchievementManager.shared.checkAchievements(
                 floor: currentFloor,
                 skillUsed: skillUsed,
                 currentBPM: currentBPM,
-                gameWon: true
+                gameWon: result == .win
             )
         }
     }

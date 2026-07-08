@@ -61,8 +61,8 @@ namespace EscapeNine.Core
         {
             var result = new HashSet<Achievement>();
 
-            // 階層到達 (勝敗問わず)
-            if (floor >= 1) result.Add(Achievement.FirstWin);
+            // 階層到達 (勝敗問わず) — 敗北時もその到達階層に応じて解除される。
+            // 呼び出し側 (GameController.EndGame) は勝利/敗北の両方でこのメソッドを呼ぶこと。
             if (floor >= 10) result.Add(Achievement.Floor10);
             if (floor >= 25) result.Add(Achievement.Floor25);
             if (floor >= 50) result.Add(Achievement.Floor50);
@@ -71,6 +71,9 @@ namespace EscapeNine.Core
 
             if (!gameWon) return result;
 
+            // 以下は勝利 (ゲームクリア) 時のみ。FirstWin は「初めてゲームをクリアした」実績のため、
+            // floor>=1 で常時ではなく勝利ゲートの内側に置く (敗北時に誤って解除されないように)。
+            result.Add(Achievement.FirstWin);
             if (floor >= 10 && !skillUsed) result.Add(Achievement.NoSkillWin);
             if (floor >= 20 && currentBPM >= 180) result.Add(Achievement.SpeedRunner);
             if (floor >= 30) result.Add(Achievement.Survivor);

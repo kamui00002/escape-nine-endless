@@ -1052,14 +1052,16 @@ namespace EscapeNine.Runtime
                 _player.AddMetaCurrency(glowEarned);
             }
 
-            // 5) 実績チェック（勝利時のみ）。Swift: GameViewModel.swift:954-964 (AchievementManager.checkAchievements)。
-            //    新規解除は LastUnlockedAchievements に控え、ResultScreen がポップアップ演出を出す (Phase 2.5)。
-            //    実績解除の効果音は Phase 3/4 送り (Swift 側にも専用 SE は無い)。
-            if (won)
+            // 5) 実績チェック（勝利・敗北の両方）。Swift: GameViewModel.swift の AchievementManager.checkAchievements。
+            //    旧実装は勝利時のみチェックしていたため、階層到達実績 (Floor10/25/50/75/100) が「死んだら
+            //    付かない」= 100階クリアしない限りほぼ永久に取れないバグだった (配信中iOS版にも存在)。
+            //    CheckAchievements は gameWon で「階層到達(勝敗問わず) / 勝利限定」を分岐済みなので、
+            //    敗北時も死亡階層に応じて到達実績が解除される。新規解除は LastUnlockedAchievements に控え、
+            //    ResultScreen がポップアップ演出を出す (Phase 2.5)。
             {
                 bool skillUsed = Session.SkillUsageCount > 0;
                 double currentBPM = Floor.CalculateBPM(Session.CurrentFloor);
-                var unlocked = AchievementChecker.CheckAchievements(Session.CurrentFloor, skillUsed, currentBPM, gameWon: true);
+                var unlocked = AchievementChecker.CheckAchievements(Session.CurrentFloor, skillUsed, currentBPM, gameWon: won);
                 PersistUnlockedAchievements(unlocked);
             }
 

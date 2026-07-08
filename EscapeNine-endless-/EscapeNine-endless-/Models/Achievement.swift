@@ -125,8 +125,7 @@ class AchievementManager: ObservableObject {
         currentBPM: Double,
         gameWon: Bool
     ) {
-        // 階層到達実績（勝敗問わず到達した階層で判定）
-        if floor >= 1 { unlock(.firstWin) }
+        // 階層到達実績（勝敗問わず到達した階層で判定。呼び出し側は勝利・敗北の両方でこれを呼ぶこと）
         if floor >= 10 { unlock(.floor10) }
         if floor >= 25 { unlock(.floor25) }
         if floor >= 50 { unlock(.floor50) }
@@ -134,6 +133,10 @@ class AchievementManager: ObservableObject {
         if floor >= 100 { unlock(.floor100) }
 
         guard gameWon else { return }
+
+        // 以下は勝利（ゲームクリア）時のみ。firstWin は「初めてゲームをクリアした」実績のため
+        // floor>=1 で常時ではなく勝利ゲートの内側に置く（敗北時に誤って解除されないように）。
+        unlock(.firstWin)
 
         // スキル未使用実績
         if floor >= 10 && !skillUsed {
