@@ -19,7 +19,9 @@ namespace EscapeNine.Runtime.UI
 {
     /// <summary>
     /// ホーム画面。SwiftUI 版 HomeView の NavigationStack 遷移を ScreenRouter.Show に置き換える。
-    /// バナー広告領域 (Swift: BannerAdView) は Phase 3 (AdMob) 送りのため置かない。
+    /// バナー広告 (Swift: BannerAdView) は IAdService 経由の継ぎ目のみ配線済み (OnShow/OnHide で
+    /// ShowBanner/HideBanner を呼ぶ)。現状は StubAdService (no-op) のため専用レイアウト領域は置かない
+    /// — 実 SDK 導入時に AdMob バナーの実サイズに合わせて追加する (decision brief §4.2)。
     /// </summary>
     public sealed class HomeScreen : ScreenBase
     {
@@ -119,6 +121,10 @@ namespace EscapeNine.Runtime.UI
             // AudioDirector.PlayBgm は同一曲再生中なら no-op なので毎回呼んで安全。
             App.I.Audio.PlayMenuBgm();
 
+            // バナー広告 (Swift: BannerAdView、ホーム画面下部のみ常時)。App.Ads が未生成 (テスト等で
+            // App.Awake を経由しない構築) の場合に備えて null ガードする。
+            if (App.I.Ads != null) App.I.Ads.ShowBanner();
+
             // HD-2D (2026-07-06): 背景パララックス / タイトル浮遊を張り直す。
             // GameObject の非活性化で既存コルーチンは自動停止するため、再表示のたびに開始し直す
             // (ToastRoutine と同じ「既存があれば止めてから張り直す」パターン)。
@@ -145,6 +151,7 @@ namespace EscapeNine.Runtime.UI
         public override void OnHide()
         {
             HideToast();
+            if (App.I != null && App.I.Ads != null) App.I.Ads.HideBanner();
             if (_parallaxRoutine != null)
             {
                 StopCoroutine(_parallaxRoutine);

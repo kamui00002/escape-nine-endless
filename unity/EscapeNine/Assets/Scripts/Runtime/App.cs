@@ -9,6 +9,7 @@
 
 using UnityEngine;
 using EscapeNine.Runtime.UI;
+using EscapeNine.Runtime.Ads;
 
 namespace EscapeNine.Runtime
 {
@@ -21,6 +22,13 @@ namespace EscapeNine.Runtime
         public EscapeNine.Runtime.UI.ScreenRouter Router;
         public GameController Game;
         public Conductor Conductor;
+
+        /// <summary>
+        /// 広告サービスの継ぎ目 (Phase 3 groundwork)。現状は StubAdService (no-op) のみ。
+        /// ネイティブ SDK 導入時はここの生成箇所を実装クラスに差し替えるだけでよい
+        /// (docs/unity-ads-iap-decision-brief.md §4.2)。
+        /// </summary>
+        public IAdService Ads;
 
         /// <summary>ローカルランキング (契約外の追加公開。Ranking 画面 / Result 画面が参照)。</summary>
         public RankingStore Ranking;
@@ -50,6 +58,13 @@ namespace EscapeNine.Runtime
             Player = new PlayerState();
             Ranking = new RankingStore();
             DailyChallenge = new DailyChallengeStore();
+
+            // 広告 groundwork (Phase 3 前倒しの継ぎ目のみ): PlayerState 生成後に構築し、
+            // AdRemoved (StoreKit/IAP 購入導線が更新する既存フラグ) をそのまま参照させる。
+            Ads = new StubAdService(Player);
+            Ads.Initialize();
+            // ATT はアプリ起動につき 1 回 (Awake は App シングルトン確立時にしか通らないため自然に once-only)。
+            Ads.RequestTrackingAuthorization();
 
             // UnityEngine.Object の null 判定は == を使う (?? は偽 null を貫通するため不可)
             Audio = GetComponent<AudioDirector>();

@@ -619,19 +619,33 @@ namespace EscapeNine.Runtime.UI
 
             // TODO(Phase 3): AnalyticsLogger.logRetryTapped(fromFloor:, secondsUntilTap:) 相当。
             //                secondsUntilTap = Time.realtimeSinceStartup - _shownAtRealtime。
-            // TODO(Phase 3): リトライ時インタースティシャル広告 (Swift: InterstitialAdPresenter)。
             App.I.Audio.PlaySfx("button_tap");
 
-            // 同条件 (同キャラ・同難易度) で 1 階から即再スタート → Game 画面へ。
-            // GameScreen の契約 (GameScreen.cs 冒頭コメント):
-            //   「HomeScreen / ResultScreen は StartNewRun() 済みで Show(Game) してくる (payload=null)」
-            // → GameScreen はラン進行中 (Status==Playing) を検知し、プレゲームオーバーレイを
-            //   出さず即 HUD に接続する。HomeScreen と同じ「StartNewRun → Show(Game)」順。
-            // 注意: ここで GameStartRequest(AutoStart=true) を渡してはいけない —
-            //   GameScreen.BeginRun がもう一度 StartNewRun してしまい (二重開始)、
-            //   リトライ条件が PlayerState 由来の値で上書きされるため。
-            App.I.Game.StartNewRun(_retryCharacter, _retryLevel, 1);
-            App.I.Router.Show(ScreenId.Game);
+            // インタースティシャル広告 (Swift: InterstitialAdPresenter.show)。表示完了 (または
+            // AdsRemoved / 広告未準備による即時クローズ) 後に本来のリトライ処理を続行する。
+            // App.I.Ads が未生成 (テスト等) の場合は広告を挟まず直接リトライする。
+            System.Action continueRetry = () =>
+            {
+                // 同条件 (同キャラ・同難易度) で 1 階から即再スタート → Game 画面へ。
+                // GameScreen の契約 (GameScreen.cs 冒頭コメント):
+                //   「HomeScreen / ResultScreen は StartNewRun() 済みで Show(Game) してくる (payload=null)」
+                // → GameScreen はラン進行中 (Status==Playing) を検知し、プレゲームオーバーレイを
+                //   出さず即 HUD に接続する。HomeScreen と同じ「StartNewRun → Show(Game)」順。
+                // 注意: ここで GameStartRequest(AutoStart=true) を渡してはいけない —
+                //   GameScreen.BeginRun がもう一度 StartNewRun してしまい (二重開始)、
+                //   リトライ条件が PlayerState 由来の値で上書きされるため。
+                App.I.Game.StartNewRun(_retryCharacter, _retryLevel, 1);
+                App.I.Router.Show(ScreenId.Game);
+            };
+
+            if (App.I.Ads != null)
+            {
+                App.I.Ads.ShowInterstitial(onClosed: continueRetry);
+            }
+            else
+            {
+                continueRetry();
+            }
         }
 
         /// <summary>ホームへ戻る。Swift: onHome (resetGame + メニュー BGM 復帰は QuitToHome が担う)</summary>
