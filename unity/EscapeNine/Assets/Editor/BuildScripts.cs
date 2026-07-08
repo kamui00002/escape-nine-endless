@@ -72,6 +72,13 @@ namespace EscapeNine.EditorTools
 
             try
             {
+                // アクティブターゲットが Standalone でなければ切り替える (iOS ビルド後などに実行しても
+                // BuildPlayer が非アクティブターゲットを弾かないように。BuildIOS と対称)。
+                if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.StandaloneOSX)
+                {
+                    EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneOSX);
+                }
+
                 var options = new BuildPlayerOptions
                 {
                     scenes = new[] { ScenePath },
