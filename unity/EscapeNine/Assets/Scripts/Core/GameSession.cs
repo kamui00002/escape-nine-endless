@@ -394,27 +394,30 @@ namespace EscapeNine.Core
 
             if (isCollision)
             {
-                // #5 不死鳥の残り火 (5aカタログ外だがフックとして実装): 衝突による敗北そのものを無効化して継続する。
-                // #12 二段構えの盾: 盾スキルを持たないキャラでも、レリックのチャージ分だけ即席の盾を発動する。
-                // Relics.None (両方0) のときはどちらの分岐にも入らず、既存の透明化/盾判定にそのまま進む。
-                if (Relics.ReviveCharges > 0)
+                // 吸収の優先順位 (Fable指摘で修正): 10階ごとに回復する「更新可能スキル」(透明化/盾) を先に、
+                // 1ラン1回きりの「レリックチャージ」(#5 不死鳥/#12 二段構えの盾) を最後の砦にする。
+                // 旧順序 (レリック→スキル) では、#12 を取った魔法使いが、透明化で無償・コンボ無傷で吸収できた
+                // 衝突で 1ラン限りのレリックを消費し更にコンボまで失う「取らない方がマシ」な逆転が起きていた。
+                // Relics.None (Revive/GenericShield=0) のとき relic 分岐は skip されるため、透明化/盾の
+                // 既存挙動 (Swift 正本と一致) は完全に不変。
+                if (Skill.Type == SkillType.Invisible && RemainingSkillUses > 0)
                 {
-                    Relics.ReviveCharges--;
-                }
-                else if (Relics.GenericShieldCharges > 0)
-                {
-                    Relics.GenericShieldCharges--;
-                    ComboCount = 0; // 既存の盾ガード(Shield)と同様、無効化時はコンボをリセットする
-                }
-                else if (Skill.Type == SkillType.Invisible && RemainingSkillUses > 0)
-                {
-                    SkillUsageCount++; // 透明化: 衝突時に自動消費
+                    SkillUsageCount++; // 透明化: 衝突時に自動消費 (コンボ維持)
                 }
                 else if (Skill.Type == SkillType.Shield && ShieldActive)
                 {
                     ShieldActive = false; // 盾ガード: 1回無効化
                     SkillUsageCount++;
                     ComboCount = 0;
+                }
+                else if (Relics.ReviveCharges > 0)
+                {
+                    Relics.ReviveCharges--; // #5 不死鳥の残り火: 敗北そのものを無効化
+                }
+                else if (Relics.GenericShieldCharges > 0)
+                {
+                    Relics.GenericShieldCharges--; // #12 二段構えの盾: 即席の盾
+                    ComboCount = 0; // 既存の盾ガード(Shield)と同様、無効化時はコンボをリセットする
                 }
                 else
                 {
@@ -546,9 +549,11 @@ namespace EscapeNine.Core
             {
                 ComboCount++;
             }
-            else if (Relics.ComboMissShieldCharges > 0)
+            else if (ComboCount > 0 && Relics.ComboMissShieldCharges > 0)
             {
                 // #6 コンボの守り (5aカタログ外だがフックとして実装、Tier2): Missでもコンボを維持する。
+                // ComboCount>0 を条件に加える (Fable指摘): コンボが無い場面で Miss しても、守る対象が
+                // 無いのに1ラン1回のチャージを無駄消費していた (結果は未所持時と同じ0)。
                 Relics.ComboMissShieldCharges--;
             }
             else

@@ -52,7 +52,8 @@ namespace EscapeNine.Core
             CharacterType character,
             int count = 3,
             AILevel selectedAI = AILevel.Normal,
-            int floor = 1)
+            int floor = 1,
+            string excludeId = null)
         {
             var ownedCounts = new Dictionary<string, int>();
             if (ownedIds != null)
@@ -69,6 +70,7 @@ namespace EscapeNine.Core
             var weighted = new List<(RelicDefinition def, double weight)>();
             foreach (var def in _pool)
             {
+                if (excludeId != null && def.Id == excludeId) continue; // 呼び出し側指定の個別除外 (例: 最後のドラフトで #18)
                 int owned = ownedCounts.TryGetValue(def.Id, out var c) ? c : 0;
                 if (owned >= def.StackLimit) continue;
 
@@ -142,6 +144,14 @@ namespace EscapeNine.Core
                 return 0.0;
             }
 
+            if (def.Id == RelicCatalog.BewilderingDustId && selectedAI == AILevel.Easy)
+            {
+                // #9 幻惑の粉は「実効AI==Hard の時に予測追跡をNormal格下げ」する効果。Easy選択では
+                // GetEffectiveAILevel が自然Hardを Normal へ下げるため実効Hardが発生せず (深淵ルート以外)、
+                // 常に発動しない。thief/elf/wizard と同じ「発動しない文脈では出さない」作法でハード除外する。
+                return 0.0;
+            }
+
             if ((tags & RelicTag.RequiresFog) != 0)
             {
                 SpecialRule rule = Floor.GetSpecialRule(floor);
@@ -168,6 +178,16 @@ namespace EscapeNine.Core
 
             return weight;
         }
+
+        /// <summary>
+        /// 指定の文脈でこのレリックがドラフト提示に足るか (ComputeWeight &gt; 0)。
+        /// 深淵ルートの Rare+ 確定枠 (GameController.EnsureRarePlusSlot) が、通常ドラフトと同じ
+        /// ハード除外 (ThiefRescue×非盗賊 / #17×エルフ / #9×Easy / RequiresFog/Disappear の階層除外 /
+        /// 魔法使い×HardAICounter) を尊重するために使う。これが無いと確定枠が「絶対に出ないはずの
+        /// 死にレリック」を注入できてしまう (RELIC_COHERENCE_AUDIT 同型)。
+        /// </summary>
+        public static bool IsEligible(RelicDefinition def, CharacterType character, AILevel selectedAI, int floor)
+            => ComputeWeight(def, character, selectedAI, floor) > 0.0;
 
         /// <summary>基準レアリティ出現率 (§2.2)。Common45 / Uncommon30 / Rare18 / Epic6 / Legendary1。</summary>
         private static double BaseRarityWeight(RelicRarity rarity)

@@ -103,9 +103,11 @@ namespace EscapeNine.Tests.EditMode
         }
 
         [Test]
-        public void Relic08_LanternRing_Stackable3()
+        public void Relic08_LanternRing_NonStackable()
         {
-            AssertMeta(RelicCatalog.LanternRingId, RelicRarity.Common, RelicTag.RequiresFog, stackLimit: 3);
+            // stackLimit=1 (旧3): 3x3盤では視界半径 1+bonus が bonus=1 で全マス可視になり、2枚目以降が
+            // 挙動を一切変えない死にスタックだったため上限1にした (Fable指摘)。
+            AssertMeta(RelicCatalog.LanternRingId, RelicRarity.Common, RelicTag.RequiresFog, stackLimit: 1);
             Assert.AreEqual(1, Apply(RelicCatalog.LanternRingId).FogVisibilityRadiusBonus);
         }
 

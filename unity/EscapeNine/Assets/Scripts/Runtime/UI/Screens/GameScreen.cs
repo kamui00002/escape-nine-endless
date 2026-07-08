@@ -1704,6 +1704,15 @@ namespace EscapeNine.Runtime.UI
             _pauseButtonLabel.text = session.Status == GameStatus.Paused ? "再開" : "一時停止";
             _pausedOverlay.SetActive(session.Status == GameStatus.Paused);
 
+            // 開始カウントダウン(3→2→1)中にポーズすると、全画面のカウントダウンオーバーレイ
+            // (raycastTarget=true) がポーズ画面の手前に残り「再開/終了」ボタンのタップを全て吸って
+            // ソフトロックする (Fable指摘、キーボード経路)。ポーズ中はカウントダウン表示を隠す。
+            // 再開時は ResumeGame→RunStartCountdown 先頭の OnCountdownTick が即座に再表示するため隙間なし。
+            if (session.Status == GameStatus.Paused && _countdownOverlay != null)
+            {
+                _countdownOverlay.SetActive(false);
+            }
+
             // Phase 5a/5c: FloorClear / RouteChoice / RelicIntro / RelicDraft の4オーバーレイの表示権は
             // ここで一元管理する。IsRouteChoicePending / IsRelicDraftPending は階層クリア確定と同時に
             // true になり得るが、UI 上は「スタート」を押す (_routeChoiceScreenOpen / _relicDraftScreenOpen

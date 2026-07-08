@@ -492,9 +492,12 @@ namespace EscapeNine.Sim
         private static bool DraftOneRelic(GameSession s, RelicDraftService draftService, List<string> ownedIds)
         {
             int count = s.Relics.DraftCandidateBonusFloorsRemaining > 0 ? 4 : 3;
+            // DraftCandidates の floor 契約は「次に入る階層」(RELIC_COHERENCE_AUDIT §2-J/§4)。
+            // Sim はルート未実装なので +1 のみで本番 (ResolveDraftFloor) と一致する。CurrentFloor
+            // (=クリア済み階層) を渡すと 20/40/60 の境界で #8/#7/#11 の候補可否が1階ズレる。
             var candidates = draftService.DraftCandidates(
                 ownedIds, s.CurrentCharacter.Type, count: count,
-                selectedAI: s.SelectedAILevel, floor: s.CurrentFloor);
+                selectedAI: s.SelectedAILevel, floor: s.CurrentFloor + 1);
             if (s.Relics.DraftCandidateBonusFloorsRemaining > 0)
             {
                 s.Relics.DraftCandidateBonusFloorsRemaining--;

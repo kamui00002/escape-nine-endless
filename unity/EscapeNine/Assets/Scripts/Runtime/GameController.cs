@@ -152,6 +152,11 @@ namespace EscapeNine.Runtime
         private bool _resultPersisted;                              // このランのスコア送信/自己ベスト更新が済んだか (二重送信防止)
         private bool _glowAwarded;                                  // このランの残光付与が済んだか (通貨二重付与防止、EndGame が万一二重呼び出しされた場合の保険)
         private int _turnBeats = GameConfig.TurnCountdownBeats;     // 1 ターンの拍数 (デバッグで可変)
+        // 再開/スキップ開始の直後に発火する「拍0」を1回だけ吸収するフラグ。Conductor.StartSong は
+        // _dspSongStart = dspTime + 0.1s で拍0を約0.1秒後に発火させるため、これを吸収しないと再開直後に
+        // TurnCountdown が即減り、現ターンの可動窓が不当に削られる (最悪、再開直後に即時間切れ死)。
+        // Swift の BeatEngine.resume は lastBeatTime をリセットし最初の減算を丸1拍後にする — それに揃える。
+        private bool _suppressNextBeatDecrement;
 
         /// <summary>Phase 5b: レリック #16 刻の猶予 (TurnCountdownBonus) を加算した実効ターン拍数 (§2.4)。
         /// Relics.None (=0) のときは _turnBeats と同値 = 既存挙動と完全一致。</summary>
@@ -336,6 +341,16 @@ namespace EscapeNine.Runtime
             // PlayerPrefs の直接改変等に備えてここでも二重に防御する)。
             if (def.Value.Rarity > RelicRarity.Uncommon) return;
 
+            // キャラ限定効果のレリック (例: #1 影の軽業=ThiefRescue は盗賊専用) を装備キャラが満たさない場合は
+            // 100%無効なので適用スキップ (ドラフトのハード除外と対称、Fable指摘)。
+            // 注: floor限定 (RequiresFog/RequiresDisappear) はスターターパークがラン全体装備で後の階層で
+            // 有効化するため、ここでは除外しない (floor1 基準で弾くと霧/消失レリックが永久に効かなくなる)。
+            CharacterType character = Session.CurrentCharacter.Type;
+            RelicTag tags = def.Value.Tags;
+            if ((tags & RelicTag.ThiefRescue) != 0 && character != CharacterType.Thief) return;
+            if ((tags & RelicTag.HardAICounter) != 0 && character == CharacterType.Wizard) return;
+            if (relicId == RelicCatalog.HeartboundPactId && character == CharacterType.Elf) return;
+
             def.Value.ApplyTo(Session.Relics);
             _ownedRelicIds.Add(relicId);
         }
@@ -464,12 +479,17 @@ namespace EscapeNine.Runtime
             // (_pendingRouteChoice == Abyss) は次階層の特殊ルールを1段階前倒しするため、その前倒しを
             // 反映した実効値を ResolveDraftFloor で解決する。
             int draftFloor = ResolveDraftFloor(Session.CurrentFloor + 1, _pendingRouteChoice);
+            // #18 蒐集家の目は「以後3階層、候補数3→4」の効果。これが最後のドラフト
+            // (取得後に上限到達で以後ドラフトが提示されない) なら効果が100%空振りするため、
+            // Legendary 枠を無駄にしないよう候補から除外する。EnsureRarePlusSlot 経由でも同様に除外。
+            bool excludeCollectorsEye = _draftAcquiredCount >= RelicConfig.MaxRelicsPerRun - 1;
             var candidates = _relicDraftService.DraftCandidates(
                 _ownedRelicIds,
                 Session.CurrentCharacter.Type,
                 count: draftCount,
                 selectedAI: Session.SelectedAILevel,
-                floor: draftFloor);
+                floor: draftFloor,
+                excludeId: excludeCollectorsEye ? RelicCatalog.CollectorsEyeId : null);
             if (Session.Relics.DraftCandidateBonusFloorsRemaining > 0)
             {
                 Session.Relics.DraftCandidateBonusFloorsRemaining--;
@@ -477,7 +497,7 @@ namespace EscapeNine.Runtime
 
             if (guaranteeRarePlus && candidates.Count > 0)
             {
-                EnsureRarePlusSlot(candidates);
+                EnsureRarePlusSlot(candidates, draftFloor, Session.SelectedAILevel);
             }
 
             if (candidates.Count > 0)
@@ -518,7 +538,7 @@ namespace EscapeNine.Runtime
         /// 無いため Runtime 側で実装する (Core は非改変)。差し替え候補が無ければ何もしない (正直な縮退)。
         /// §2.2 原則5 (魔法使いは HardAICounter を絶対に見せない) はここでも尊重する。
         /// </summary>
-        private void EnsureRarePlusSlot(List<RelicDefinition> candidates)
+        private void EnsureRarePlusSlot(List<RelicDefinition> candidates, int draftFloor, AILevel selectedAI)
         {
             foreach (var c in candidates)
             {
@@ -531,10 +551,14 @@ namespace EscapeNine.Runtime
                 ownedCounts[id] = ownedCounts.TryGetValue(id, out var c) ? c + 1 : 1;
             }
 
+            CharacterType character = Session.CurrentCharacter.Type;
+            // 最後のドラフトでは #18 蒐集家の目 (効果が以後のドラフト前提) を確定枠からも除外する。
+            bool excludeCollectorsEye = _draftAcquiredCount >= RelicConfig.MaxRelicsPerRun - 1;
             var pool = new List<RelicDefinition>();
             foreach (var def in RelicCatalog.All)
             {
                 if (def.Rarity < RelicRarity.Rare) continue;
+                if (excludeCollectorsEye && def.Id == RelicCatalog.CollectorsEyeId) continue;
                 int owned = ownedCounts.TryGetValue(def.Id, out var oc) ? oc : 0;
                 if (owned >= def.StackLimit) continue;
 
@@ -545,9 +569,10 @@ namespace EscapeNine.Runtime
                 }
                 if (alreadyOffered) continue;
 
-                // §2.2 原則5: 魔法使いは HardAICounter レリックをドラフト対象外にする明示ルール。
-                if (Session.CurrentCharacter.Type == CharacterType.Wizard
-                    && (def.Tags & RelicTag.HardAICounter) != 0) continue;
+                // 通常ドラフトと同じ文脈ハード除外を尊重する (ThiefRescue×非盗賊 / #17×エルフ / #9×Easy /
+                // RequiresFog/Disappear の階層除外 / 魔法使い×HardAICounter)。これが無いと「絶対に出ない
+                // はずの死にレリック」を確定枠が注入できてしまう (RELIC_COHERENCE_AUDIT 同型のバイパス)。
+                if (!RelicDraftService.IsEligible(def, character, selectedAI, draftFloor)) continue;
 
                 pool.Add(def);
             }
@@ -659,6 +684,8 @@ namespace EscapeNine.Runtime
                 //       サポートするため拍サイクル (位相) はリセットされる。ただし TurnCountdown
                 //       (残りターン締切) 自体は保持する — ポーズ連打で締切を無限に引き延ばせる穴を
                 //       防ぐため、満タンには戻さない。
+                // StartSong 直後の拍0を1回吸収し、最初の減算を丸1拍後にする (Swift の resume 相当)。
+                _suppressNextBeatDecrement = true;
                 _conductor.StartSong();
             }
             OnStateChanged?.Invoke();
@@ -709,12 +736,14 @@ namespace EscapeNine.Runtime
 
             _startCountdownBpm = bpm;
             TurnCountdown = EffectiveTurnBeats; // Swift: resetTurnCountdown() + Phase 5b #16 刻の猶予
+            _suppressNextBeatDecrement = false; // 通常開始は IsGameStartCountdownActive 側で吸収するため不要
 
             if (skipCountdown)
             {
                 // Swift: startGameStartCountdown の #if DEBUG 早期 return (completion() を同期的に呼ぶ)
                 IsGameStartCountdownActive = false;
                 _phase = Phase.Playing;
+                _suppressNextBeatDecrement = true; // スキップ開始は入力ブロック窓が無いので拍0を吸収して初回ターンを丸1拍に
                 _conductor.ChangeBPM(bpm);
                 OnGameStarted?.Invoke();
                 RaiseBossPatternIfChanged(); // Phase 5c: ボス階なら最初のパターンをテレグラフ通知
@@ -784,6 +813,9 @@ namespace EscapeNine.Runtime
                     // 削られる (2026-07-08 iOS実機ログで確定: floor1/BPM70 でも可動窓が約1.3秒しかなく時間切れ)。
                     // 入力解除後は通常どおり毎拍 1 減算 = 最初のターンも他ターンと同じ full 3 拍 (floor1 で約2.5秒) になる。
                     if (IsGameStartCountdownActive) break;
+
+                    // 再開/スキップ開始の直後に発火する拍0を1回だけ吸収 (最初の減算を丸1拍後にする)。
+                    if (_suppressNextBeatDecrement) { _suppressNextBeatDecrement = false; break; }
 
                     // Swift: onBeat() — turnCountdown を減らし、0 でアクセント音 + 締切処理
                     TurnCountdown--;
@@ -890,11 +922,16 @@ namespace EscapeNine.Runtime
         }
 
         /// <summary>Phase 5c: 分岐ルート選択を提示すべき階層か (§4)。
-        /// デイリーチャレンジ中は公平性のため常に false、Floor 6 以降でのみ提示する。</summary>
+        /// デイリーチャレンジ中は公平性のため常に false。
+        /// 深淵ルートの主報酬は「Rare+ 確定ドラフト」なので、ドラフトが実際に発生し得ない状況
+        /// (レリック未解放 / ドラフト上限到達 / 最終階クリアで次階層が無い) では提示しない —
+        /// これをしないと UI が「Rare+ 確定」を約束しながらリスクだけ課す片務契約になる (Fable指摘)。</summary>
         private bool ShouldOfferRouteChoice()
         {
             return !Session.DailyChallengeMode
-                && Session.CurrentFloor >= RouteChoiceStartFloor;
+                && Session.CurrentFloor >= RouteChoiceStartFloor
+                && Session.CurrentFloor < GameConfig.MaxFloors                 // 最終階クリア後はルート先(次階層)が無い
+                && RelicConfig.ShouldOfferDraft(Session.CurrentFloor, _draftAcquiredCount); // ドラフトが実際に出る時のみ
         }
 
         /// <summary>

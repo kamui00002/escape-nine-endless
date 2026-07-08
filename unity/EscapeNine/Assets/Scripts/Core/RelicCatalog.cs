@@ -77,16 +77,19 @@ namespace EscapeNine.Core
                 stackLimit: 1,
                 applyDelta: e => e.DisappearCellReduction += 1),
 
-            // #8 灯火の指輪 (Common, スタック可・上限3, RequiresFog) — 霧の視界半径+1マス (階層21+で有効)。
+            // #8 灯火の指輪 (Common, RequiresFog) — 霧の視界半径+1マス (階層21+で有効)。
             // RELIC_COHERENCE_AUDIT.md §2-C: 霧が無い階層 (41-60含む) で候補から完全除外するため
             // 旧 LateGame から RequiresFog へ変更。
+            // stackLimit=1: 3x3盤の Chebyshev 最大距離は2、視界半径 1+bonus は bonus=1 で全マス可視
+            // (霧を完全無効化) になるため bonus=2/3 は挙動を一切変えない死にスタック。2枚目以降を
+            // 提示しないよう上限1にする (設計 §2.3 も上限1へ修正)。
             new RelicDefinition(
                 LanternRingId,
                 "灯火の指輪",
                 "霧の視界半径+1マス",
                 RelicRarity.Common,
                 RelicTag.RequiresFog,
-                stackLimit: 3,
+                stackLimit: 1,
                 applyDelta: e => e.FogVisibilityRadiusBonus += 1),
 
             // #10 護りの起点 (Common, General/Safety) — 階層開始時、プレイヤーと敵の初期配置距離を2マス以上保証する。

@@ -93,19 +93,30 @@ namespace EscapeNine.Tests.EditMode
         }
 
         [Test]
-        public void DraftCandidates_StackableRelic_EligibleBelowCap_ExcludedAtCap()
+        public void DraftCandidates_LanternRing_ExcludedOnceOwned()
         {
-            // #8 灯火の指輪 (lantern_ring) は stackLimit=3
-            var owned2 = new List<string> { RelicCatalog.LanternRingId, RelicCatalog.LanternRingId };
-            var serviceBelowCap = new RelicDraftService(new FakeRandom());
-            var resultBelowCap = serviceBelowCap.DraftCandidates(owned2, FullPoolCharacter, count: CatalogSize, floor: FullPoolFloor);
-            Assert.IsTrue(resultBelowCap.Exists(d => d.Id == RelicCatalog.LanternRingId), "2個所持 (上限3未満) ではまだ候補に入る");
+            // #8 灯火の指輪 は stackLimit=1 に変更 (3x3盤で2枚目以降が無効な死にスタックを避ける修正、Fable指摘)。
+            // 全レリックが stackLimit=1 になったため、1枚所持で候補から除外される。
+            var owned1 = new List<string> { RelicCatalog.LanternRingId };
+            var service = new RelicDraftService(new FakeRandom());
+            var result = service.DraftCandidates(owned1, FullPoolCharacter, count: CatalogSize, floor: FullPoolFloor);
+            Assert.IsFalse(result.Exists(d => d.Id == RelicCatalog.LanternRingId), "1個所持 (上限1到達) で候補から除外される");
+            Assert.AreEqual(CatalogSize - 1, result.Count);
+        }
 
-            var owned3 = new List<string> { RelicCatalog.LanternRingId, RelicCatalog.LanternRingId, RelicCatalog.LanternRingId };
-            var serviceAtCap = new RelicDraftService(new FakeRandom());
-            var resultAtCap = serviceAtCap.DraftCandidates(owned3, FullPoolCharacter, count: CatalogSize, floor: FullPoolFloor);
-            Assert.IsFalse(resultAtCap.Exists(d => d.Id == RelicCatalog.LanternRingId), "3個所持 (上限到達) では候補から除外される");
-            Assert.AreEqual(CatalogSize - 1, resultAtCap.Count);
+        // 深淵ルートの Rare+ 確定枠 (GameController.EnsureRarePlusSlot) が通常ドラフトと同じハード除外を
+        // 尊重できるよう公開した IsEligible の回帰ガード。これが漏れると「絶対に出ないはずの死にレリック」を
+        // 確定枠が注入できてしまう (Fable指摘のバイパス)。
+        [Test]
+        public void IsEligible_HardExclusions()
+        {
+            var thiefRescue = RelicCatalog.Find(RelicCatalog.ShadowFootworkId).Value; // #1 ThiefRescue (盗賊専用)
+            Assert.IsFalse(RelicDraftService.IsEligible(thiefRescue, CharacterType.Hero, AILevel.Normal, FullPoolFloor), "ThiefRescue は非盗賊で不適格");
+            Assert.IsTrue(RelicDraftService.IsEligible(thiefRescue, CharacterType.Thief, AILevel.Normal, FullPoolFloor), "盗賊なら適格");
+
+            var dust = RelicCatalog.Find(RelicCatalog.BewilderingDustId).Value; // #9 幻惑の粉 (Easyで不発)
+            Assert.IsFalse(RelicDraftService.IsEligible(dust, CharacterType.Hero, AILevel.Easy, FullPoolFloor), "#9 は Easy選択で不適格");
+            Assert.IsTrue(RelicDraftService.IsEligible(dust, CharacterType.Hero, AILevel.Normal, FullPoolFloor), "Normal なら適格");
         }
 
         [Test]
