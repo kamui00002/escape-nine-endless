@@ -323,8 +323,13 @@ class GameViewModel: ObservableObject {
             // スキルがアクティブな場合
             switch currentSkill.type {
             case .dash:
-                isValid = gameEngine.isValidDashMove(from: from, to: to)
-                shouldConsumeSkill = isValid
+                // ダッシュ発動中も通常1マス移動を許可し（斜め移動と同じ扱い）、ダッシュ移動時のみ消費する。
+                // 旧実装はダッシュのみ有効で、通常移動を選ぶと invalid→即死、中央マス(5)はダッシュ先が
+                // 全て盤外で確定死だった。ダッシュ中も通常移動OKにして罠を解消する。
+                let isDashMove = gameEngine.isValidDashMove(from: from, to: to)
+                let isNormalDash = gameEngine.isValidMove(from: from, to: to)
+                isValid = isDashMove || isNormalDash
+                shouldConsumeSkill = isDashMove
             case .diagonal:
                 let isDiagonal = gameEngine.isValidDiagonalMove(from: from, to: to)
                 let isNormal = gameEngine.isValidMove(from: from, to: to)

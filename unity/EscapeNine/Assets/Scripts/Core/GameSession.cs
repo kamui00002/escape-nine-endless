@@ -451,8 +451,13 @@ namespace EscapeNine.Core
                 switch (Skill.Type)
                 {
                     case SkillType.Dash:
-                        isValid = GameEngine.IsValidDashMove(from, to);
-                        shouldConsume = isValid;
+                        // ダッシュ発動中も通常1マス移動を許可し (Diagonal と同じ扱い)、ダッシュ移動時のみ
+                        // チャージ消費する。旧実装は Dash のみ有効で、通常移動を選ぶと invalid→即死、
+                        // 中央マス(5)はダッシュ先が全て盤外で確定死だった (オーナー判断: ダッシュ中も通常移動OK)。
+                        bool isDashMove = GameEngine.IsValidDashMove(from, to);
+                        bool isNormalDash = GameEngine.IsValidMove(from, to);
+                        isValid = isDashMove || isNormalDash;
+                        shouldConsume = isDashMove;
                         break;
                     case SkillType.Diagonal:
                         bool isDiag = GameEngine.IsValidDiagonalMove(from, to);

@@ -20,7 +20,7 @@ namespace EscapeNine.Core
             SkillType.Dash => "2マス移動できる",
             SkillType.Diagonal => "斜め方向に移動可能",
             SkillType.Invisible => "鬼に当たっても無敵",
-            SkillType.Bind => "鬼を1ターン停止させる",
+            SkillType.Bind => $"鬼を{GameConfig.BindDurationTurns}ターン停止させる",
             SkillType.Shield => "次の衝突を1回無効化する",
             _ => ""
         };

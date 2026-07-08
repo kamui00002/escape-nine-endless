@@ -29,7 +29,7 @@ enum SkillType: String {
         case .dash: return "2マス移動できる"
         case .diagonal: return "斜め方向に移動可能"
         case .invisible: return "鬼に当たっても無敵"
-        case .bind: return "鬼を1ターン停止させる"
+        case .bind: return "鬼を\(Constants.bindDurationTurns)ターン停止させる"
         case .shield: return "次の衝突を1回無効化する"
         }
     }
