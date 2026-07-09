@@ -128,7 +128,11 @@ namespace EscapeNine.EditorTools
                     scenes = new[] { ScenePath },
                     locationPathName = outputPath,
                     target = BuildTarget.iOS,
-                    options = BuildOptions.None, // Xcode プロジェクト生成のみ (実機転送は Xcode 側)
+                    // Development Build にすると DEVELOPMENT_BUILD が定義され、HomeScreen の
+                    // 「管理者用設定 (DEBUG)」パネル (開始階層/BPM/AI/ターンCD/全キャラ解放/カウントダウン省略) が
+                    // 実機でも表示される (#if UNITY_EDITOR || DEVELOPMENT_BUILD ゲート)。移行/テスト中はこれで運用。
+                    // ★ App Store 提出ビルドでは BuildOptions.None (Release) に戻すこと (デバッグ機能を出荷しない)。
+                    options = BuildOptions.Development,
                 };
 
                 BuildReport report = BuildPipeline.BuildPlayer(options);

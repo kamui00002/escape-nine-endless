@@ -149,6 +149,7 @@ namespace EscapeNine.Runtime.Stage
             // 鬼: 霧で見えない位置なら非表示 (Swift/GridBoardWidget: isEnemy && isVisible)。
             bool enemyVisible = session.IsCellVisible(session.EnemyPosition);
             _enemy.Render(enemySprite, enemyVisible);
+            _enemy.SetBossPresence(session.IsBossFloor); // ボス階は鬼を拡大表示 (演出でのボス化。専用スプライトは後日)
             SetPawnTarget(ref _enemyFrom, ref _enemyTo, ref _enemyT, _enemy, WorldCenterOf(session.EnemyPosition));
 
             _snapNext = false;

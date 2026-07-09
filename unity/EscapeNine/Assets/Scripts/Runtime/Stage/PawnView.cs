@@ -26,9 +26,15 @@ namespace EscapeNine.Runtime.Stage
         private const float MoveHopPunch = 0.18f;
         private const float MoveHopDuration = 0.18f;
 
+        // 2026-07-09 オーナー「ボスも普通の鬼のまま」→ まず演出でボス化。ボス階の鬼は基準スケールを拡大して
+        // 威圧感を出す (専用スプライトは後日 AI 生成)。既存のボス威圧テレグラフ=床の赤明滅と併せて「ボス」と読ませる。
+        private const float BossScaleMul = 1.42f;
+
         private SpriteRenderer _renderer;
         private Coroutine _flashRoutine;
         private Coroutine _punchRoutine;
+        // 基準スケール倍率 (通常1.0 / ボス階でBossScaleMul)。PunchHop/ResetFx はこれを土台に合成する。
+        private float _baseScaleMul = 1f;
 
         public static PawnView Create(Transform parent, string name)
         {
@@ -61,6 +67,17 @@ namespace EscapeNine.Runtime.Stage
             transform.localPosition = new Vector3(groundXZ.x, HoverHeight, groundXZ.z);
         }
 
+        /// <summary>ボス階の鬼を拡大表示して威圧感を出す (BoardStage.Render が毎回 session.IsBossFloor で駆動)。
+        /// PunchHop 実行中は上書きせず、_baseScaleMul のみ更新して次の非パンチ時に反映する
+        /// (パンチアニメを途中で潰さないため)。</summary>
+        public void SetBossPresence(bool isBoss)
+        {
+            float target = isBoss ? BossScaleMul : 1f;
+            if (Mathf.Approximately(target, _baseScaleMul)) return;
+            _baseScaleMul = target;
+            if (_punchRoutine == null) transform.localScale = Vector3.one * _baseScaleMul;
+        }
+
         /// <summary>移動ホップ (squash&amp;stretch 風の強調)。GridBoardWidget の PunchScale 呼び出しと同タイミング。</summary>
         public void PunchHop()
         {
@@ -71,7 +88,7 @@ namespace EscapeNine.Runtime.Stage
 
         private IEnumerator PunchRoutine(float punch, float duration)
         {
-            Vector3 baseScale = transform.localScale;
+            Vector3 baseScale = Vector3.one * _baseScaleMul; // ボス拡大を土台に合成 (現在値の残留を拾わない)
             Vector3 peak = baseScale * (1f + Mathf.Max(punch, 0f));
             float half = Mathf.Max(duration * 0.5f, 0.0001f);
 
@@ -120,6 +137,7 @@ namespace EscapeNine.Runtime.Stage
         {
             if (_punchRoutine != null) { StopCoroutine(_punchRoutine); _punchRoutine = null; }
             if (_flashRoutine != null) { StopCoroutine(_flashRoutine); _flashRoutine = null; }
+            _baseScaleMul = 1f; // 新ラン/リセット時は素の大きさへ (次の BoardStage.Render がボス階なら再拡大)
             transform.localScale = Vector3.one;
             if (_renderer != null) _renderer.color = Color.white;
         }
