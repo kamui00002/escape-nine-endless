@@ -624,6 +624,13 @@ namespace EscapeNine.Core
                     if (i != PlayerPosition && i != EnemyPosition) available.Add(i);
                 }
 
+                // 公平化ガード (A, 2026-07-09 オーナー): プレイヤーの直交隣接 (=待機以外の逃げ場) を最低1つ
+                // 非消失で残し、「動く場所が全て消えて詰む」理不尽を防ぐ。鬼が乗る隣接は逃げ場にならないので
+                // 除外し、鬼から最も遠い非鬼隣接を1つ予約 (available から除去) する。rng は消費しない (決定論)
+                // ため下流の乱数列 (AI 等) はずれない。存在しなければ (3x3 では常に存在) 何もしない。
+                int reservedEscape = SelectReservedEscapeCell();
+                if (reservedEscape != -1) available.Remove(reservedEscape);
+
                 var disappeared = new HashSet<int>();
                 int toDisappear = Math.Min(count, available.Count);
                 for (int i = 0; i < toDisappear; i++)
@@ -639,6 +646,30 @@ namespace EscapeNine.Core
             {
                 DisappearedCells = new HashSet<int>();
             }
+        }
+
+        /// <summary>公平化ガード (A): プレイヤーの直交隣接のうち鬼が乗っていないマスから1つを選ぶ
+        /// (消失させず残す逃げ場)。鬼から最も遠いマスを優先 (同距離は上/下/左/右の順で先勝ち)。
+        /// 該当が無ければ -1 (3x3 では最低2つの直交隣接があり鬼は1マスのみなので実際には必ず存在)。
+        /// rng を使わない決定論のため、下流の乱数列 (AI 等) に影響しない。Swift 正本と 1:1。</summary>
+        private int SelectReservedEscapeCell()
+        {
+            int pr = GameConfig.RowFromPosition(PlayerPosition);
+            int pc = GameConfig.ColumnFromPosition(PlayerPosition);
+            int best = -1;
+            int bestDist = -1;
+            int[,] dirs = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } }; // 上/下/左/右
+            for (int k = 0; k < 4; k++)
+            {
+                int nr = pr + dirs[k, 0];
+                int nc = pc + dirs[k, 1];
+                if (nr < 0 || nr > 2 || nc < 0 || nc > 2) continue;
+                int pos = nr * 3 + nc + 1;
+                if (pos == EnemyPosition) continue; // 鬼が乗るマスは逃げ場にならない
+                int dist = ChebyshevDistance(pos, EnemyPosition);
+                if (dist > bestDist) { bestDist = dist; best = pos; }
+            }
+            return best;
         }
 
         /// <summary>階層に応じた消失マス数 (段階的)。Swift: getNumberOfDisappearingCells(for:)

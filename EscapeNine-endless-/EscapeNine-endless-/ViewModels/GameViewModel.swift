@@ -842,6 +842,12 @@ class GameViewModel: ObservableObject {
 
             // ランダムで指定数のマスを消失
             var remainingCells = Array(availableCells)
+            // 公平化ガード(A, 2026-07-09): プレイヤーの直交隣接(=待機以外の逃げ場)を最低1つ非消失で残し、
+            // 「動く場所が全て消えて詰む」理不尽を防ぐ。鬼が乗る隣接は逃げ場にならないので除外し、鬼から
+            // 最も遠い非鬼隣接を1つ予約(消失候補から除去)する。C# 正本 GameSession.SelectReservedEscapeCell と 1:1。
+            if let reserved = selectReservedEscapeCell() {
+                remainingCells.removeAll { $0 == reserved }
+            }
             for _ in 0..<cellsToDisappear {
                 if let cell = remainingCells.randomElement() {
                     disappeared.insert(cell)
@@ -853,6 +859,29 @@ class GameViewModel: ObservableObject {
         } else {
             disappearedCells = []
         }
+    }
+
+    /// 公平化ガード(A): プレイヤーの直交隣接のうち鬼が乗っていないマスから1つを返す（消失させず残す逃げ場）。
+    /// 鬼から最も遠いマスを優先（同距離は上/下/左/右の順で先勝ち）。該当が無ければ nil。C# 正本
+    /// GameSession.SelectReservedEscapeCell と 1:1（Swift はシステム乱数のため決定論性は求めず、ロジックのみ一致）。
+    private func selectReservedEscapeCell() -> Int? {
+        let pr = (playerPosition - 1) / 3
+        let pc = (playerPosition - 1) % 3
+        let er = (enemyPosition - 1) / 3
+        let ec = (enemyPosition - 1) % 3
+        var best: Int? = nil
+        var bestDist = -1
+        let dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)] // 上/下/左/右
+        for (dr, dc) in dirs {
+            let nr = pr + dr
+            let nc = pc + dc
+            if nr < 0 || nr > 2 || nc < 0 || nc > 2 { continue }
+            let pos = nr * 3 + nc + 1
+            if pos == enemyPosition { continue } // 鬼が乗るマスは逃げ場にならない
+            let dist = max(abs(nr - er), abs(nc - ec))
+            if dist > bestDist { bestDist = dist; best = pos }
+        }
+        return best
     }
 
     /// 階層に応じた消失マスの数を計算（段階的スケーリング）

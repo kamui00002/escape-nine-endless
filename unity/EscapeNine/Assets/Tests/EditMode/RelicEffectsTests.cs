@@ -157,7 +157,8 @@ namespace EscapeNine.Tests.EditMode
         [Test]
         public void DisappearForgivenessPerFloor_ForgivesOncePerFloor_ThenDefeat()
         {
-            // floor41 + player=1,enemy=9: available={2,3,4,5,6,7,8}, ints=[0] → index0=2 が消失マスになる
+            // floor41 + player=1,enemy=9: 公平化ガードAがプレイヤーPos1の逃げ場としてPos4を予約(消失対象外)。
+            // → available=[2,3,5,6,7,8], ints=[0] → index0=2 が消失マスになる (セル2は依然消失する)
             var aiRng = new FakeRandom();
             var sessionRng = new FakeRandom(ints: new[] { 0 });
             var s = NewSession(CharacterType.Hero, AILevel.Hard, aiRng, sessionRng);
@@ -173,6 +174,28 @@ namespace EscapeNine.Tests.EditMode
             s.PendingPlayerMove = 2; // 同マスに留まる (待機は有効な移動)
             Assert.AreEqual(TurnResult.Defeated, s.ResolveTurn(), "1階層で使い切った後は通常どおり敗北する");
             Assert.AreEqual(DefeatReason.CaughtByEnemy, s.LastDefeatReason);
+        }
+
+        [Test]
+        public void Disappear_FairnessGuard_AlwaysLeavesPlayerAnEscape()
+        {
+            // 公平化ガード(A): 消失最大の高階(floor80=霧+消失)でも、プレイヤーの直交隣接に
+            // 「鬼が乗っておらず消失もしていない」マスが最低1つ残る (=待機以外の逃げ場が必ずある)。
+            // 複数の player/enemy 配置で検証 (FakeRandom 既定は NextInt→0 で決定論)。
+            int[][] placements =
+            {
+                new[] { 5, 9 }, new[] { 5, 1 }, new[] { 1, 9 }, new[] { 2, 8 },
+                new[] { 4, 6 }, new[] { 5, 3 }, new[] { 3, 7 }, new[] { 8, 2 },
+            };
+            foreach (var pe in placements)
+            {
+                var s = NewSession(CharacterType.Hero, AILevel.Hard);
+                s.StartGame(80, pe[0], pe[1]);
+                bool hasEscape = GameEngine.GetAvailableMoves(s.PlayerPosition)
+                    .Exists(p => p != s.EnemyPosition && !s.DisappearedCells.Contains(p));
+                Assert.IsTrue(hasEscape,
+                    $"player={s.PlayerPosition} enemy={s.EnemyPosition} disappeared=[{string.Join(",", s.DisappearedCells)}]: 逃げ場ゼロ(公平化ガードA違反)");
+            }
         }
 
         [Test]
