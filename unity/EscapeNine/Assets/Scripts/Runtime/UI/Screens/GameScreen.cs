@@ -1851,12 +1851,15 @@ namespace EscapeNine.Runtime.UI
                 _playerSprite = UIFactory.LoadSprite(playerName);
             }
 
-            // 鬼の帯: 1-25 赤鬼 / 26-50 青鬼 / 51-75 骸骨 / 76-100 ドラゴン (正本: Floor.getEnemySprite)
-            string enemyName = Floor.GetEnemySprite(session.CurrentFloor);
+            // 鬼の帯: 1-25 赤鬼 / 26-50 青鬼 / 51-75 骸骨 / 76-100 ドラゴン (正本: Floor.getEnemySprite)。
+            // ボス階 (10の倍数) は専用ボススプライト "{enemy}_boss" を優先。未生成ゾーンは通常鬼へフォールバック。
+            string baseEnemy = Floor.GetEnemySprite(session.CurrentFloor);
+            string enemyName = session.IsBossFloor ? baseEnemy + "_boss" : baseEnemy;
             if (enemyName != _enemySpriteName)
             {
-                _enemySpriteName = enemyName;
+                _enemySpriteName = enemyName; // 要求名を記録 (次フレームの再ロード防止)
                 _enemySprite = UIFactory.LoadSprite(enemyName);
+                if (_enemySprite == null) _enemySprite = UIFactory.LoadSprite(baseEnemy); // ボス絵が無いゾーンは通常鬼
             }
 
             _board.Render(session, session.Status != GameStatus.Playing, _playerSprite, _enemySprite);
