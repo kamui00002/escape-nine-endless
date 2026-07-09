@@ -26,10 +26,11 @@ namespace EscapeNine.Runtime.Stage
         private const float MoveHopPunch = 0.18f;
         private const float MoveHopDuration = 0.18f;
 
-        // 2026-07-09 オーナー「ボスも普通の鬼のまま」→ まず演出でボス化。ボス階の鬼は基準スケールを拡大して
-        // 威圧感を出す (専用スプライトは後日 AI 生成)。既存のボス威圧テレグラフ=床の赤明滅と併せて「ボス」と読ませる。
-        // 2026-07-09 実機: 1.42 は盤面上端をはみ出す (鬼スプライトは元々背が高い) → 1.15 に抑える。
-        private const float BossScaleMul = 1.15f;
+        // 2026-07-09 オーナー「ボスも普通の鬼のまま」→ 演出でボス化を試みたが、鬼スプライトは元々背が高く
+        // 盤面の縦フレームがキツいため、1.42→1.15 に下げても実機で上端をはみ出した (オーナー報告)。
+        // スケール拡大での差別化は断念し 1.0 (通常サイズ) に戻す。ボス差別化は専用ボススプライト (AI生成) と
+        // 既存のボス威圧テレグラフ (床の赤明滅) に委ねる。SetBossPresence の配線は将来の別演出用に残置。
+        private const float BossScaleMul = 1.0f;
 
         private SpriteRenderer _renderer;
         private Coroutine _flashRoutine;
