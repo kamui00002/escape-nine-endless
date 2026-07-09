@@ -28,7 +28,8 @@ namespace EscapeNine.Runtime.Stage
 
         // 2026-07-09 オーナー「ボスも普通の鬼のまま」→ まず演出でボス化。ボス階の鬼は基準スケールを拡大して
         // 威圧感を出す (専用スプライトは後日 AI 生成)。既存のボス威圧テレグラフ=床の赤明滅と併せて「ボス」と読ませる。
-        private const float BossScaleMul = 1.42f;
+        // 2026-07-09 実機: 1.42 は盤面上端をはみ出す (鬼スプライトは元々背が高い) → 1.15 に抑える。
+        private const float BossScaleMul = 1.15f;
 
         private SpriteRenderer _renderer;
         private Coroutine _flashRoutine;
