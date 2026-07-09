@@ -140,6 +140,8 @@ namespace EscapeNine.Runtime.Stage
                     IsDisappeared = session.IsCellDisappeared(pos),
                     Disabled = disabled,
                 });
+                // B案: ボス階で鬼が乗る (かつ霧で見える) マスに足元アオーラ (赤い拍発光) を点ける。
+                _tiles[pos].SetBossAura(session.IsBossFloor && session.EnemyPosition == pos && session.IsCellVisible(pos));
             }
 
             // プレイヤー: 自分のマスは霧でも常に可視 (IsCellVisible は距離 0 で必ず true)。

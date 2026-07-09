@@ -115,6 +115,7 @@ namespace EscapeNine.Runtime.Stage
         private float _disappearTarget;
         private float _disabledDim;
         private bool _isSelectedGlow; // 予約済み移動先マスの拍同期パルス発光 (オーナー: 矢印だと分かりづらい→マスを光らせる)
+        private bool _bossAura;       // ボス階で鬼が乗るマスの赤い拍発光 (足元アオーラ。B案・縦に伸びない演出)
 
         // ---- Phase 5c ボステレグラフ ----
         private BossTelegraphKind _telegraph = BossTelegraphKind.None;
@@ -128,6 +129,9 @@ namespace EscapeNine.Runtime.Stage
 
         /// <summary>予約済み移動先マスの発光色 (暖色ゴールド。明るくして URP Bloom で"光る"→移動先が一目で分かる)。</summary>
         private static readonly Color SelectedGlowColor = new Color(1f, 0.82f, 0.35f);
+
+        /// <summary>ボス足元アオーラの発光色 (深紅。鬼が乗るマスを拍で赤熱させ威圧感を出す。B案)。</summary>
+        private static readonly Color BossAuraColor = new Color(1f, 0.18f, 0.06f);
 
         private TileView(int position, Transform fill, Renderer fillRenderer,
             TextMeshPro selectedMark, TextMeshPro fogMark, TextMeshPro xMark)
@@ -235,6 +239,12 @@ namespace EscapeNine.Runtime.Stage
             _telegraph = kind;
         }
 
+        /// <summary>ボス階で鬼が乗るマスの足元アオーラ (赤い拍発光) の on/off。BoardStage.Render が毎回設定する。</summary>
+        public void SetBossAura(bool active)
+        {
+            _bossAura = active;
+        }
+
         /// <summary>霧フェード + 消失の崩落アニメの時間進行。BoardStage.Update() から毎フレーム呼ばれる。</summary>
         public void Tick(float deltaTime, float beatPhase)
         {
@@ -285,6 +295,14 @@ namespace EscapeNine.Runtime.Stage
             {
                 float pulse = 0.35f + 0.30f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * Mathf.PI)) : 1f);
                 fill = Color.Lerp(fill, SelectedGlowColor, pulse);
+            }
+
+            // ボス階: 鬼が乗るマスを赤く拍で発光させ「ボスの足元アオーラ」を表現 (B案・縦に伸びずはみ出さない)。
+            // 拍位相 (_telegraphPhase) 同期。Reduce Motion 時は定常発光。URP Bloom で赤熱がにじむ。
+            if (_bossAura)
+            {
+                float pulse = 0.40f + 0.35f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * Mathf.PI)) : 1f);
+                fill = Color.Lerp(fill, BossAuraColor, pulse);
             }
 
             SetFillColor(fill);
