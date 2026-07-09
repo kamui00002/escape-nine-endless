@@ -114,6 +114,7 @@ namespace EscapeNine.Runtime.Stage
         private float _disappearAlpha;
         private float _disappearTarget;
         private float _disabledDim;
+        private bool _isSelectedGlow; // 予約済み移動先マスの拍同期パルス発光 (オーナー: 矢印だと分かりづらい→マスを光らせる)
 
         // ---- Phase 5c ボステレグラフ ----
         private BossTelegraphKind _telegraph = BossTelegraphKind.None;
@@ -124,6 +125,9 @@ namespace EscapeNine.Runtime.Stage
 
         /// <summary>先読み予告の青白い発光色 (§5.1②のフォールバック: ボス隣接を青白く明滅)。</summary>
         private static readonly Color ForesightGlowColor = new Color(0.62f, 0.80f, 1f);
+
+        /// <summary>予約済み移動先マスの発光色 (暖色ゴールド。明るくして URP Bloom で"光る"→移動先が一目で分かる)。</summary>
+        private static readonly Color SelectedGlowColor = new Color(1f, 0.82f, 0.35f);
 
         private TileView(int position, Transform fill, Renderer fillRenderer,
             TextMeshPro selectedMark, TextMeshPro fogMark, TextMeshPro xMark)
@@ -204,13 +208,15 @@ namespace EscapeNine.Runtime.Stage
         {
             if (v.IsPlayer) _normalFillColor = Color.Lerp(UITheme.Background, UITheme.Player, 0.30f);
             else if (v.IsEnemy) _normalFillColor = Color.Lerp(UITheme.Background, UITheme.Enemy, 0.30f);
-            else if (v.IsSelected) _normalFillColor = Color.Lerp(UITheme.Background, UITheme.Available, 0.25f);
+            else if (v.IsSelected) _normalFillColor = Color.Lerp(UITheme.Background, UITheme.Available, 0.40f);
             else _normalFillColor = ZoneGridTint;
 
             _disappearTarget = v.IsDisappeared ? 1f : 0f;
             _fogTarget = (!v.IsDisappeared && !v.IsVisible) ? 1f : 0f;
 
             _selectedMark.gameObject.SetActive(v.IsSelected && !v.IsDisappeared && v.IsVisible);
+            // 予約済み移動先 (プレイヤー/敵が乗っていない純粋な移動先マス) を拍同期で発光させる。
+            _isSelectedGlow = v.IsSelected && !v.IsPlayer && !v.IsEnemy && !v.IsDisappeared && v.IsVisible;
 
             // Swift/GridCellWidget: 通常マスのみ disabled で 0.5 減光、霧/消失は常時 alpha=1。
             // 3D では背景と同色 (UITheme.Background) への Lerp で同じ「薄暗くなる」印象を近似する。
@@ -271,6 +277,14 @@ namespace EscapeNine.Runtime.Stage
             {
                 float pulse = 0.25f + 0.25f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * Mathf.PI * 2f)) : 1f);
                 fill = Color.Lerp(fill, ForesightGlowColor, pulse);
+            }
+
+            // 予約済み移動先マスの拍同期パルス発光 (テレグラフと同じ _telegraphPhase 拍位相を再利用。
+            // 明るいゴールドへ寄せることで URP Bloom が拾い"光る"。Reduce Motion 時は定常発光)。
+            if (_isSelectedGlow)
+            {
+                float pulse = 0.35f + 0.30f * (FxKit.MotionEnabled ? Mathf.Abs(Mathf.Sin(_telegraphPhase * Mathf.PI)) : 1f);
+                fill = Color.Lerp(fill, SelectedGlowColor, pulse);
             }
 
             SetFillColor(fill);

@@ -59,6 +59,10 @@ namespace EscapeNine.Runtime.Stage
         private const float TiltMaxPitchDegrees = 18f; // 前後傾きで盤面中心まわりに最大 ±18° ピッチ (上下の覗き込み)
         private const float PitchGain = 1.5f;           // accel.z の変化に対するピッチ感度 (基準からの差分に乗算)
         private const float TiltSmoothing = 9f;         // 目標へ寄せる速さ (大=機敏 / 小=ゆったり)。フレームレート非依存
+        // 2026-07-09 オーナー「揺れが斜めで気持ち悪い」→ 優勢軸ブレンド。ヨーとピッチが同時に効くと合成が
+        // 斜めになるため、片軸が優勢な時はもう片方を最大 AxisDominance ぶん減衰させ、水平 or 垂直へ寄せる
+        // (両軸が同程度=意図的な斜めの時だけ両方効く)。0=無効(常に両軸) / 1=弱い方を完全に殺す。
+        private const float AxisDominance = 0.8f;
 
         private Camera _cam;
 
@@ -215,7 +219,16 @@ namespace EscapeNine.Runtime.Stage
                 _pitchBaseline = Input.acceleration.z;
                 _tiltCalibrated = true;
             }
-            float targetYaw = Mathf.Clamp(-(Input.acceleration.x - _yawBaseline), -1f, 1f) * TiltMaxYawDegrees;
+            // 生の傾き入力を正規化 (-1..1) してから優勢軸ブレンド。片軸が優勢な時にもう片方を減衰させ、
+            // ヨー+ピッチの同時発火で生じる「斜め揺れ」(オーナー: 気持ち悪い) を抑えて水平 or 垂直へ寄せる。
+            float rawYaw = Mathf.Clamp(-(Input.acceleration.x - _yawBaseline), -1f, 1f);
+            float rawPitch = Mathf.Clamp((Input.acceleration.z - _pitchBaseline) * PitchGain, -1f, 1f);
+            float yawMag = Mathf.Abs(rawYaw);
+            float pitchMag = Mathf.Abs(rawPitch);
+            rawYaw *= 1f - AxisDominance * Mathf.Clamp01(pitchMag - yawMag);   // ピッチ優勢時はヨーをフェード
+            rawPitch *= 1f - AxisDominance * Mathf.Clamp01(yawMag - pitchMag); // ヨー優勢時はピッチをフェード
+
+            float targetYaw = rawYaw * TiltMaxYawDegrees;
             _tiltYaw = Mathf.Lerp(_tiltYaw, targetYaw, 1f - Mathf.Exp(-TiltSmoothing * Time.unscaledDeltaTime));
             if (Mathf.Abs(_tiltYaw) > 0.0001f)
             {
@@ -230,7 +243,7 @@ namespace EscapeNine.Runtime.Stage
             // 前後傾き(ピッチ): 盤面表示開始時の accel.z を neutral として一度取り込み、以後その差分で
             // 上下の覗き込み。ヨーの後に (post-yaw の) カメラ右軸まわりに原点中心で回すことで、
             // 「箱を上/下から覗き込む」2軸目の立体感を出す。
-            float targetPitch = Mathf.Clamp((Input.acceleration.z - _pitchBaseline) * PitchGain, -1f, 1f) * TiltMaxPitchDegrees;
+            float targetPitch = rawPitch * TiltMaxPitchDegrees;
             _tiltPitch = Mathf.Lerp(_tiltPitch, targetPitch, 1f - Mathf.Exp(-TiltSmoothing * Time.unscaledDeltaTime));
             if (Mathf.Abs(_tiltPitch) > 0.0001f)
             {
