@@ -74,9 +74,9 @@ namespace EscapeNine.Runtime
             // ATT はアプリ起動につき 1 回 (Awake は App シングルトン確立時にしか通らないため自然に once-only)。
             Ads.RequestTrackingAuthorization();
 
-            // IAP groundwork (広告と同じ継ぎ目のみの前倒し): PlayerState 生成後に構築し、
+            // IAP (Unity IAP 5.4.1): PlayerState 生成後に構築し、
             // 購入済み商品 (PurchasedProducts / AdRemoved、既存の SSOT) をそのまま参照させる。
-            Iap = new StubIapService(Player);
+            Iap = new UnityIapService(Player);
             Iap.Initialize();
 
             // UnityEngine.Object の null 判定は == を使う (?? は偽 null を貫通するため不可)
