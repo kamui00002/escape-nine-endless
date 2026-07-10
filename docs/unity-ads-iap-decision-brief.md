@@ -104,3 +104,27 @@
   - **ネイティブ SDK 未導入・manifest 不可触**。GMA/Unity Ads の実 API は一切呼んでいない（推測実装を避けた）。
   - 検証: Unity EditMode green（コンパイル + 回帰なし）。
 - **残り（実機接続時に §4 ランブックで実行）**: ★ GMA Unity plugin + Unity Ads アダプタ(4.16.500) を manifest へ追加 → `AdMobService : IAdService` を1クラス実装 → `App.cs` の `new StubAdService(Player)` を1行差し替え → ATT/consent 実結線 → Info.plist 相当注入 → 実機 + 実広告アカウントで検証。**★ごとに iOS 実機ビルド通過を確認**（ここが今動作中のビルドを壊し得る唯一の危険手のため電話が要る）。
+
+---
+
+## 6. 実行ログ / 環境運用メモ
+
+### 2026-07-10 セッション（着手前の環境整備）
+- **Unity Editor は閉じている / MCP サーバ (pid 44824) は孤児化**（親=launchd）→ 対話 MCP は応答 null。**着手は CLI batchmode ルート**で行う（Editor 常駐不要、`unity/setup/ios-device-deploy.sh`）。次に Editor を GUI で開く時、孤児サーバがポート 26865 を掴んでいると MCP 再バインドが失敗し得る（その時は pid を kill してから起動）。
+- **実機（iPhone 17 Pro, 87F3A267…）は devicectl から `unavailable`**（USB 未接続 / ロック中）。→ **ビルド通過確認までは実機不要でできるが、ATT / Sandbox 購入 / 実広告の目視検証は実機を available にしてから（次回）**。
+- **deploy スクリプトを repo に恒久化**: `unity/setup/ios-device-deploy.sh`（前セッションの scratchpad にあった実物を移植、揮発対策 + 環境変数 override 対応）。
+- **manifest 運用方針（確定）**: Unity 依存の唯一の真実源は **ミラー `~/EscapeNineUnity/Packages/manifest.json`**（rsync は `.cs` のみのため repo は `Packages/` を追跡しない）。**repo に manifest.json を置かない**（ミラーと乖離する「死んだ第2権威」を作らないため）。その代わり、**広告 / IAP で追加した依存行は必ず本節「追加依存ログ」に追記**して、ミラー消失時に手復元できるようにする。
+- **baseline**: manifest を触る前に現ミラーの iOS ビルドが green か記録する（パッケージ追加で壊れた時に「元から/追加が原因か」を切り分けるため）。
+
+### 追加依存ログ（manifest.json に足した行をここに記録）
+- **2026-07-10 Unity IAP 導入**: ミラー `~/EscapeNineUnity/Packages/manifest.json` の dependencies に
+  `"com.unity.purchasing": "5.4.1"` を追加（Unity 2022.3+ 対応 = 6000.3 で可）。依存 `com.unity.services.core 1.18.0`
+  が自動解決される（packages-lock.json に記録・PackageCache に DL 済み）。
+  **CLI batchmode iOS ビルド green**（result=Succeeded / errors=0 / IAP 由来の新規 CS 警告なし /
+  sizeMB 1375→1501 = +126MB は IAP + services.core のネイティブ分）。既存コード・Stub 継ぎ目に影響なし。
+  ※ ミラー消失時はこの1行を dependencies に足せば復元できる。
+  **未了（次の実機セッションで一気通貫）**: (1) `UnityIapService : IIapService` を実装（PackageCache の
+  `com.unity.purchasing@…` の実 API に合わせる。推測実装せず実型で検証）→ (2) `App.cs` の
+  `new StubIapService(Player)` を差し替え → (3) StoreKit Configuration + Sandbox で実機購入/復元検証。
+  広告（GMA + Unity Ads アダプタ 4.16.500）は **IAP が固まってから別 manifest 変更**で（1変更に2つ混ぜると
+  ビルドが壊れた時に原因が切り分けられないため）。
