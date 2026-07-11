@@ -426,7 +426,16 @@ namespace EscapeNine.Runtime.UI
             _bestCaptionLabel.gameObject.SetActive(showPrevBest);
             if (showPrevBest)
             {
-                _bestCaptionLabel.text = "ベスト: " + _data.PreviousBest + "階";
+                // PostHog実測でリトライ率41%、残り階数の明示が未実装だったため追加 (ベストを「超える」に必要な残り階数)
+                int remaining = _data.PreviousBest + 1 - _data.Floor;
+                if (!_data.IsVictory && remaining >= 1)
+                {
+                    _bestCaptionLabel.text = "ベスト: " + _data.PreviousBest + "階（あと" + remaining + "階!）";
+                }
+                else
+                {
+                    _bestCaptionLabel.text = "ベスト: " + _data.PreviousBest + "階";
+                }
             }
 
             // 統計カード
