@@ -626,8 +626,7 @@ namespace EscapeNine.Runtime.UI
         {
             if (App.I == null) return;
 
-            // TODO(Phase 3): AnalyticsLogger.logRetryTapped(fromFloor:, secondsUntilTap:) 相当。
-            //                secondsUntilTap = Time.realtimeSinceStartup - _shownAtRealtime。
+            App.I.Analytics.LogRetryTapped(_data.Floor, Time.realtimeSinceStartup - _shownAtRealtime);
             App.I.Audio.PlaySfx("button_tap");
 
             // インタースティシャル広告 (Swift: InterstitialAdPresenter.show)。表示完了 (または
@@ -662,7 +661,7 @@ namespace EscapeNine.Runtime.UI
         {
             if (App.I == null) return;
 
-            // TODO(Phase 3): AnalyticsLogger.logHomeTapped(fromFloor:) 相当。
+            App.I.Analytics.LogHomeTapped(_data.Floor);
             App.I.Audio.PlaySfx("button_tap");
             App.I.Game.QuitToHome();
             App.I.Router.Show(ScreenId.Home);

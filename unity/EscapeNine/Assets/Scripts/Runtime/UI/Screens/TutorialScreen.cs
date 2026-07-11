@@ -72,6 +72,9 @@ namespace EscapeNine.Runtime.UI
         private PageDef[] _pages;
         private int _currentPage; // 0-indexed
 
+        /// <summary>Swift: startTime。eg_tutorial_complete.elapsed_seconds の基準 (Phase 3 計装用)。</summary>
+        private float _startedAtRealtime;
+
         // ---- ページ切替のたびに更新する参照 ----
         private TextMeshProUGUI _stepCaptionLabel;   // "STEP n / 6"
         private TextMeshProUGUI _titleLabel;
@@ -129,8 +132,8 @@ namespace EscapeNine.Runtime.UI
         public override void OnShow(object payload)
         {
             // Swift: onAppear で startTime 記録 + AnalyticsLogger.logTutorialStarted()。
-            // TODO(Phase 3): Analytics 計装 (logTutorialStarted / logTutorialStepCompleted /
-            //                logTutorialComplete(elapsedSeconds)) を AnalyticsLogger 移植とセットで追加。
+            _startedAtRealtime = Time.realtimeSinceStartup;
+            App.I.Analytics.LogTutorialStarted();
             ResetPlayableState();
             ShowPage(0); // 再入時 (ホームの「遊び方」から何度でも開ける) は必ず 1 ページ目から
         }
@@ -601,7 +604,7 @@ namespace EscapeNine.Runtime.UI
         private void OnNextTapped()
         {
             App.I.Audio.PlaySfx("button_tap");
-            // TODO(Phase 3): AnalyticsLogger.logTutorialStepCompleted(stepNumber, skipped: false)
+            App.I.Analytics.LogTutorialStepCompleted(_currentPage + 1, skipped: false);
             if (_currentPage >= _pages.Length - 1)
             {
                 Complete();
@@ -614,7 +617,7 @@ namespace EscapeNine.Runtime.UI
         private void OnSkipTapped()
         {
             App.I.Audio.PlaySfx("button_tap");
-            // TODO(Phase 3): AnalyticsLogger.logTutorialStepCompleted(stepNumber, skipped: true)
+            App.I.Analytics.LogTutorialStepCompleted(_currentPage + 1, skipped: true);
             Complete();
         }
 
@@ -625,7 +628,7 @@ namespace EscapeNine.Runtime.UI
         /// </summary>
         private void Complete()
         {
-            // TODO(Phase 3): AnalyticsLogger.logTutorialComplete(elapsedSeconds)
+            App.I.Analytics.LogTutorialComplete(Time.realtimeSinceStartup - _startedAtRealtime);
             var player = App.I.Player;
             player.HasSeenTutorial = true;
             player.HasSeenTutorialV11 = true;

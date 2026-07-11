@@ -77,6 +77,10 @@ GoogleService-Info.plist
 Secrets.xcconfig
 **/Secrets.xcconfig
 
+# Unity Analytics Secrets (PostHog Project API Key - 絶対にコミット禁止、Secrets.xcconfigと同じ扱い)
+unity/EscapeNine/Assets/Scripts/Runtime/Analytics/AnalyticsSecrets.cs
+unity/EscapeNine/Assets/Scripts/Runtime/Analytics/AnalyticsSecrets.cs.meta
+
 # Claude Code ローカル workspace
 .claude/
 

@@ -20,6 +20,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using EscapeNine.Core;
+using EscapeNine.Runtime.Analytics;
 
 namespace EscapeNine.Runtime
 {
@@ -142,6 +143,7 @@ namespace EscapeNine.Runtime
         private PlayerState _player;
         private RankingStore _ranking;
         private DailyChallengeStore _dailyChallenge;
+        private AnalyticsService _analytics;
 
         // MARK: - 内部状態
         private Phase _phase = Phase.Idle;
@@ -193,7 +195,7 @@ namespace EscapeNine.Runtime
         /// App の Awake から呼ぶ依存注入。Conductor.OnBeat の購読もここで 1 回だけ行う。
         /// </summary>
         public void Configure(Conductor conductor, AudioDirector audio, PlayerState player, RankingStore ranking,
-            DailyChallengeStore dailyChallenge)
+            DailyChallengeStore dailyChallenge, AnalyticsService analytics)
         {
             if (_conductor != null) _conductor.OnBeat -= HandleBeat; // 再 Configure 安全
             _conductor = conductor;
@@ -201,6 +203,7 @@ namespace EscapeNine.Runtime
             _player = player;
             _ranking = ranking;
             _dailyChallenge = dailyChallenge;
+            _analytics = analytics;
             _conductor.OnBeat += HandleBeat;
         }
 
@@ -312,7 +315,8 @@ namespace EscapeNine.Runtime
 
             BeginStartCountdown(bpm, skipCountdown);
 
-            // TODO(Phase 3): AnalyticsLogger.logGameStarted 相当 (floor / characterId)。
+            _analytics.LogGameStarted(Session.CurrentFloor, Session.DailyChallengeMode,
+                Session.CurrentCharacter.Type.RawValue());
             OnStateChanged?.Invoke();
         }
 
@@ -900,8 +904,8 @@ namespace EscapeNine.Runtime
 
                     _audio.PlaySfx("floor_clear"); // Swift: playSoundEffect(.floorClear)
                     OnTurnResolved?.Invoke(result);
-                    // TODO(Phase 3): AnalyticsLogger.logFloorCleared(floor:, clearSeconds:) 相当。
-                    //                per-floor 秒は Time.realtimeSinceStartup - _floorStartRealtime。
+                    _analytics.LogFloorCleared(Session.CurrentFloor,
+                        Time.realtimeSinceStartup - _floorStartRealtime);
                     break;
 
                 case TurnResult.Defeated:
@@ -1008,7 +1012,15 @@ namespace EscapeNine.Runtime
             ElapsedSeconds = Time.realtimeSinceStartup - _runStartRealtime;
             NearMissDistance = Session.CurrentNearMissDistance;
 
-            // TODO(Phase 3): AnalyticsLogger.logGameOverShown 相当 (.lose のみ / defeatReason 付き)。
+            // Swift: logGameOverShown は .lose のみ (勝利時は送らない、Swift正本のガードに合わせる)。
+            if (!won)
+            {
+                _analytics.LogGameOverShown(
+                    Session.CurrentFloor,
+                    MapDefeatReason(Session.LastDefeatReason ?? DefeatReason.CaughtByEnemy),
+                    NearMissDistance,
+                    ElapsedSeconds);
+            }
 
             // 2) 状態確定 (Session.Status は GameSession / NextFloor が設定済み)
             _phase = Phase.Finished;
@@ -1068,6 +1080,21 @@ namespace EscapeNine.Runtime
             // 6) 通知 — 勝利時は OnGameOver を発火しない (Swift 同様、UI は Status == Win を見て
             //    リザルトへ遷移する)。敗北時の OnGameOver は HandleDefeat で発火済み。
             OnStateChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Unity の DefeatReason (CaughtByEnemy/TimeOut の 2 値) を Swift 正本の
+        /// AnalyticsDefeatReason (trap/timeout/enemy/fall/unknown) 相当の小文字文字列へマップする。
+        /// Unity 側に trap/fall に対応する敗因が存在しないため、対応がない case は unknown に落とす。
+        /// </summary>
+        private static string MapDefeatReason(DefeatReason reason)
+        {
+            switch (reason)
+            {
+                case DefeatReason.CaughtByEnemy: return "enemy";
+                case DefeatReason.TimeOut: return "timeout";
+                default: return "unknown";
+            }
         }
 
         /// <summary>

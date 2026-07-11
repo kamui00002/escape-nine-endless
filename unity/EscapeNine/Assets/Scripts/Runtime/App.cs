@@ -11,6 +11,7 @@ using UnityEngine;
 using EscapeNine.Runtime.UI;
 using EscapeNine.Runtime.Ads;
 using EscapeNine.Runtime.IAP;
+using EscapeNine.Runtime.Analytics;
 
 namespace EscapeNine.Runtime
 {
@@ -37,6 +38,12 @@ namespace EscapeNine.Runtime
         /// 差し替えるだけでよい。
         /// </summary>
         public IIapService Iap;
+
+        /// <summary>
+        /// 分析サービスの継ぎ目 (PostHog REST 直叩き、単一ファサード)。UnityWebRequest がコルーチンを
+        /// 要するため MonoBehaviour として GameObject に AddComponent する (Audio/Conductor と同じ流儀)。
+        /// </summary>
+        public AnalyticsService Analytics;
 
         /// <summary>ローカルランキング (契約外の追加公開。Ranking 画面 / Result 画面が参照)。</summary>
         public RankingStore Ranking;
@@ -67,6 +74,11 @@ namespace EscapeNine.Runtime
             Ranking = new RankingStore();
             DailyChallenge = new DailyChallengeStore();
 
+            // 分析 (PostHog REST): UnityWebRequest のコルーチン実行主体として MonoBehaviour 化。
+            // Iap より前に構築する (OnPurchasePending からの LogPurchase 呼び出しに使うため)。
+            Analytics = GetComponent<AnalyticsService>();
+            if (Analytics == null) Analytics = gameObject.AddComponent<AnalyticsService>();
+
             // 広告 groundwork (Phase 3 前倒しの継ぎ目のみ): PlayerState 生成後に構築し、
             // AdRemoved (StoreKit/IAP 購入導線が更新する既存フラグ) をそのまま参照させる。
             Ads = new StubAdService(Player);
@@ -76,7 +88,7 @@ namespace EscapeNine.Runtime
 
             // IAP (Unity IAP 5.4.1): PlayerState 生成後に構築し、
             // 購入済み商品 (PurchasedProducts / AdRemoved、既存の SSOT) をそのまま参照させる。
-            Iap = new UnityIapService(Player);
+            Iap = new UnityIapService(Player, Analytics);
             Iap.Initialize();
 
             // UnityEngine.Object の null 判定は == を使う (?? は偽 null を貫通するため不可)
@@ -92,7 +104,7 @@ namespace EscapeNine.Runtime
 
             Game = GetComponent<GameController>();
             if (Game == null) Game = gameObject.AddComponent<GameController>();
-            Game.Configure(Conductor, Audio, Player, Ranking, DailyChallenge);
+            Game.Configure(Conductor, Audio, Player, Ranking, DailyChallenge, Analytics);
 
             // --- UI 構築 ---
             // 画面は Canvas/ScreenRoot 配下 (= App の子ではない) ため、screenRoot 経由で発見する。

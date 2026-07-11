@@ -17,12 +17,15 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Purchasing;
+using EscapeNine.Core;
+using EscapeNine.Runtime.Analytics;
 
 namespace EscapeNine.Runtime.IAP
 {
     public sealed class UnityIapService : IIapService
     {
         private readonly PlayerState _player;
+        private readonly AnalyticsService _analytics;
 
         private StoreController _store;
         private bool _isConnected;
@@ -36,9 +39,10 @@ namespace EscapeNine.Runtime.IAP
         private readonly Dictionary<string, Action<bool>> _pendingPurchaseCallbacks =
             new Dictionary<string, Action<bool>>();
 
-        public UnityIapService(PlayerState player)
+        public UnityIapService(PlayerState player, AnalyticsService analytics = null)
         {
             _player = player;
+            _analytics = analytics;
         }
 
         // MARK: - Initialize (Swift: StoreKitService.init = トランザクションリスナー開始 + loadPurchasedProducts)
@@ -188,6 +192,13 @@ namespace EscapeNine.Runtime.IAP
 
             _player?.AddPurchasedProduct(productId); // キャラ解放/広告削除は内部で反映 (SSOT)
             Debug.Log($"[UnityIapService] 購入付与完了 (確定前): {productId}");
+
+            // 課金コンバージョン計測 (Swift: ConversionService.trackPurchase 相当)。
+            // 価格は PlayerState.ProductRemoveAds のみ広告削除の固定額、それ以外はキャラ価格 (GameConfig)。
+            double value = productId == PlayerState.ProductRemoveAds
+                ? 480.0
+                : GameConfig.PremiumCharacterPrice;
+            _analytics?.LogPurchase(productId, value, "JPY");
 
             _store.ConfirmPurchase(order);
 
