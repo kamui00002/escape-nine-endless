@@ -23,6 +23,7 @@ using System.Globalization;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
+using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.Analytics
 {
@@ -182,6 +183,7 @@ namespace EscapeNine.Runtime.Analytics
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = 10; // スタック時にコルーチンを解放するため (通信スタックで無限に止まるのを防ぐ)
 
                 yield return request.SendWebRequest();
 
@@ -205,9 +207,9 @@ namespace EscapeNine.Runtime.Analytics
         private string BuildBodyJson(string eventName, Dictionary<string, object> properties)
         {
             var sb = new StringBuilder();
-            sb.Append("{\"api_key\":\"").Append(EscapeJsonString(AnalyticsConfig.ProjectKey)).Append('"');
-            sb.Append(",\"event\":\"").Append(EscapeJsonString(eventName)).Append('"');
-            sb.Append(",\"distinct_id\":\"").Append(EscapeJsonString(_distinctId)).Append('"');
+            sb.Append("{\"api_key\":\"").Append(JsonStringUtil.Escape(AnalyticsConfig.ProjectKey)).Append('"');
+            sb.Append(",\"event\":\"").Append(JsonStringUtil.Escape(eventName)).Append('"');
+            sb.Append(",\"distinct_id\":\"").Append(JsonStringUtil.Escape(_distinctId)).Append('"');
             sb.Append(",\"properties\":").Append(BuildPropsJson(properties));
             sb.Append('}');
             return sb.ToString();
@@ -225,7 +227,7 @@ namespace EscapeNine.Runtime.Analytics
             {
                 if (!first) sb.Append(',');
                 first = false;
-                sb.Append('"').Append(EscapeJsonString(kv.Key)).Append("\":").Append(SerializeValue(kv.Value));
+                sb.Append('"').Append(JsonStringUtil.Escape(kv.Key)).Append("\":").Append(SerializeValue(kv.Value));
             }
             sb.Append('}');
             return sb.ToString();
@@ -248,40 +250,11 @@ namespace EscapeNine.Runtime.Analytics
                 case double d:
                     return d.ToString(CultureInfo.InvariantCulture);
                 case string s:
-                    return "\"" + EscapeJsonString(s) + "\"";
+                    return "\"" + JsonStringUtil.Escape(s) + "\"";
                 default:
                     // 想定外の型は文字列化してエスケープする (黙って落とすより安全側)。
-                    return "\"" + EscapeJsonString(value.ToString()) + "\"";
+                    return "\"" + JsonStringUtil.Escape(value.ToString()) + "\"";
             }
-        }
-
-        private static string EscapeJsonString(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return string.Empty;
-
-            var sb = new StringBuilder(s.Length);
-            foreach (char c in s)
-            {
-                switch (c)
-                {
-                    case '"': sb.Append("\\\""); break;
-                    case '\\': sb.Append("\\\\"); break;
-                    case '\n': sb.Append("\\n"); break;
-                    case '\r': sb.Append("\\r"); break;
-                    case '\t': sb.Append("\\t"); break;
-                    default:
-                        if (c < 0x20)
-                        {
-                            sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
-                        }
-                        else
-                        {
-                            sb.Append(c);
-                        }
-                        break;
-                }
-            }
-            return sb.ToString();
         }
     }
 }

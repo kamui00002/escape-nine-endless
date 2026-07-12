@@ -185,20 +185,28 @@ namespace EscapeNine.Runtime.IAP
 
             if (string.IsNullOrEmpty(productId))
             {
-                Debug.LogWarning("[UnityIapService] PendingOrder から productId を解決できない");
+                // productId 不明のため付与・callback照合ができない既知の限界 (課金済み未付与という重大事態、再設計はしない)。
+                Debug.LogError("[UnityIapService] PendingOrder から productId を解決できない");
                 _store.ConfirmPurchase(order);
                 return;
             }
 
+            // 起動時の FetchPurchases 等で未確定注文が再配信されても LogPurchase が毎回再発火しないよう、
+            // 付与前の所有状態 (IsPurchased、RemoveAds は AdRemoved との複合判定を内包) を捕捉しておく。
+            bool wasOwned = IsPurchased(productId);
             _player?.AddPurchasedProduct(productId); // キャラ解放/広告削除は内部で反映 (SSOT)
             Debug.Log($"[UnityIapService] 購入付与完了 (確定前): {productId}");
 
             // 課金コンバージョン計測 (Swift: ConversionService.trackPurchase 相当)。
             // 価格は PlayerState.ProductRemoveAds のみ広告削除の固定額、それ以外はキャラ価格 (GameConfig)。
-            double value = productId == PlayerState.ProductRemoveAds
-                ? 480.0
-                : GameConfig.PremiumCharacterPrice;
-            _analytics?.LogPurchase(productId, value, "JPY");
+            // 非消耗型は本物の再購入が起きないため、新規付与時のみ送信し PostHog 指標の水増しを防ぐ。
+            if (!wasOwned)
+            {
+                double value = productId == PlayerState.ProductRemoveAds
+                    ? 480.0
+                    : GameConfig.PremiumCharacterPrice;
+                _analytics?.LogPurchase(productId, value, "JPY");
+            }
 
             _store.ConfirmPurchase(order);
 

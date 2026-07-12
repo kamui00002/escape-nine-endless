@@ -27,6 +27,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.Networking;
+using EscapeNine.Core;
 
 namespace EscapeNine.Runtime.Ranking
 {
@@ -179,6 +180,7 @@ namespace EscapeNine.Runtime.Ranking
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                request.timeout = 10; // スタック時にラッチ解放するため (通信スタックで _authInProgress が固まるのを防ぐ)
 
                 yield return request.SendWebRequest();
 
@@ -223,6 +225,7 @@ namespace EscapeNine.Runtime.Ranking
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = 10; // スタック時にラッチ解放するため (通信スタックで _authInProgress が固まるのを防ぐ)
 
                 yield return request.SendWebRequest();
 
@@ -278,6 +281,7 @@ namespace EscapeNine.Runtime.Ranking
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.SetRequestHeader("Authorization", "Bearer " + _idToken);
+                request.timeout = 10; // スタック時にラッチ解放するため (通信スタックで _authInProgress が固まるのを防ぐ)
 
                 yield return request.SendWebRequest();
 
@@ -324,6 +328,7 @@ namespace EscapeNine.Runtime.Ranking
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.SetRequestHeader("Authorization", "Bearer " + _idToken);
+                request.timeout = 10; // スタック時にラッチ解放するため (通信スタックで _authInProgress が固まるのを防ぐ)
 
                 yield return request.SendWebRequest();
 
@@ -377,11 +382,11 @@ namespace EscapeNine.Runtime.Ranking
         {
             var sb = new StringBuilder();
             sb.Append("{\"fields\":{");
-            sb.Append("\"userId\":{\"stringValue\":\"").Append(EscapeJsonString(uid)).Append("\"},");
-            sb.Append("\"displayName\":{\"stringValue\":\"").Append(EscapeJsonString(displayName)).Append("\"},");
+            sb.Append("\"userId\":{\"stringValue\":\"").Append(JsonStringUtil.Escape(uid)).Append("\"},");
+            sb.Append("\"displayName\":{\"stringValue\":\"").Append(JsonStringUtil.Escape(displayName)).Append("\"},");
             sb.Append("\"floor\":{\"integerValue\":\"").Append(floor.ToString(CultureInfo.InvariantCulture)).Append("\"},");
-            sb.Append("\"characterType\":{\"stringValue\":\"").Append(EscapeJsonString(characterType)).Append("\"},");
-            sb.Append("\"timestamp\":{\"timestampValue\":\"").Append(EscapeJsonString(timestampIso)).Append("\"}");
+            sb.Append("\"characterType\":{\"stringValue\":\"").Append(JsonStringUtil.Escape(characterType)).Append("\"},");
+            sb.Append("\"timestamp\":{\"timestampValue\":\"").Append(JsonStringUtil.Escape(timestampIso)).Append("\"}");
             sb.Append("}}");
             return sb.ToString();
         }
@@ -521,7 +526,7 @@ namespace EscapeNine.Runtime.Ranking
         {
             var match = Regex.Match(fieldsJson,
                 "\"" + Regex.Escape(key) + "\"\\s*:\\s*\\{\\s*\"stringValue\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"\\s*\\}");
-            return match.Success ? UnescapeJsonString(match.Groups[1].Value) : null;
+            return match.Success ? JsonStringUtil.Unescape(match.Groups[1].Value) : null;
         }
 
         /// <summary>Firestore typed value {"integerValue":"..."} を key 指定で抽出する (未検出/解析失敗は 0)。</summary>
@@ -539,65 +544,7 @@ namespace EscapeNine.Runtime.Ranking
         private static string ExtractJsonString(string json, string key)
         {
             var match = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
-            return match.Success ? UnescapeJsonString(match.Groups[1].Value) : null;
-        }
-
-        private static string UnescapeJsonString(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return s;
-
-            var sb = new StringBuilder(s.Length);
-            for (int i = 0; i < s.Length; i++)
-            {
-                char c = s[i];
-                if (c == '\\' && i + 1 < s.Length)
-                {
-                    char next = s[i + 1];
-                    switch (next)
-                    {
-                        case '"': sb.Append('"'); i++; break;
-                        case '\\': sb.Append('\\'); i++; break;
-                        case 'n': sb.Append('\n'); i++; break;
-                        case 'r': sb.Append('\r'); i++; break;
-                        case 't': sb.Append('\t'); i++; break;
-                        default: sb.Append(c); break;
-                    }
-                }
-                else
-                {
-                    sb.Append(c);
-                }
-            }
-            return sb.ToString();
-        }
-
-        private static string EscapeJsonString(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return string.Empty;
-
-            var sb = new StringBuilder(s.Length);
-            foreach (char c in s)
-            {
-                switch (c)
-                {
-                    case '"': sb.Append("\\\""); break;
-                    case '\\': sb.Append("\\\\"); break;
-                    case '\n': sb.Append("\\n"); break;
-                    case '\r': sb.Append("\\r"); break;
-                    case '\t': sb.Append("\\t"); break;
-                    default:
-                        if (c < 0x20)
-                        {
-                            sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
-                        }
-                        else
-                        {
-                            sb.Append(c);
-                        }
-                        break;
-                }
-            }
-            return sb.ToString();
+            return match.Success ? JsonStringUtil.Unescape(match.Groups[1].Value) : null;
         }
     }
 }

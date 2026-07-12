@@ -54,6 +54,9 @@ namespace EscapeNine.Runtime.UI
         private CloudState _cloudState = CloudState.Loading;
         private List<OnlineRankingEntry> _cloudEntries;
 
+        /// <summary>連続表示 (OnShow 連打) で古いフェッチ応答が新しい結果を上書きしないための世代カウンタ。</summary>
+        private int _cloudFetchGeneration;
+
         // ---- 動的要素への参照 ----
         private TextMeshProUGUI _myRecordLabel;      // 自己ベスト階層の数字
         private Image _tabLocalBg;
@@ -104,12 +107,17 @@ namespace EscapeNine.Runtime.UI
             _cloudEntries = null;
             RefreshAll();
 
-            App.I.OnlineRanking.FetchRankings(OnCloudRankingsFetched);
+            // この呼び出しの世代をラムダのクロージャで捕捉し、コールバック到達時に古い世代なら破棄する
+            // (連続表示で発生し得る stale 応答の上書きを防ぐ)。
+            int generation = ++_cloudFetchGeneration;
+            App.I.OnlineRanking.FetchRankings(entries => OnCloudRankingsFetched(generation, entries));
         }
 
         /// <summary>OnlineRankingService.FetchRankings のコールバック。null = 取得失敗 (未認証/ネットワーク不可等)。</summary>
-        private void OnCloudRankingsFetched(List<OnlineRankingEntry> entries)
+        private void OnCloudRankingsFetched(int generation, List<OnlineRankingEntry> entries)
         {
+            if (generation != _cloudFetchGeneration) return; // stale (この後に新しいフェッチが開始済み) は破棄
+
             if (entries != null)
             {
                 _cloudState = CloudState.Success;
