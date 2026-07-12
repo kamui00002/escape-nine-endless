@@ -81,6 +81,10 @@ Secrets.xcconfig
 unity/EscapeNine/Assets/Scripts/Runtime/Analytics/AnalyticsSecrets.cs
 unity/EscapeNine/Assets/Scripts/Runtime/Analytics/AnalyticsSecrets.cs.meta
 
+# Unity Ranking Secrets (Firebase Web API Key - 絶対にコミット禁止、AnalyticsSecrets.csと同じ扱い)
+unity/EscapeNine/Assets/Scripts/Runtime/Ranking/RankingSecrets.cs
+unity/EscapeNine/Assets/Scripts/Runtime/Ranking/RankingSecrets.cs.meta
+
 # Claude Code ローカル workspace
 .claude/
 

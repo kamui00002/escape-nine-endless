@@ -12,6 +12,7 @@ using EscapeNine.Runtime.UI;
 using EscapeNine.Runtime.Ads;
 using EscapeNine.Runtime.IAP;
 using EscapeNine.Runtime.Analytics;
+using EscapeNine.Runtime.Ranking;
 
 namespace EscapeNine.Runtime
 {
@@ -48,6 +49,13 @@ namespace EscapeNine.Runtime
         /// <summary>ローカルランキング (契約外の追加公開。Ranking 画面 / Result 画面が参照)。</summary>
         public RankingStore Ranking;
 
+        /// <summary>
+        /// 世界ランキング (Firebase Auth REST + Firestore REST 直叩き、単一ファサード)。UnityWebRequest が
+        /// コルーチンを要するため MonoBehaviour として GameObject に AddComponent する
+        /// (Analytics と同じ流儀)。
+        /// </summary>
+        public OnlineRankingService OnlineRanking;
+
         /// <summary>デイリーチャレンジ (契約外の追加公開、Phase 2.5)。Home / DailyChallenge 画面が参照。</summary>
         public DailyChallengeStore DailyChallenge;
 
@@ -78,6 +86,19 @@ namespace EscapeNine.Runtime
             // Iap より前に構築する (OnPurchasePending からの LogPurchase 呼び出しに使うため)。
             Analytics = GetComponent<AnalyticsService>();
             if (Analytics == null) Analytics = gameObject.AddComponent<AnalyticsService>();
+
+            // 世界ランキング (Firebase Auth REST + Firestore REST): UnityWebRequest のコルーチン実行主体
+            // として MonoBehaviour 化 (Analytics と同じ流儀)。起動時に EnsureAuth を 1 回だけ呼び、
+            // 以後は保存済み refreshToken で再認証する (匿名UIDを永続化、毎起動 signUp しない)。
+            OnlineRanking = GetComponent<OnlineRankingService>();
+            if (OnlineRanking == null) OnlineRanking = gameObject.AddComponent<OnlineRankingService>();
+            OnlineRanking.EnsureAuth(success =>
+            {
+                if (!success)
+                {
+                    Debug.LogWarning("[App] 世界ランキングの認証に失敗しました (オフライン等、ゲーム進行には影響しない)");
+                }
+            });
 
             // 広告 groundwork (Phase 3 前倒しの継ぎ目のみ): PlayerState 生成後に構築し、
             // AdRemoved (StoreKit/IAP 購入導線が更新する既存フラグ) をそのまま参照させる。

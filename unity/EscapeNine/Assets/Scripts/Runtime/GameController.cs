@@ -1001,8 +1001,18 @@ namespace EscapeNine.Runtime
             int floor = Session.CurrentFloor;
             string characterId = Session.CurrentCharacter.Type.RawValue();
             _ranking.SubmitScore(floor, characterId);
+
+            // 世界ランキング (Firestore): 自己ベスト更新時のみ送信する (update ルールが floor>=既存の
+            // 単調増加を要求するため、非ベストの送信は 403 になる)。_player.HighestFloor はこの時点では
+            // まだ「今回より前」の自己ベストを保持している (直後の UpdateHighestFloor で更新される) ため、
+            // この判定はこの行の位置 (UpdateHighestFloor より前) に依存する — 並び替え禁止。
+            if (App.I != null && App.I.OnlineRanking != null && floor > _player.HighestFloor)
+            {
+                App.I.OnlineRanking.SubmitScore(floor, characterId);
+            }
+
             _player.UpdateHighestFloor(floor);
-            // TODO(Phase 3): GameCenterService.submitScore / FirebaseService.submitScore 相当。
+            // TODO(Phase 3): GameCenterService.submitScore 相当。
         }
 
         /// <summary>ラン終了処理。Swift: endGame(result:) と同順 (計測確定 → 音 → 永続化 → 実績)。</summary>

@@ -2,9 +2,10 @@
 // Swift 正本: Views/Ranking/RankingView.swift + ViewModels/RankingViewModel.swift
 //   - 自己ベストカード (あなたの記録) / タブ (プレイ履歴・クラウド) / ランキング行 / 空状態 を移植。
 //   - Swift の List → コード構築の uGUI ScrollRect + 行パネル。
-//   - クラウドタブ (Firestore) と Game Center ボタンは Phase 3 のため「準備中」プレースホルダのみ。
-//     (RankingViewModel.fetchCloudRankings / isLoading / hasError / retry のオンライン系状態機械も
-//      Phase 3 でクラウド実装とセットで移植する。ローカルは同期取得なのでローディング表示は不要。)
+//   - クラウドタブは OnlineRankingService (Firebase Auth REST + Firestore REST) 経由の世界ランキング。
+//     Swift 側に対応する REST 実装はまだ無い Unity 独自の追加 (Game Center 経由の Swift とは非対称)。
+//     画面表示のたびに FetchRankings を実行し、成功時は世界ランキング (isMe 行をハイライト)、
+//     失敗/未認証時は既存のローカル RankingStore 表示へフォールバックする (silent fail 禁止)。
 //
 // レイアウトは全て UIFactory.Place の親比率 0..1 (固定 px 禁止)。
 // 座標系は Unity 左下原点: cy が大きいほど画面上部 (Swift の top-left と逆)。
@@ -14,6 +15,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using EscapeNine.Core;
+using EscapeNine.Runtime.Ranking;
 
 namespace EscapeNine.Runtime.UI
 {
@@ -31,6 +33,14 @@ namespace EscapeNine.Runtime.UI
             Cloud
         }
 
+        /// <summary>クラウドタブの取得状態。Swift の isLoading/hasError 相当をまとめた簡易状態機械。</summary>
+        private enum CloudState
+        {
+            Loading,
+            Success,
+            Failed
+        }
+
         /// <summary>1 行あたりの高さ (ビューポート高さ比、行間込み)。</summary>
         private const float RowHeightVp = 0.085f;
 
@@ -39,6 +49,10 @@ namespace EscapeNine.Runtime.UI
         private bool _built;
 
         private Tab _selectedTab = Tab.Local;
+
+        // ---- クラウド (世界ランキング) 状態 ----
+        private CloudState _cloudState = CloudState.Loading;
+        private List<OnlineRankingEntry> _cloudEntries;
 
         // ---- 動的要素への参照 ----
         private TextMeshProUGUI _myRecordLabel;      // 自己ベスト階層の数字
@@ -50,7 +64,9 @@ namespace EscapeNine.Runtime.UI
         private ScrollRect _scroll;
         private RectTransform _listContent;
         private GameObject _emptyPanel;   // ローカル履歴が空のとき
-        private GameObject _cloudPanel;   // クラウドタブ (準備中)
+        private GameObject _cloudPanel;   // クラウドタブ (読み込み中 / データなしの簡易表示)
+        private TextMeshProUGUI _cloudTitleLabel;
+        private TextMeshProUGUI _cloudCaptionLabel;
 
         public override void BuildUI()
         {
@@ -81,9 +97,30 @@ namespace EscapeNine.Runtime.UI
 
         public override void OnShow(object payload)
         {
-            // Swift は @StateObject が push のたびに作り直され selectedTab = .local に戻る。
-            // それに合わせて表示のたびにローカルタブへリセットする。
-            _selectedTab = Tab.Local;
+            // 「表示を世界ランキングにする」方針のため、表示のたびにクラウドタブへリセットしフェッチする
+            // (Swift の Game Center 経由とは非対称。ローカル履歴は引き続きタブ切替で参照可能)。
+            _selectedTab = Tab.Cloud;
+            _cloudState = CloudState.Loading;
+            _cloudEntries = null;
+            RefreshAll();
+
+            App.I.OnlineRanking.FetchRankings(OnCloudRankingsFetched);
+        }
+
+        /// <summary>OnlineRankingService.FetchRankings のコールバック。null = 取得失敗 (未認証/ネットワーク不可等)。</summary>
+        private void OnCloudRankingsFetched(List<OnlineRankingEntry> entries)
+        {
+            if (entries != null)
+            {
+                _cloudState = CloudState.Success;
+                _cloudEntries = entries;
+            }
+            else
+            {
+                _cloudState = CloudState.Failed;
+                _cloudEntries = null;
+            }
+
             RefreshAll();
         }
 
@@ -180,18 +217,19 @@ namespace EscapeNine.Runtime.UI
             UIFactory.Place((RectTransform)emptyCaption.transform, 0.5f, 0.47f, 0.9f, 0.08f);
             _emptyPanel = empty.gameObject;
 
-            // クラウドタブ (Phase 3 準備中。Swift の世界ランキング (Game Center) ボタン +
-            // クラウドランキング (Firestore) を将来ここへ実装する)
+            // クラウドタブ: 読み込み中 / 取得失敗かつローカル記録も無い場合の簡易表示
+            // (取得成功時、および取得失敗でもローカル記録があるときはスクロールリストを使うため非表示になる)。
             var cloud = UIFactory.Panel(parent, "CloudPanel");
             UIFactory.Place(cloud, 0.5f, 0.365f, 1f, 0.73f);
-            var cloudTitle = UIFactory.Label(cloud, "Title", "クラウドランキングは準備中です", 40,
+            var cloudTitle = UIFactory.Label(cloud, "Title", "読み込み中...", 40,
                 UITheme.WithAlpha(UITheme.TextColor, 0.8f));
             UIFactory.Place((RectTransform)cloudTitle.transform, 0.5f, 0.56f, 0.9f, 0.10f);
-            var cloudCaption = UIFactory.Label(cloud, "Caption",
-                "Phase 3 で Game Center / Firestore の\n世界ランキングと連携します", 30,
+            var cloudCaption = UIFactory.Label(cloud, "Caption", "世界ランキングを取得しています", 30,
                 UITheme.WithAlpha(UITheme.TextColor, 0.5f));
             UIFactory.Place((RectTransform)cloudCaption.transform, 0.5f, 0.43f, 0.9f, 0.14f);
             _cloudPanel = cloud.gameObject;
+            _cloudTitleLabel = cloudTitle;
+            _cloudCaptionLabel = cloudCaption;
         }
 
         // MARK: - 再描画 (Swift の @Published バインディング相当を OnShow / タブ切替で一括実行)
@@ -207,15 +245,20 @@ namespace EscapeNine.Runtime.UI
             // タブの選択見た目 (選択中 = ゴールド地 + 濃色文字)
             ApplyTabVisual(_tabLocalBg, _tabLocalLabel, _selectedTab == Tab.Local);
             ApplyTabVisual(_tabCloudBg, _tabCloudLabel, _selectedTab == Tab.Cloud);
+            UpdateCloudTabLabel();
 
-            if (_selectedTab == Tab.Cloud)
+            if (_selectedTab == Tab.Local)
             {
-                _scrollRoot.SetActive(false);
-                _emptyPanel.SetActive(false);
-                _cloudPanel.SetActive(true);
+                RefreshLocalList();
                 return;
             }
 
+            RefreshCloudList();
+        }
+
+        /// <summary>ローカルタブの描画 (Swift 正本のローカル履歴表示、変更なし)。</summary>
+        private void RefreshLocalList()
+        {
             _cloudPanel.SetActive(false);
 
             IReadOnlyList<RankingEntry> entries = App.I.Ranking.GetRankings();
@@ -229,6 +272,67 @@ namespace EscapeNine.Runtime.UI
             _emptyPanel.SetActive(false);
             _scrollRoot.SetActive(true);
             RebuildRows(entries);
+        }
+
+        /// <summary>
+        /// クラウドタブの描画。読み込み中はプレースホルダ、成功時は世界ランキング (isMe ハイライト)、
+        /// 失敗時は既存ローカル RankingStore 表示へフォールバックする (silent fail 禁止、
+        /// タブラベルに "(オフライン)" を付けて簡易表示する。UpdateCloudTabLabel 参照)。
+        /// </summary>
+        private void RefreshCloudList()
+        {
+            switch (_cloudState)
+            {
+                case CloudState.Loading:
+                    _scrollRoot.SetActive(false);
+                    _emptyPanel.SetActive(false);
+                    _cloudPanel.SetActive(true);
+                    if (_cloudTitleLabel != null) _cloudTitleLabel.text = "読み込み中...";
+                    if (_cloudCaptionLabel != null) _cloudCaptionLabel.text = "世界ランキングを取得しています";
+                    break;
+
+                case CloudState.Success:
+                    if (_cloudEntries == null || _cloudEntries.Count == 0)
+                    {
+                        _cloudPanel.SetActive(false);
+                        _scrollRoot.SetActive(false);
+                        _emptyPanel.SetActive(true);
+                    }
+                    else
+                    {
+                        _cloudPanel.SetActive(false);
+                        _emptyPanel.SetActive(false);
+                        _scrollRoot.SetActive(true);
+                        RebuildOnlineRows(_cloudEntries);
+                    }
+                    break;
+
+                case CloudState.Failed:
+                    IReadOnlyList<RankingEntry> localEntries = App.I.Ranking.GetRankings();
+                    if (localEntries.Count == 0)
+                    {
+                        _scrollRoot.SetActive(false);
+                        _emptyPanel.SetActive(false);
+                        _cloudPanel.SetActive(true);
+                        if (_cloudTitleLabel != null) _cloudTitleLabel.text = "世界ランキングを取得できませんでした";
+                        if (_cloudCaptionLabel != null) _cloudCaptionLabel.text = "ネットワーク接続を確認してください";
+                    }
+                    else
+                    {
+                        _cloudPanel.SetActive(false);
+                        _emptyPanel.SetActive(false);
+                        _scrollRoot.SetActive(true);
+                        RebuildRows(localEntries); // 既存ローカル RankingStore 表示へフォールバック
+                    }
+                    break;
+            }
+        }
+
+        /// <summary>クラウドタブのラベルに取得失敗の簡易表示 ("(オフライン)") を付与する。</summary>
+        private void UpdateCloudTabLabel()
+        {
+            if (_tabCloudLabel == null) return;
+            _tabCloudLabel.text = _cloudState == CloudState.Failed ? "クラウド(オフライン)" : "クラウド";
         }
 
         private static void ApplyTabVisual(Image bg, TextMeshProUGUI label, bool selected)
@@ -299,6 +403,55 @@ namespace EscapeNine.Runtime.UI
 
             // 到達階層 (Swift: "\(entry.floor)階" textSecondary)
             var floor = UIFactory.Label(row, "Floor", entry.floor + "階", 44, UITheme.GoldText,
+                TextAnchor.MiddleRight, FontStyle.Bold);
+            UIFactory.Place((RectTransform)floor.transform, 0.86f, 0.5f, 0.24f, 0.9f);
+        }
+
+        // MARK: - Online Rows (世界ランキング。ローカル行と同じ Card/Border 質感を流用し、
+        // 日付の代わりに isMe ハイライトを持たせる)
+
+        /// <summary>RebuildRows と同型 (OnlineRankingEntry 版)。データ源が違うだけで生成ロジックは同じにする。</summary>
+        private void RebuildOnlineRows(IReadOnlyList<OnlineRankingEntry> entries)
+        {
+            for (int i = _listContent.childCount - 1; i >= 0; i--)
+            {
+                Destroy(_listContent.GetChild(i).gameObject);
+            }
+
+            float k = Mathf.Max(1f, entries.Count * RowHeightVp + 0.02f);
+            SetContentHeight(_listContent, k);
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                float cy = 1f - (0.01f + RowHeightVp * (i + 0.5f)) / k;
+                float h = RowHeightVp * 0.9f / k;
+                BuildOnlineRow(_listContent, i, entries[i], cy, h);
+            }
+
+            _scroll.verticalNormalizedPosition = 1f;
+            _listContent.anchoredPosition = Vector2.zero;
+        }
+
+        private void BuildOnlineRow(RectTransform parent, int index, OnlineRankingEntry entry, float cy, float h)
+        {
+            var row = UIFactory.Card(parent, "OnlineRow" + index, out _, UITheme.PanelFillTop, UITheme.PanelFillBottom);
+            UIFactory.Place(row, 0.5f, cy, 0.94f, h);
+            // isMe (自分の記録) はボーダーをゴールドで強調する (Swift に対応表現が無いため Unity 独自)。
+            UIFactory.BorderTrim(row, "OnlineRow" + index + "Border",
+                entry.IsMe ? UITheme.GoldText : UITheme.Accent, entry.IsMe ? 0.7f : 0.4f);
+
+            var rank = UIFactory.Label(row, "Rank", "#" + (index + 1), 44, RankColor(index),
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)rank.transform, 0.10f, 0.5f, 0.18f, 0.9f);
+
+            // 日付が無い分、名前ラベルは縦中央いっぱいを使う (ローカル行は名前+日付の2段組)。
+            string nameText = CharacterDisplayName(entry.CharacterType) + "  " + entry.DisplayName
+                + (entry.IsMe ? " (YOU)" : "");
+            var name = UIFactory.Label(row, "Name", nameText, 36,
+                entry.IsMe ? UITheme.GoldText : UITheme.TextColor, TextAnchor.MiddleLeft);
+            UIFactory.Place((RectTransform)name.transform, 0.45f, 0.5f, 0.52f, 0.9f);
+
+            var floor = UIFactory.Label(row, "Floor", entry.Floor + "階", 44, UITheme.GoldText,
                 TextAnchor.MiddleRight, FontStyle.Bold);
             UIFactory.Place((RectTransform)floor.transform, 0.86f, 0.5f, 0.24f, 0.9f);
         }
