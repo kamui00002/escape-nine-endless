@@ -24,8 +24,13 @@ service cloud.firestore {
 
       allow update: if isAuthenticated()
         && isOwner(userId)
+        && request.resource.data.keys().hasAll(['userId', 'displayName', 'floor', 'characterType', 'timestamp'])
         && request.resource.data.userId == resource.data.userId
-        && request.resource.data.floor >= resource.data.floor;
+        && request.resource.data.floor is int
+        && request.resource.data.floor >= 1
+        && request.resource.data.floor <= 100
+        && request.resource.data.floor >= resource.data.floor
+        && request.resource.data.characterType in ['hero', 'thief', 'wizard', 'elf', 'knight'];
 
       allow delete: if false;
     }
