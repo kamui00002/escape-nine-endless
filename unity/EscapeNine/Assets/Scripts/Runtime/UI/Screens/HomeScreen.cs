@@ -46,6 +46,14 @@ namespace EscapeNine.Runtime.UI
         private Coroutine _toastRoutine;
         private const float ToastDisplaySeconds = 1.5f;
 
+        // 世界ランキング刷新のお知らせ (初回1回だけ表示。Swift正本には対応なし、Unity固有拡張)。
+        // Swift版から Unity版 (Firestore REST) へ移行したユーザーは匿名IDが引き継がれず、
+        // 以前の順位が入り直しになる場合があるため、初回起動時に1回だけ周知する
+        // (2回目以降は PlayerPrefs フラグで抑止。文言の長さ・要「とじる」操作から、
+        // 1.5秒で自動消滅する共有トースト (ShowToast) には収まらないため専用オーバーレイとする)。
+        private const string HasSeenRankingRenewalNoticeKey = "hasSeenRankingRenewalNotice";
+        private GameObject _rankingRenewalNoticeOverlay;
+
         // ---- HD-2D (2026-07-06 追加): 背景パララックス / タイトル浮遊の駆動状態 ----
         // どちらも「酔わない範囲の極小演出」。FxKit.MotionEnabled (Reduce Motion) を毎 tick 見て、
         // 無効時は即座に基準位置へ戻す (BeatPulse.SettleToBase と同じ考え方)。
@@ -108,6 +116,11 @@ namespace EscapeNine.Runtime.UI
 
             // トーストは最後に構築し、DangerZone (DEBUG時) を含む他要素より必ず手前に描画されるようにする
             BuildToast(safe);
+
+            // 世界ランキング刷新のお知らせは safe (Toast 含む) より後に transform 直下へ構築し、
+            // 兄弟順序で本画面の全要素より手前に描画されるようにする (GameScreen の
+            // Pregame/Paused オーバーレイと同じ「screen root 直下の全画面オーバーレイ」方式)。
+            BuildRankingRenewalNoticeOverlay();
         }
 
         public override void OnShow(object payload)
@@ -146,11 +159,37 @@ namespace EscapeNine.Runtime.UI
             {
                 StartCoroutine(ShowTutorialNextFrame());
             }
+            else
+            {
+                // 世界ランキング刷新のお知らせは「チュートリアル読了済み (=本画面に留まる)」の
+                // 場合のみ表示する。上の if 分岐 (チュートリアル未読了) は 1 フレーム後に
+                // Router.Show(Tutorial) で本画面から離脱するため、そちらでお知らせを出すと
+                // 離脱までの一瞬しか見えないまま「見せた」フラグだけが立ってしまい、
+                // 二度と表示されなくなる (見せたつもりが実際には見せられていない事故)。
+                MaybeShowRankingRenewalNotice();
+            }
+        }
+
+        /// <summary>
+        /// 世界ランキング刷新のお知らせを初回1回だけ表示する (Swift正本には対応なし、Unity固有拡張)。
+        /// タスク仕様どおり「表示後にフラグを立てて保存」する (とじるボタン押下を待たない) —
+        /// 表示直後に強制終了・アプリ切り替えされても「見せた」扱いにし、再度表示させないため。
+        /// </summary>
+        private void MaybeShowRankingRenewalNotice()
+        {
+            if (PlayerPrefs.GetInt(HasSeenRankingRenewalNoticeKey, 0) != 0) return;
+
+            PlayerPrefs.SetInt(HasSeenRankingRenewalNoticeKey, 1);
+            PlayerPrefs.Save();
+
+            if (_rankingRenewalNoticeOverlay != null) _rankingRenewalNoticeOverlay.SetActive(true);
         }
 
         public override void OnHide()
         {
             HideToast();
+            // お知らせオーバーレイの防御的クローズ (Toast と同じ「非表示のたびに片付ける」作法)。
+            if (_rankingRenewalNoticeOverlay != null) _rankingRenewalNoticeOverlay.SetActive(false);
             if (App.I != null && App.I.Ads != null) App.I.Ads.HideBanner();
             if (_parallaxRoutine != null)
             {
@@ -611,6 +650,39 @@ namespace EscapeNine.Runtime.UI
                 _toastRoutine = null;
             }
             if (_toast != null) _toast.gameObject.SetActive(false);
+        }
+
+        // MARK: - 世界ランキング刷新のお知らせ (初回1回だけ。Swift正本には対応なし、Unity固有拡張)
+        // GameScreen の BuildPregameOverlay/BuildPausedOverlay と同じ「全画面半透明パネル +
+        // タイトル + 本文 + とじるボタン」構成。共有トースト (ShowToast) は 1 行・1.5秒自動消滅の
+        // 前提のため、複数行の周知文 + 明示クローズが必要な本お知らせには使わない。
+
+        private void BuildRankingRenewalNoticeOverlay()
+        {
+            var overlay = UIFactory.Panel(transform, "RankingRenewalNoticeOverlay",
+                UITheme.WithAlpha(UITheme.Background, 0.95f));
+            _rankingRenewalNoticeOverlay = overlay.gameObject;
+
+            var title = UIFactory.Label(overlay, "Title", "世界ランキングをリニューアル", 52, UITheme.GoldText,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Place((RectTransform)title.transform, 0.5f, 0.64f, 0.85f, 0.08f);
+
+            var body = UIFactory.Label(overlay, "Body",
+                "オンラインランキングを新しくしました。以前の記録から順位が引き継がれない場合があります。新しく挑戦して世界に挑もう！",
+                34, UITheme.TextColor);
+            UIFactory.Place((RectTransform)body.transform, 0.5f, 0.47f, 0.82f, 0.22f);
+
+            UIFactory.SecondaryButton(overlay, "CloseButton", "とじる", 0.5f, 0.28f, 0.5f, 0.06f,
+                HideRankingRenewalNotice, 48);
+
+            _rankingRenewalNoticeOverlay.SetActive(false);
+        }
+
+        /// <summary>とじるボタン (Swift: GameButton が内蔵する buttonTap と同じ効果音方針)。</summary>
+        private void HideRankingRenewalNotice()
+        {
+            App.I.Audio.PlaySfx("button_tap");
+            if (_rankingRenewalNoticeOverlay != null) _rankingRenewalNoticeOverlay.SetActive(false);
         }
 
         // MARK: - 動的要素の更新 (Swift の @Published バインディング相当を OnShow で一括再描画)
