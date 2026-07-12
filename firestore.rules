@@ -20,7 +20,7 @@ service cloud.firestore {
         && request.resource.data.floor is int
         && request.resource.data.floor >= 1
         && request.resource.data.floor <= 100
-        && request.resource.data.characterType in ['hero', 'thief', 'wizard', 'elf'];
+        && request.resource.data.characterType in ['hero', 'thief', 'wizard', 'elf', 'knight'];
 
       allow update: if isAuthenticated()
         && isOwner(userId)
