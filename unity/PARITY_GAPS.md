@@ -23,7 +23,7 @@
 
 | # | 項目 | 状態 | 備考 |
 |---|---|---|---|
-| B-1 | **セーブ互換の移行コード** | 未実装 | 同名キー型不一致 5 件。詳細と出荷ゲートは `.claude/rules/save-compat-ledger.md`。**アップデート差し替えのリリースブロッカー** |
+| B-1 | **セーブ互換の移行コード** | **実装済み・実機検証待ち**（2026-07-15） | `SwiftSaveMigration.RunOnce()` が進行/課金直結の3キー（`purchasedProductIDs`=Keychain / `unlockedCharacters`=NSArray / `unlockedAchievements`=日本語blob）を一回限り変換。`localRankings`/`dailyChallengeHistory` は実害軽微のため意図的スキップ。**残る出荷ゲート: Swift 版でプレイした実機で Unity 版を起動するハッピーパス確認（人間ゲート）**。詳細は `.claude/rules/save-compat-ledger.md` |
 | B-2 | **ハプティクス実発火** | **未実装のまま Phase 4 完了申告と矛盾** | `PlayerState.HapticsEnabled` と SettingsScreen のトグル UI だけ存在し、振動 API 呼び出しゼロ（SettingsScreen.cs:196 に「Phase 4/juice 送り」コメント残存）。トグルが機能しない騙し UI 状態 |
 | B-3 | **抜かれ通知**（`eg_overtaken_notification_shown`） | 機能ごと未移植 | iOS Sprint2 F2 機能。移植するか捨てるか判断が必要（捨てるなら A 表へ移動） |
 | B-4 | VoiceOver / スクリーンリーダー | Unity ゼロ | iOS は GridCellView に盤面読み上げ実装あり。uGUI はネイティブ連携が薄くプラグイン等の検討が必要 |

@@ -78,6 +78,10 @@ namespace EscapeNine.Runtime
             DontDestroyOnLoad(gameObject);
 
             // --- サービス初期化 ---
+            // Swift 版セーブデータの一回限り移行 (B-1)。PlayerState.Load() が PlayerPrefs を
+            // 読み込む前に、Swift 形式 (NSUserDefaults NSArray/Data・Keychain) のデータを
+            // Unity 形式へ変換しておく必要があるため、PlayerState 生成より必ず前に呼ぶ。
+            SwiftSaveMigration.RunOnce();
             Player = new PlayerState();
             Ranking = new RankingStore();
             DailyChallenge = new DailyChallengeStore();
