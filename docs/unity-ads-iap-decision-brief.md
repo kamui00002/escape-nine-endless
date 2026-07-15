@@ -128,3 +128,20 @@
   `new StubIapService(Player)` を差し替え → (3) StoreKit Configuration + Sandbox で実機購入/復元検証。
   広告（GMA + Unity Ads アダプタ 4.16.500）は **IAP が固まってから別 manifest 変更**で（1変更に2つ混ぜると
   ビルドが壊れた時に原因が切り分けられないため）。
+
+- **2026-07-15 GMA 広告導入（GMA プラグイン単体・メディエーション後回し）**: ミラー `~/EscapeNineUnity/Packages/manifest.json` の
+  dependencies に `"com.google.ads.mobile": "11.2.0"` と `"com.google.external-dependency-manager": "1.2.187"` を追加、
+  scopedRegistries の openupm(`package.openupm.com`) の scopes に `"com.google"` を追加（GMA/EDM4U を openupm で解決）。
+  **CLI batchmode iOS ビルド green**（result=Succeeded / **CS error 0**）。EDM4U の iOS Resolver が **batchmode でも自動実行**され、
+  `Builds/ios/Podfile`（`pod 'Google-Mobile-Ads-SDK', '~> 13.4'` + `GoogleUserMessagingPlatform 3.1.0`）→ `pod install` →
+  `Unity-iPhone.xcworkspace`（Pods 統合）まで生成された。
+  - ★ **native GMA SDK は 13.4**（Unity plugin 11.2.0 が pull）。→ 将来 Unity Ads メディエーションアダプタを足す時は
+    **4.16.601+（GMA 13 対応版）が必要**。上の「4.16.500 固定」は GMA 12 時代の記述で**今は不適用**（GMA 13 に上がったため）。
+  - GMA 設定: `Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset` の `adMobIOSAppId` に App ID
+    `ca-app-pub-5237930968754753~9585848266`、`userTrackingUsageDescription` に Swift 正本と同一の ATT 文言を設定
+    （空だと GMA PListProcessor が `BuildMethodException: app ID is empty` で落ちる＝必須）。
+  - deploy スクリプト `unity/setup/ios-device-deploy.sh` を **workspace 自動検出**に修正（Podfile 生成後は `-project` だと
+    広告 SDK 未リンクのため `-workspace Unity-iPhone.xcworkspace` を使う。アドバイザー指摘）。
+  - ※ ミラー消失時は上記 dependencies 2行 + `com.google` スコープ + GoogleMobileAdsSettings.asset の2値を復元すれば戻る。
+  - **未了（本セッション継続）**: `AdMobService : IAdService` 実装（実機ビルド→テスト広告目視）→ App.cs 差し替え → deploy #2 →
+    バナー(ホーム下部)+インタースティシャル(GO→リトライ) がテスト広告で出るか実機確認。Unity Ads メディエーション(4.16.601+)は後続。

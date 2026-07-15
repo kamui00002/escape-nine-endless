@@ -100,9 +100,11 @@ namespace EscapeNine.Runtime
                 }
             });
 
-            // 広告 groundwork (Phase 3 前倒しの継ぎ目のみ): PlayerState 生成後に構築し、
+            // 広告 (GMA 11.2.0 実 SDK): PlayerState 生成後に構築し、
             // AdRemoved (StoreKit/IAP 購入導線が更新する既存フラグ) をそのまま参照させる。
-            Ads = new StubAdService(Player);
+            // 呼び出し順序 Initialize() → RequestTrackingAuthorization() は固定
+            // (init=denied → ATT 完了後に npa 切替。AdMobService クラスヘッダ参照)。
+            Ads = new AdMobService(Player);
             Ads.Initialize();
             // ATT はアプリ起動につき 1 回 (Awake は App シングルトン確立時にしか通らないため自然に once-only)。
             Ads.RequestTrackingAuthorization();

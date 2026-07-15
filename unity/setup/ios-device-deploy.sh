@@ -40,7 +40,15 @@ fi
 
 # 2) 実機ビルド (署名は自動プロビジョニング)
 cd "$IOSDIR" || { echo "result=FAIL stage=cd_iosdir" >> "$OUT"; exit 0; }
-xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release \
+# GMA/CocoaPods 導入後は EDM4U が Podfile → pod install → Unity-iPhone.xcworkspace を生成する。
+# workspace があればそちらでビルドしないと pods (Google-Mobile-Ads-SDK 等) がリンクされない
+# (-project 単体だと広告 SDK 未リンクのまま通ってしまう。アドバイザー指摘 2026-07-15)。
+if [ -d "$IOSDIR/Unity-iPhone.xcworkspace" ]; then
+  XCODE_CONTAINER=(-workspace Unity-iPhone.xcworkspace)
+else
+  XCODE_CONTAINER=(-project Unity-iPhone.xcodeproj)
+fi
+xcodebuild "${XCODE_CONTAINER[@]}" -scheme Unity-iPhone -configuration Release \
   -destination "id=$DEV" -derivedDataPath ./DerivedData -allowProvisioningUpdates build \
   > "$MIRROR/xcodebuild-device3.log" 2>&1
 if ! grep -q "BUILD SUCCEEDED" "$MIRROR/xcodebuild-device3.log"; then
