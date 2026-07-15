@@ -395,6 +395,9 @@ struct OnboardingTutorialView: View {
         AnalyticsLogger.logTutorialComplete(elapsedSeconds: elapsed)
         logger.info("Onboarding tutorial completed in \(elapsed, privacy: .public) seconds")
 
+        // GA4 コンバージョンは初回完了時のみ（再視聴では送らない）
+        ConversionService.shared.trackTutorialComplete()
+
         hasSeenTutorial = true
         hasSeenTutorialV1_1 = true
 

@@ -11,7 +11,7 @@
 |---|---|---|
 | `eg_app_init_ok` | Unity 未送信 | Firebase Analytics の無音故障検知 sentinel。Unity は Firebase 自体を持たない |
 | `app_open` | Unity 未送信 | Firebase 専用（GA4→Google Ads コンバージョン経路）。PostHog には元々流れていない |
-| `tutorial_complete`（無 prefix 版） | Unity 未送信 | iOS 側のファサード迂回イベント（B-7 参照、**現役で発火中**）。Unity は AnalyticsService.cs が「反面教師」と明記し意図的に非再現 — 非移植の判断自体は正しい |
+| `tutorial_complete`（無 prefix 版） | Unity 未送信 | iOS の GA4→Google Ads コンバージョン専用イベント（2026-07-15 に発火場所を初回オンボーディング完了時のみへ是正済み）。Unity は PostHog のみで対応不要 |
 | `aiLevel` の永続化 | Unity は PlayerPrefs 保存 | iOS は GameView の @State（画面間受け渡しのため。PlayerState.cs コメント明記） |
 | Reduce Motion | Unity はアプリ内トグル（既定 OFF） | iOS は OS 設定 `UIAccessibility.isReduceMotionEnabled` を自動検出。Unity 独自設定として文書化済み — ただし体験としては後退（B-4 も参照） |
 | ローグライク拡張（レリック/残光/分岐ルート/ボスパターン） | Unity のみ | Phase 5 の意図的な深化。Swift 正本に対応物なし |
@@ -29,7 +29,8 @@
 | B-4 | VoiceOver / スクリーンリーダー | Unity ゼロ | iOS は GridCellView に盤面読み上げ実装あり。uGUI はネイティブ連携が薄くプラグイン等の検討が必要 |
 | B-5 | Dynamic Type / フォントスケール | Unity ゼロ | iOS も本編は固定 pt（チュートリアルのみセマンティック）なので優先度低 |
 | B-6 | 色覚多様性配慮（斜線+アイコン） | Unity ゼロ | iOS も実質オンボーディング Step2 限定。両版とも本編の危険表示は色依存 — 対応するなら両版同時に |
-| B-7 | **iOS: `tutorial_complete` のファサード迂回**（/review-full 2026-07-15 検出） | 未対応 | 「死にコード」は誤認だった。`HomeView.swift:197` の「遊び方」ボタン → `TutorialOverlayView` 完了 → `ConversionService.trackTutorialComplete()` が **AnalyticsLogger を迂回して無 prefix イベントを現役送信**（analytics-instrumentation.md 原則2・5違反）。対応: 迂回呼び出しの削除 or `eg_` 正規経路化（iOS コード修正・別タスク） |
+
+※ B-7（iOS: `tutorial_complete` のファサード迂回）は 2026-07-15 解消: GA4 コンバージョン発火を v1.1 オンボーディング初回完了時（OnboardingTutorialView）へ移設し、「遊び方」再視聴経路からは削除。A 表の `tutorial_complete` 行も参照。
 
 ## 運用
 

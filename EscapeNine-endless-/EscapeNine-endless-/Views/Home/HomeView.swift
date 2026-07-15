@@ -76,9 +76,9 @@ struct HomeView: View {
         }
         .fullScreenCover(isPresented: $showTutorial) {
             TutorialOverlayView {
+                // GA4 コンバージョンは初回完了時のみ（再視聴では送らない、OnboardingTutorialView.complete() 参照）
                 hasSeenTutorial = true
                 showTutorial = false
-                ConversionService.shared.trackTutorialComplete()
             }
         }
         .fullScreenCover(isPresented: $showOnboardingTutorialV1_1) {
