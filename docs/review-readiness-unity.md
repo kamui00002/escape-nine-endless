@@ -94,6 +94,14 @@ Escape Nine を **Swift → Unity 版に差し替え**て `com.souatou.escapenin
 
 ---
 
+## 進捗 (2026-07-16 device 不要タスク)
+
+- ✅ **R1**: PrivacyInfo.xcprivacy 生成 PostProcessBuild 実装済 (`71bfd00`)。次のクリーン Unity ビルドで実地検証。
+- ✅ **R3**: **クリア確認 — 対応不要**。Unity は SIWA/ログインUI/実 Apple-auth API (ASAuthorization 等) がゼロ、生成 entitlements もクリーン (capability 未設定)。→ 5.1.1(v)「SIWA→アカウント削除」は **N/A**。※匿名UIDで世界ランキングを保存する点は 5.1.1(v) グレーだが「ユーザーによるアカウント作成」が無く低リスク。防御したい場合は設定に「ランキングデータ削除」導線 (Firestore rules の `allow delete` 変更 + OnlineRankingService に DELETE 追加) = **任意・オーナー判断**。
+- ✅ **R5**: サポートページ草案 `docs/support.html` 作成 (連絡先 `yoshidometoru@gmail.com`・FAQ・ポリシーリンク、ダークモード対応)。→ **GitHub Pages 等でホストして ASC の Support URL を `.../support.html` に設定**すれば 1.5 解消。
+- ✅ **R8**: 「10ターン」の各言語置換文言 (ja/en/ko/zh-TW) を `docs/appstore-metadata.md` §未処理タスクに用意。ASC で該当文を差し替えるだけ。
+- ⬜ **残 (オーナー主導)**: R2 (ASC App Privacy 追跡=はい確認) / R9 (BuildOptions.None) / **R10 (bundle 差し替え判断・不可逆)** / B-1 実機検証 (本番bundleビルド)。
+
 ## 関連
 - 過去リジェクト: [[2026-06-17 ITMS-91064]] / [[2026-06-09 第2R]] / [[2026-06-06 SIWA]] / [[2026-03-31 round2 ATT-IAP-buildnumber]] / [[2026-03-24 IAP-support-url]]
 - メタデータ: `docs/appstore-metadata.md` / 収益化: `docs/収益化設定ガイド.md`
