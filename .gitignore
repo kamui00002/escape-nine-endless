@@ -85,8 +85,10 @@ unity/EscapeNine/Assets/Scripts/Runtime/Analytics/AnalyticsSecrets.cs.meta
 unity/EscapeNine/Assets/Scripts/Runtime/Ranking/RankingSecrets.cs
 unity/EscapeNine/Assets/Scripts/Runtime/Ranking/RankingSecrets.cs.meta
 
-# Claude Code ローカル workspace
-.claude/
+# Claude Code — rules/hooks/skills/commands/settings.json は「規約凍結」のため追跡する (2026-07-15)。
+# 個人ローカル設定と一時領域のみ ignore
+.claude/settings.local.json
+.claude/worktrees/
 
 # バックアップファイル
 *.bak

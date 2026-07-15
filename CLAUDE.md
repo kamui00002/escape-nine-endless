@@ -117,3 +117,32 @@ let spacing = ResponsiveLayout.verticalSpacing(for: geometry)
 
 ## スコープ補足（iOS共通ルール）
 > 本 repo は共通 iOS ルール~/.claude/CLAUDE-ios.md を使わず、独自系統（MVVM + Combine /docs/DEVELOPMENT_SWIFT.md）で運用する。共通ルールの改善は必要時に手動で取り込む。
+
+---
+
+# Unity 版（unity/ 配下）⭐️
+
+iOS 版からの移植（ほぼ完了・稼働中）。**正本コードは `unity/EscapeNine/Assets/`（この repo）**、`~/EscapeNineUnity` は bootstrap.sh が生成したビルド/テスト実行用の実体（git 管理外）。
+
+> 本 repo は汎用 Unity ルール `~/.claude/CLAUDE-unity.md` を @include せず、下記の repo 固有 rules で運用する（iOS 節と同方式。汎用テンプレの改善は必要時に手動で取り込む）。
+
+## Rules（unity/ の .cs を触る前に必読）
+
+- @.claude/rules/unity-conventions.md ← レイヤリング（Core=純.NET）/ C#9 固定 / コード生成 UI / 命名 / ログ / 検証コマンド
+- @.claude/rules/swift-csharp-parity.md ← **正本は Swift・1:1 規約**とファイル対応表
+- @.claude/rules/save-compat-ledger.md ← PlayerPrefs キー台帳 + アップデート差し替えのリリースゲート
+- @.claude/rules/daily-seed-spec.md ← デイリーシード LCG の凍結仕様（変更原則却下）
+- @.claude/rules/analytics-parity.md ← eg_ イベント規約（9 イベント 1:1）
+
+意図的差分・未移植の台帳: `unity/PARITY_GAPS.md`（差分を作ったら必ず追記）
+
+## Skills
+
+- `/unity-test` — dotnet test (Core) → Unity CLI EditMode → XML 集計の turnkey 実行
+- `/parity-check` — Swift↔C# パリティ監査（定数 diff + イベント diff + 敵対的レビュー）
+- `/ui-overlap-audit` — OverlapAudit.cs による UI 重なり監査
+
+## Hooks（.claude/settings.json 登録済み）
+
+- `post_write_cs_check.py` — .cs 編集時の回帰チェック。**Core での UnityEngine.Random は exit 2 でブロック**、他は警告のみ
+- `check_analytics_parity.py` — イベント名の iOS↔Unity 突合（PARITY_GAPS.md が allowlist）

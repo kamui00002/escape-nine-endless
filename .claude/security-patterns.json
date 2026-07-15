@@ -1,0 +1,21 @@
+{
+  "patterns": [
+    {
+      "rule_name": "hardcoded_api_key",
+      "substrings": ["AIza", "sk-proj-", "sk-ant-", "GOCSPX-", "AKIA"],
+      "reminder": "APIキー直書きの疑い。ソースに鍵を書かず Keychain / secret 管理から読むこと。"
+    },
+    {
+      "rule_name": "pii_in_log_or_analytics",
+      "regex": "(logger\\.|print\\(|os_log|logEvent)[^\\n]*(email|password|displayName|phone|uid)",
+      "paths": ["**/*.swift"],
+      "reminder": "PII をログ/Analytics に出していないか確認。Swift ログは privacy:.private、Analytics は内部IDのみ。"
+    },
+    {
+      "rule_name": "consent_granted_check",
+      "regex": "setConsent",
+      "paths": ["**/*.swift"],
+      "reminder": "setConsent は ATT 回答前に .granted にしない（起動時 .denied → ATT 許可後に .granted）。"
+    }
+  ]
+}

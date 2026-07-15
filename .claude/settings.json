@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(./docs/**)",
+      "Write(README.md)",
+      "Write(./README.md)",
+      "Write(CHANGELOG.md)",
+      "Read(./DerivedData/**)",
+      "Read(./EscapeNine-endless-/DerivedData/**)",
+      "Read(./EscapeNine-endless-/build/**)",
+      "Read(./build/**)",
+      "Read(./venv/**)",
+      "Read(./screenshots/**)",
+      "Read(./suno-mcp/node_modules/**)",
+      "Read(./suno-mcp/dist/**)",
+      "Read(./suno-mcp/.next/**)",
+      "Read(**/*.xcuserstate)",
+      "Read(**/xcuserdata/**)",
+      "Read(./firebase-debug.log)",
+      "Read(**/.DS_Store)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_write_cs_check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/check_analytics_parity.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
