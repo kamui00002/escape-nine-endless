@@ -37,6 +37,11 @@ namespace EscapeNine.EditorTools
         private const string IosBundleId = "com.yoshidometoru.EscapeNine-endless-";
         private const string IosTeamId = "B7F79FDM78"; // 元 Swift アプリと同一 Apple Developer チーム
         private const string IosMinVersion = "15.0";
+        // App Store 提出バージョン: 配信中 1.5.7 (build 21) を「厳密に超える」こと (ASC の要件。超えないと upload 拒否)。
+        // トレイン運用 (memory version_train_scheme): 1.5.x トレイン。upload で altool 90186 (train closed) が
+        // 出たら MARKETING_VERSION を次番号へ上げて再アップロード (build 番号も +1)。
+        private const string IosMarketingVersion = "1.5.8";
+        private const string IosBuildNumber = "22";
 
         /// <summary>
         /// デスクトップ(スタンドアロン)専用の PlayerSettings。iOS/Android には影響しない。
@@ -131,11 +136,13 @@ namespace EscapeNine.EditorTools
                     scenes = new[] { ScenePath },
                     locationPathName = outputPath,
                     target = BuildTarget.iOS,
-                    // Development Build にすると DEVELOPMENT_BUILD が定義され、HomeScreen の
-                    // 「管理者用設定 (DEBUG)」パネル (開始階層/BPM/AI/ターンCD/全キャラ解放/カウントダウン省略) が
-                    // 実機でも表示される (#if UNITY_EDITOR || DEVELOPMENT_BUILD ゲート)。移行/テスト中はこれで運用。
-                    // ★ App Store 提出ビルドでは BuildOptions.None (Release) に戻すこと (デバッグ機能を出荷しない)。
-                    options = BuildOptions.Development,
+                    // ★ 2026-07-16 App Store 提出のため None (Release) に設定。DEVELOPMENT_BUILD が未定義になり、
+                    // HomeScreen の「管理者用設定 (DEBUG)」パネル (開始階層/BPM/AI/ターンCD/全キャラ解放/
+                    // カウントダウン省略) が出荷ビルドから消え、AdConfig も本番広告 ID を返す
+                    // (#if UNITY_EDITOR || DEVELOPMENT_BUILD ゲート)。
+                    // 実機デバッグ (デバッグパネル/テスト広告/console ログ) が要る時のみ一時的に
+                    // BuildOptions.Development へ戻す (提出前に必ず None に戻すこと)。
+                    options = BuildOptions.None,
                 };
 
                 BuildReport report = BuildPipeline.BuildPlayer(options);
@@ -199,6 +206,9 @@ namespace EscapeNine.EditorTools
             PlayerSettings.iOS.appleDeveloperTeamID = IosTeamId;
             PlayerSettings.iOS.appleEnableAutomaticSigning = true; // Xcode 自動署名
             PlayerSettings.iOS.targetOSVersionString = IosMinVersion;
+            // App Store 提出バージョン (配信中 1.5.7/build21 を超える)。更新配信として受理されるために必須。
+            PlayerSettings.bundleVersion = IosMarketingVersion;
+            PlayerSettings.iOS.buildNumber = IosBuildNumber;
             // 実機ビルドは常に Device SDK。BuildIOSSimulator が SimulatorSDK に切替え得るため、
             // 直後に実機ビルドしても取り残しでシミュレータ SDK のままにならないよう明示的に戻す。
             PlayerSettings.iOS.sdkVersion = iOSSdkVersion.DeviceSDK;
