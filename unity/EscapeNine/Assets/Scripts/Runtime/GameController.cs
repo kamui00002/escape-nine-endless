@@ -240,8 +240,25 @@ namespace EscapeNine.Runtime
             }
 #endif
 
+            // デイリーの CharacterLock 指定キャラは、所有していなくてもその日の挑戦では一時的に使える。
+            // (課金キャラ (魔法使い/エルフ/ナイト) 固定の日を無課金プレイヤーもクリア可能にするため。
+            //  デイリーシード=チャレンジ内容は不変・永続解放もしない=このランのみの一時付与。
+            //  旧配信 Swift 版は所有ゲートのままなので Unity の意図的改善、unity/PARITY_GAPS.md §A に記録)。
+            CharacterType runCharacter = c;
+            if (_dailyChallenge != null && _dailyChallenge.PendingChallenge != null)
+            {
+                foreach (var cond in _dailyChallenge.PendingChallenge.Conditions)
+                {
+                    if (cond.Kind == ChallengeConditionKind.CharacterLock)
+                    {
+                        runCharacter = cond.Character;
+                        break;
+                    }
+                }
+            }
+
             // ルール本体は GameSession に委譲 (配置・特殊ルール・消失マスまで全部)
-            Session = new GameSession(Character.GetCharacter(c), lvl);
+            Session = new GameSession(Character.GetCharacter(runCharacter), lvl);
 
             // デイリーチャレンジ: pending challenge があれば適用 (Swift: startGame 内の
             // `if let pending = DailyChallengeService.shared.pendingChallenge` 分岐)。

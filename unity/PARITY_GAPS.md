@@ -18,6 +18,7 @@
 | ナイトキャラ | 両方に実装あり | 要件定義書に未記載だが両実装一致（差分ではない、記録のみ） |
 | SFX 音量キー | Unity は `seVolume` のみ | Swift の `sfxVolume`/`seVolume` 二重経路負債を統一（unity-migration-plan.md） |
 | ATT/consent の非パーソナライズ化方式 | Unity は `npa=1`（AdRequest Extras）方式 | Swift は ATT 完了後に `MobileAds.shared.start()` を呼ぶ「ad load 遅延」方式。Unity は `App.cs` の呼び出し順序が `Initialize()`→`RequestTrackingAuthorization()` 固定のため、ATT 完了前は全 `AdRequest` に `npa=1` を付与し、ATT `Authorized` 完了時のみ personalized 許可へ切替（`AdMobService.cs` ヘッダ／`BuildAdRequest()`）。「init=denied → ATT 後切替」の原則自体は両実装で担保 |
+| デイリー CharacterLock の一時解放 | Unity はデイリー中だけ指定キャラを**所有不問**で使える | Swift(旧配信)は所有ゲートのままで、キャラ指定条件が課金キャラ(魔法使い/エルフ/ナイト)に当たる日(約5日中3日)を無課金だとクリア不能だった。Unity は `GameController.StartNewRun` で CharacterLock 条件のキャラに `runCharacter` を上書きして**そのランのみ一時付与**(永続解放なし)し公平化(2026-07-16 オーナー指摘で修正)。**デイリーシード(生成 `DailyChallengeGenerator`)は不変** = チャレンジ内容・過去シェア記録・iOS との seed 一致に影響なし。Swift 版は差し替え引退のため未修正 |
 
 ## B. 未移植・未実装（要対応。勝手に「完了」扱いしない）
 

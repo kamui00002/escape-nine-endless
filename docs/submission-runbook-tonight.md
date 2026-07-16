@@ -1,6 +1,6 @@
 # 提出実行ランブック（夜・実機セッション用）⭐️☀️
 
-> **目的**: Unity 版 Escape Nine を `com.souatou.escapenine` の**アップデート差し替え**として App Store 審査に出すまでを、**上から順に実行するだけ**にした turnkey 手順。過去リジェクト対策は `docs/review-readiness-unity.md`（R1〜R11）と対応。
+> **目的**: Unity 版 Escape Nine を `com.yoshidometoru.EscapeNine-endless-` の**アップデート差し替え**として App Store 審査に出すまでを、**上から順に実行するだけ**にした turnkey 手順。過去リジェクト対策は `docs/review-readiness-unity.md`（R1〜R11）と対応。
 > 作成 2026-07-16（Phase3③広告 実機達成 + 審査対策 R1/R3/R5/R8 完了後）。
 > 前提値: 実機 iPhone 17 Pro（devicectl UDID `87F3A267-5378-5F81-A2F5-2AA1DFE1A51A` / ハードUDID `00008150-001A11EA3441401C`）/ Team `B7F79FDM78` / ミラー `~/EscapeNineUnity`。
 
@@ -22,11 +22,11 @@
 // 変更前
 private const string IosBundleId = "com.yoshidometoru.escapenine.unity";
 // 変更後（本番＝Swift 版と同一 bundle。既存アプリのアップデートとして配信される）
-private const string IosBundleId = "com.souatou.escapenine";
+private const string IosBundleId = "com.yoshidometoru.EscapeNine-endless-";
 ```
 → repo で変更 → §0.4 の rsync でミラーへ反映。
 
-**署名の注意**: 自動署名（`appleEnableAutomaticSigning=true` / Team `B7F79FDM78`）。`com.souatou.escapenine` の App ID は Swift 版で登録済み。ただし **旧 Swift App ID に紐づく capability（Sign in with Apple / Game Center / Push 等）が Developer Portal で有効だと、entitlements 不一致で署名警告/失敗**の可能性。Unity ビルドは entitlements クリーン（R3 確認済）なので、xcodebuild `-allowProvisioningUpdates` が合わないときは **Portal 側で該当 App ID の不要 capability を外す** or **一致する provisioning profile を用意**（この場で対処）。
+**署名の注意**: 自動署名（`appleEnableAutomaticSigning=true` / Team `B7F79FDM78`）。`com.yoshidometoru.EscapeNine-endless-` の App ID は Swift 版で登録済み。ただし **旧 Swift App ID に紐づく capability（Sign in with Apple / Game Center / Push 等）が Developer Portal で有効だと、entitlements 不一致で署名警告/失敗**の可能性。Unity ビルドは entitlements クリーン（R3 確認済）なので、xcodebuild `-allowProvisioningUpdates` が合わないときは **Portal 側で該当 App ID の不要 capability を外す** or **一致する provisioning profile を用意**（この場で対処）。
 
 ---
 
@@ -41,7 +41,7 @@ private const string IosBundleId = "com.souatou.escapenine";
 **手順**:
 1. BuildOptions は **Development のまま**（console ログ・デバッグ確認のため。§3 でまだ None にしない）。
 2. `bash unity/setup/ios-device-deploy.sh`（workspace 自動・OOM 対策で必要なら xcodebuild を `-jobs 4`）。
-3. console 起動: `xcrun devicectl device process launch --console --terminate-existing --device 87F3A267-5378-5F81-A2F5-2AA1DFE1A51A com.souatou.escapenine > ~/console-mig.log 2>&1 &`
+3. console 起動: `xcrun devicectl device process launch --console --terminate-existing --device 87F3A267-5378-5F81-A2F5-2AA1DFE1A51A com.yoshidometoru.EscapeNine-endless- > ~/console-mig.log 2>&1 &`
 4. **目視確認（人間ゲート）**:
    - 起動ログに `[SwiftSaveMigration] ... を移行しました`（characters/purchasedProductIDs/achievements の件数）
    - **課金キャラ（購入済のもの）が解放されたまま**か

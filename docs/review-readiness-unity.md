@@ -1,6 +1,6 @@
 # Unity 版 提出前 審査レディネス（過去リジェクト履歴との照合）⭐️
 
-Escape Nine を **Swift → Unity 版に差し替え**て `com.souatou.escapenine` で再提出する前に、**過去に実際に落ちた指摘**を先回りで潰すためのチェックリスト。
+Escape Nine を **Swift → Unity 版に差し替え**て `com.yoshidometoru.EscapeNine-endless-` で再提出する前に、**過去に実際に落ちた指摘**を先回りで潰すためのチェックリスト。
 出典: Obsidian 学びログ（phc / Escape Nine の審査リジェクト実例）。各項目に **過去の該当リジェクト** と **Unity 版での状態 / 対策** を対応づけた。
 
 最終更新: 2026-07-16（Phase 3 収益化③広告 実機達成後、提出準備フェーズ）。
@@ -74,7 +74,7 @@ Escape Nine を **Swift → Unity 版に差し替え**て `com.souatou.escapenin
 - `BuildScripts.BuildIOS` の `BuildOptions.Development` を **`None`（Release）** に戻す。デバッグパネル（DangerZone・全キャラ解放等）を出荷しない。本番広告ID有効化（`#if UNITY_EDITOR || DEVELOPMENT_BUILD` が false になり本番IDへ）。**恒久ATT framework リンク（`7b325c2`）もこのクリーンビルドで初めて実地検証される**。
 
 ### R10. bundle 差し替え（★不可逆・オーナー決定）
-- `BuildScripts.cs` の `IosBundleId` を `com.yoshidometoru.escapenine.unity` → 本番 `com.souatou.escapenine`。紐づく provisioning/entitlements も本番App IDへ。**B-1 セーブ移行検証はこの本番bundleビルドでしかできない**（Keychain/NSUserDefaults は bundle 単位。移行コードは正しいと敵対レビュー済 = 課金ID完全一致・Keychain クエリ一致）。
+- `BuildScripts.cs` の `IosBundleId` を `com.yoshidometoru.escapenine.unity` → 本番 `com.yoshidometoru.EscapeNine-endless-`。紐づく provisioning/entitlements も本番App IDへ。**B-1 セーブ移行検証はこの本番bundleビルドでしかできない**（Keychain/NSUserDefaults は bundle 単位。移行コードは正しいと敵対レビュー済 = 課金ID完全一致・Keychain クエリ一致）。
 - **entitlements 確認**: Sign in with Apple / Game Center の要否。Unity 版は匿名認証・Game Center 未結線なら不要（R3 参照）。
 
 ### R11. SKAdNetwork

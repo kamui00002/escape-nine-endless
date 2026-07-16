@@ -30,8 +30,11 @@ namespace EscapeNine.EditorTools
         private const string ResultMarkerFileName = "build-mac-result.txt";
         private const string IosResultMarkerFileName = "build-ios-result.txt";
 
-        // iOS 実機テスト用の設定 (2026-07-05 オーナー実機テスト、Bundle ID はテスト用に配信中 Swift 版と分離)。
-        private const string IosBundleId = "com.yoshidometoru.escapenine.unity";
+        // Bundle ID = 配信中 Swift 版と同一 (2026-07-16 差し替え: Unity 版を既存アプリのアップデートとして配信し、
+        // レビュー/順位資産を維持 + 既存ユーザーのセーブ移行 B-1 を成立させるため)。本番 bundle は
+        // GoogleService-Info.plist / 全 build config / 配信中アプリ(1.5.7 build21) の3点一致で確認済。
+        // ※ docs の com.souatou.escapenine は古い仕様書(DEVELOPMENT_SWIFT.md)の誤記。旧テスト用分離 bundle: com.yoshidometoru.escapenine.unity。
+        private const string IosBundleId = "com.yoshidometoru.EscapeNine-endless-";
         private const string IosTeamId = "B7F79FDM78"; // 元 Swift アプリと同一 Apple Developer チーム
         private const string IosMinVersion = "15.0";
 
