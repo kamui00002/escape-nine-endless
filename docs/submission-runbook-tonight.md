@@ -70,6 +70,15 @@ private const string IosBundleId = "com.yoshidometoru.EscapeNine-endless-";
 - ※ Unity の Xcode プロジェクトは `make testflight`（Swift 版用）とは別系統。Unity 用の archive/export 手順を用意（Unity-iPhone.xcworkspace を Release で archive）。
 - **upload 成功 ≠ 検証通過**。submit 時にもう一段の自動検証（ITMS-91064 等）が走る。
 
+> **⚠️ 2026-07-17 に踏んだ罠: ERROR 91111「Missing app icon (1024 'Any Appearance')」で upload 失敗。**
+> Unity iOS Player Settings に App Store 1024 アイコンが未設定だと、生成 `AppIcon.appiconset` に
+> `ios-marketing`(1024) スロットが欠落し、**altool upload 自体が弾かれる**（submit 前・アップロード段階で失敗）。
+> 対策は恒久化済み: `Editor/AdsBuild/IconPostProcess.cs`（PostProcessBuild 102）が同梱の
+> `AppStoreIcon1024.png`（Swift 版と同一・アルファ無し）を appiconset へ注入し Contents.json に
+> ios-marketing エントリを追加する（コミット `45cd0b9`）。→ **次のクリーン Unity ビルドで自動適用**。
+> 検証: `unzip -p <ipa> Payload/*.app/... ` は不可なので、`Assets.car` を `assetutil --info` で見て
+> AppIcon に 1024 が入っているか、または archive 後に actool ログで確認。upload が 91111 を返さなければ OK。
+
 ---
 
 ## 5. ASC メタデータ整備（提出前・R2/R5/R6/R7/R8）
