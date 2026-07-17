@@ -158,7 +158,7 @@ Sprint 1 リリース: Game Over 画面を「発射台」へリニューアル!
 | 種別 | URL |
 |---|---|
 | プライバシーポリシー | https://kamui00002.github.io/escape-nine-endless/privacy-policy.html |
-| サポート | https://github.com/kamui00002/escape-nine-endless |
+| サポート | https://kamui00002.github.io/escape-nine-endless/support.html |
 | マーケティング (任意) | (未設定) |
 
 ---
