@@ -79,6 +79,18 @@ private const string IosBundleId = "com.yoshidometoru.EscapeNine-endless-";
 > 検証: `unzip -p <ipa> Payload/*.app/... ` は不可なので、`Assets.car` を `assetutil --info` で見て
 > AppIcon に 1024 が入っているか、または archive 後に actool ログで確認。upload が 91111 を返さなければ OK。
 
+> **✅ 2026-07-17 ASC API 実測**: build 22 = `state=VALID`（処理完了・提出可能）。App id `6760906738`。upload 段階の自動却下無し。
+
+---
+
+## 4.5 App Store バージョンレコードの新規作成（★番号に注意・2026-07-17 判明）
+
+**ASC API 実測**: 公開 App Store バージョンは **1.0.0〜1.2.4（最新 `1.2.4` 配信中）**。**1.5.x の公開版は存在しない**。編集中/提出前の版レコードも無い＝**新規作成が必要**。
+
+- **公開バージョン番号は `1.2.5`（1.2.x トレインの次）で新規作成**する。**`1.5.8` で作らない**（1.5.x は build の MARKETING_VERSION トレインで、公開番号とは別系統＝二重運用。`version_train_scheme` 参照。過去 1.2.0〜1.2.4 も同方式で公開実績あり＝binary が 1.5.x でも公開 1.2.x で審査通過している）。
+- ASC → App → 「+ バージョンまたはプラットフォーム」→ バージョン番号 `1.2.5` → 作成 → **build 22 を選択**して紐付け。
+- ※ もし ASC が「バージョン文字列とビルドの不一致」で警告/拒否したら（過去は通っているので想定薄だが）、その時は binary を 1.2.5 で再ビルドが必要 → 相談。
+
 ---
 
 ## 5. ASC メタデータ整備（提出前・R2/R5/R6/R7/R8）
