@@ -84,7 +84,8 @@ private const string IosBundleId = "com.yoshidometoru.EscapeNine-endless-";
 ## 5. ASC メタデータ整備（提出前・R2/R5/R6/R7/R8）
 
 - **R2 App Privacy**: 「Device ID / 広告データ → **トラッキングに使用=はい**」を確認（AdMob+ATT の実態と、§3 の PrivacyInfo と整合）。
-- **R5 Support URL**: `docs/support.html` を GitHub Pages 等でホスト → ASC の Support URL を `https://kamui00002.github.io/escape-nine-endless/support.html` に更新。
+- **R5 Support URL**: ✅ `docs/support.html` は main に追加済・GitHub Pages で**公開確認済** (`https://kamui00002.github.io/escape-nine-endless/support.html`, HTTP 200)。→ ASC の Support URL をこれに更新するだけ。
+- **Export Compliance (輸出コンプライアンス)**: build22 の Info.plist に `ITSAppUsesNonExemptEncryption` が無いため、TestFlight で **「Missing Compliance / 輸出コンプライアンス情報がありません」**が出る。→ **「暗号化を使用していますか?」に "いいえ (標準的な暗号化のみ = 適用除外)"** で回答 (通信は Firebase/PostHog/AdMob すべて標準 HTTPS)。これを答えないと build を審査提出に添付できない。※次ビルド以降は `ExportCompliancePostProcess.cs` が自動で false を付与するのでこの質問は出ない。
 - **R6**: App プレビュー動画に**端末フレーム付きの Seedance マーケ動画を使わない**（実機素録画のみ / 或いはプレビュー枠は未設定）。
 - **R7**: 促進 IAP 画像がアイコンと同一なら**外す**。
 - **R8**: 説明文の「10ターン / 10 turns / 10턴 / 10回合」を `docs/appstore-metadata.md §未処理` の置換文言に差し替え（ja/en/ko/zh-TW）。
@@ -123,6 +124,9 @@ private const string IosBundleId = "com.yoshidometoru.EscapeNine-endless-";
   - `[PrivacyManifestPostProcess]` 実行 → app レベル `PrivacyInfo.xcprivacy` 生成（`plutil -lint` OK / `NSPrivacyTracking=true` / `googleads.g.doubleclick.net`）を App ターゲットへ追加（pbxproj 参照8件）＝ITMS-91064 対策が効く。
   - CS エラー0・asmdef 参照（`UnityEditor.iOS.Extensions.Xcode.dll`）正常。→ **§3 の本番bundle Release でも同じ PostProcess が自動適用される（確証あり）**。
 - ✅ R1/R3/R5/R8 の審査対策コミット済（`71bfd00` / `0f1f8b5`）。
+- ✅ **2026-07-17 build22 (1.5.8) を ASC へ upload 成功**（Delivery UUID `ed0a37f2`）。バイナリ客観検証: bundle=`com.yoshidometoru.EscapeNine-endless-` / ver 1.5.8 / build 22 / PrivacyInfo(Tracking=true+`googleads.g.doubleclick.net`) / GADApplicationIdentifier(本番) / Assets.car に 1024 アイコン。
+- ✅ **build22 = Release ビルド確定（objective）**: `Builds/ios/Data/boot.config` に development フラグ（`player-connection-debug` 等）**無し** + 生成元 `build-release.log`(BuildScripts.BuildIOS 経由・`result=Succeeded`) の repo/ミラー両 BuildScripts.cs が `BuildOptions.None` → `DEVELOPMENT_BUILD` 未定義 = **DangerZone デバッグパネル非同梱・本番広告ユニットID**。※最終ダメ押しは TestFlight で実機起動して (a)デバッグパネルが出ない (b)本番広告が描画される を確認（§4 の #1/#4）。
+- ⬜ **screenshots 未更新（2.3.3 リスク）**: 現ストアのスクショは Swift 版。Unity 版は HD-2D で別物 → **提出前に**実機スクショ差し替え（R8 と同枠・オーナー作業）。
 
 ---
 
