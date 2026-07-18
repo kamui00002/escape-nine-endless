@@ -30,6 +30,7 @@
 | B-4 | VoiceOver / スクリーンリーダー | Unity ゼロ | iOS は GridCellView に盤面読み上げ実装あり。uGUI はネイティブ連携が薄くプラグイン等の検討が必要 |
 | B-5 | Dynamic Type / フォントスケール | Unity ゼロ | iOS も本編は固定 pt（チュートリアルのみセマンティック）なので優先度低 |
 | B-6 | 色覚多様性配慮（斜線+アイコン） | Unity ゼロ | iOS も実質オンボーディング Step2 限定。両版とも本編の危険表示は色依存 — 対応するなら両版同時に |
+| B-8 | **Game Center** | 未実装（意図的・将来やりたい） | Unity は世界ランキングを **Firebase Firestore REST** で実装、**Game Center は未使用**（`GameController.cs:1032`/`RankingStore.cs`/`RankingScreen.cs` は TODO コメントのみ）。Swift 版のリーダーボード `highestfloor` は Unity 未結線。**2026-07-19 App Store 提出は ASC で Game Center オフ**（build22 に game-center entitlement 無し・オーナー決定）。将来実装は entitlement 付与(PostProcess)+GameKit スコア送信の TODO 結線。詳細: memory `gamecenter-deferred` |
 
 ※ B-7（iOS: `tutorial_complete` のファサード迂回）は 2026-07-15 解消: GA4 コンバージョン発火を v1.1 オンボーディング初回完了時（OnboardingTutorialView）へ移設し、「遊び方」再視聴経路からは削除。A 表の `tutorial_complete` 行も参照。
 
