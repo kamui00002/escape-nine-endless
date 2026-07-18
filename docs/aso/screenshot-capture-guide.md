@@ -128,8 +128,16 @@ App Store が要求する主要サイズ:
 | ⑤ simple 指1本で十分 | ✅ | `w2-rt-a`（**階層1=非フォグで赤鬼くっきり**・マスク不要） |
 
 - ③ランキングは実機撮影が必要だった（現行ランキングは旧テストビルドに無い）。**iOS26 実機は CLI スクショ不可**（devicectl 非対応・idevicescreenshot も DDI 新方式で×）→ **端末でスクショ＋AirDrop** が唯一の手段。テストbundleでデプロイ（Swift版に触れない）。
+- **③ランキングの名前は全て匿名化**（`fix_ranking_names.py`）: 実ユーザー表示名をマーケに出すのは privacy 上 NG のため、見える範囲(#1〜#7)を自動生成風ハンドル（MintFalcon2091 等）へ置換。スコア/順位/「勇者」/「あなたの記録」は実データ不変。既定名「プレイヤー」は汎用なので残す。#8以降は合成でクロップ。
 - ⚠️ **実ゲームのバグ**: ランキング名にフォント未収録文字（絵文字/特殊字）が入ると □(tofu) で文字化けする（TMP fallback 無し）。スクショは修復済だが、本体は要別タスク（TMP dynamic font or 名前 sanitize）。
 - ⚠️ 敵はフォグ階層（21-40 / 61-100）だと網目化。**クリーンな敵は階層1-20 or 41-60**（勇者は自マス可視で常時クッキリ）。
+
+## iPad 版（2064×2752 / 13"）— ✅ 5枚完成（2026-07-19）
+
+アプリは**ユニバーサル（iPad 対応＝iPad アイコン有り）なので iPad スクショは必須**。`marketing/screenshot-gen/output-ipad/` に **iPhone 完成5枚をブランド背景の iPad キャンバス中央へ配置**（`gen_ipad.py`＝影＋暖色グロー＋金ヘアライン）。デザイン路線は iPhone と統一。旧 iPad スクショ（音ゲー路線）は差し替え対象。
+
+- Downloads にも配置: `~/Downloads/EscapeNine-appstore-5枚/`（iPhone）/ `~/Downloads/EscapeNine-appstore-iPad-5枚/`（iPad）
+- ⚠️ ASC の旧 iPad 6点（アプリプレビュー動画1＋旧スクショ5）は「音ゲー×戦略/ビートに合わせて逃げろ」の旧路線 → 新5枚に入れ替え。プレビュー動画が Seedance 枠付きなら 2.3.4 で NG（R6・実機素録画のみ）。
 
 ## 関連
 - ASO 戦略元: `docs/aso/sprint-1-improvements.md §3`
