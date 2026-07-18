@@ -115,20 +115,21 @@ App Store が要求する主要サイズ:
 - **2.3.4 / R6**: App **プレビュー動画**枠に Seedance 生成動画は**使わない**（実機素録画のみ）。Seedance は広告キャンペーン用。
 - 数字（7階/12階/2倍速 等）は演出値。実プレイと矛盾しない範囲で調整可。
 
-## 進捗（2026-07-17・端末なしで作成）
+## 進捗（2026-07-19・✅ 5/5 完成）
 
-`marketing/screenshot-gen/output/` に 1320×2868（6.9"）で **4/5 完成**（既存キャプチャ発掘で作成、`marketing/screenshot-gen/gen_screens.py` が生成）:
+`marketing/screenshot-gen/output/` に 1320×2868（6.9"）で **5枚すべて完成**（全て Unity 実機画面、`marketing/screenshot-gen/gen_screens.py` が生成）:
 
-| # | 状態 | 素材（`~/EscapeNineUnity/` 等） |
+| # | 状態 | 素材 |
 |---|---|---|
 | ① hook あなたは何階まで行ける？ | ✅ | `IMG_8865`（階層80ドラゴン。フォグ網目を隅の闇ラジアルgradで沈めた） |
 | ② retry もう一回？ | ✅ | `phase4-shot-result`（階層16 NEW RECORD・自己ベスト） |
+| ③ ranking 世界と競え | ✅ | 実機撮影（世界ランキング）。文字化け2名を `fix_ranking_names.py` で可読名に修復 |
 | ④ daily 毎日、新しい挑戦 | ✅ | `phase25-shot-daily`（実デイリー画面） |
 | ⑤ simple 指1本で十分 | ✅ | `w2-rt-a`（**階層1=非フォグで赤鬼くっきり**・マスク不要） |
-| ③ ranking 世界と競え | ⬜ **残** | ランキング画面のキャプチャが無い → **端末で1枚だけ撮る** |
 
-- **残タスクは③ランキング1枚のみ**。端末で「世界ランキング画面」を出して撮り、`public/screenshots/ja/leaderboard.png` に置いて再生成すれば5枚完成。
-- ⚠️ 敵はフォグ階層（21-40 / 61-100）だと網目化する。**クリーンな敵が要るなら階層1-20 か 41-60**（勇者は自マス可視で常時クッキリ）。
+- ③ランキングは実機撮影が必要だった（現行ランキングは旧テストビルドに無い）。**iOS26 実機は CLI スクショ不可**（devicectl 非対応・idevicescreenshot も DDI 新方式で×）→ **端末でスクショ＋AirDrop** が唯一の手段。テストbundleでデプロイ（Swift版に触れない）。
+- ⚠️ **実ゲームのバグ**: ランキング名にフォント未収録文字（絵文字/特殊字）が入ると □(tofu) で文字化けする（TMP fallback 無し）。スクショは修復済だが、本体は要別タスク（TMP dynamic font or 名前 sanitize）。
+- ⚠️ 敵はフォグ階層（21-40 / 61-100）だと網目化。**クリーンな敵は階層1-20 or 41-60**（勇者は自マス可視で常時クッキリ）。
 
 ## 関連
 - ASO 戦略元: `docs/aso/sprint-1-improvements.md §3`
